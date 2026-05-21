@@ -83,7 +83,7 @@ function hasAccess(minLevel) { return (ROLES[currentUser?.role]||0) >= minLevel;
 function renderLogin() {
   document.getElementById('app').innerHTML = `
   <div class="login-page"><div class="login-box">
-    <h2>🏢 IJEF Corp</h2><p class="subtitle">HRD & Legal System v5.0</p>
+    <h2>[OFFICE] IJEF Corp</h2><p class="subtitle">HRD & Legal System v5.0</p>
     <div class="form-group"><label>Username</label><input type="text" class="form-control" id="loginUser" placeholder="Username" onkeydown="if(event.key==='Enter')document.getElementById('loginPass').focus()"></div>
     <div class="form-group"><label>Password</label><input type="password" class="form-control" id="loginPass" placeholder="Password" onkeydown="if(event.key==='Enter')handleLogin()"></div>
     <button class="btn btn-primary" style="width:100%;padding:12px;font-size:.9rem;margin-top:8px" onclick="handleLogin()">Masuk</button>
@@ -103,14 +103,14 @@ function renderApp() {
   const isKaryawan = currentUser.role === 'karyawan';
   document.getElementById('app').innerHTML = `
   <div class="sidebar" id="sidebar">
-    <div class="logo">🏢 <span>IJEF Corp HRD</span></div>
+    <div class="logo">[OFFICE] <span>IJEF Corp HRD</span></div>
     <nav>${buildNavItems(isKaryawan)}</nav>
     <div style="padding:16px 20px;border-top:1px solid rgba(255,255,255,.1)"><div style="font-size:.75rem;color:rgba(255,255,255,.5)">v5.0 — ${currentUser.nama}</div></div>
   </div>
   <div class="header">
-    <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+    <button class="menu-btn" onclick="toggleSidebar()">=</button>
     <div class="title">HRD & Legal IJEF Corp</div>
-    <div class="notif-badge" onclick="navigateTo('notifikasi')" title="Notifikasi">🔔<span class="count" id="notifCount" style="display:none">0</span></div>
+    <div class="notif-badge" onclick="navigateTo('notifikasi')" title="Notifikasi">[BELL]<span class="count" id="notifCount" style="display:none">0</span></div>
     <div class="user-info">
       <div class="avatar">${currentUser.nama.charAt(0)}</div>
       <span>${currentUser.nama}</span>
@@ -124,20 +124,20 @@ function renderApp() {
 
 function buildNavItems(isKaryawan) {
   if (isKaryawan) {
-    return navGroup('Portal Saya',[['portal','🏠','Beranda'],['portal-absensi','📍','Absensi'],['portal-cuti','🏖️','Cuti & Izin'],['portal-gaji','💰','Slip Gaji'],['portal-jobdesk','📋','Jobdesk'],['portal-peraturan','📜','Peraturan'],['inbox','📬','Inbox Meeting'],['chat','💬','Obrolan']]);
+    return navGroup('Portal Saya',[['portal','[HOME]','Beranda'],['portal-absensi','[PIN]','Absensi'],['portal-cuti','[LEAVE]','Cuti & Izin'],['portal-gaji','[MONEY]','Slip Gaji'],['portal-jobdesk','[LIST]','Jobdesk'],['portal-peraturan','[SCROLL]','Peraturan'],['inbox','[INBOX]','Inbox Meeting'],['chat','[CHAT]','Obrolan']]);
   }
   let nav='';
-  nav+=navGroup('Utama',[['dashboard','📊','Dashboard'],['approval-center','✅','Approval Center'],['notifikasi','🔔','Notifikasi'],['pengumuman','📢','Pengumuman']]);
-  nav+=navGroup('Perusahaan',[['departemen','🏛️','Departemen'],['posisi','💼','Posisi'],['cabang','🏢','Cabang']]);
-  nav+=navGroup('Karyawan',[['karyawan','👥','Data Karyawan'],['struktur-org','🌳','Struktur Org'],['jobdesk-mgmt','📋','Kelola Jobdesk'],['onboarding','🚀','Onboarding'],['offboarding','📦','Offboarding']]);
-  nav+=navGroup('Rekrutmen',[['lowongan','📝','Lowongan'],['pipeline','🔄','Pipeline Kanban'],['kandidat','🧑‍💼','Kandidat']]);
-  nav+=navGroup('Kehadiran',[['absensi','📍','Absensi IJEF'],['cuti','🏖️','Cuti/Izin/WFH'],['overtime','⏰','Overtime'],['hari-libur','📅','Hari Libur'],['penalty','⚠️','Penalty Point']]);
-  nav+=navGroup('Keuangan',[['penggajian','💰','Penggajian'],['reimbursement','🧾','Reimbursement'],['kasbon','💳','Kasbon & Loan'],['tunjangan','🎁','Tunjangan']]);
-  nav+=navGroup('Kinerja',[['kpi','📈','KPI & Penilaian'],['pelatihan','🎓','Pelatihan']]);
-  nav+=navGroup('Legal & Aset',[['kontrak','📄','Kontrak'],['asset','🖥️','Asset'],['peraturan','📜','Peraturan'],['surat','✉️','Generator Surat']]);
-  nav+=navGroup('Komunikasi',[['meeting','📅','Meeting & Invite'],['chat','💬','Obrolan Divisi'],['broadcast','📡','Broadcast'],['inbox','📬','Inbox Saya']]);
-  nav+=navGroup('Portal',[['portal-share','🔗','Download Aplikasi']]);
-  nav+=navGroup('Pengaturan',[['akun','👤','Manajemen Akun'],['approval-mgmt','⚙️','Approval Mgmt'],['qr-share','📱','QR & PWA']]);
+  nav+=navGroup('Utama',[['dashboard','[CHART]','Dashboard'],['approval-center','[OK]','Approval Center'],['notifikasi','[BELL]','Notifikasi'],['pengumuman','[ANNOUNCE]','Pengumuman']]);
+  nav+=navGroup('Perusahaan',[['departemen','[DEPT]','Departemen'],['posisi','[JOB]','Posisi'],['cabang','[OFFICE]','Cabang']]);
+  nav+=navGroup('Karyawan',[['karyawan','[USERS]','Data Karyawan'],['struktur-org','[TREE]','Struktur Org'],['jobdesk-mgmt','[LIST]','Kelola Jobdesk'],['onboarding','[START]','Onboarding'],['offboarding','[BOX]','Offboarding']]);
+  nav+=navGroup('Rekrutmen',[['lowongan','[NOTE]','Lowongan'],['pipeline','[SYNC]','Pipeline Kanban'],['kandidat','🧑‍[JOB]','Kandidat']]);
+  nav+=navGroup('Kehadiran',[['absensi','[PIN]','Absensi IJEF'],['cuti','[LEAVE]','Cuti/Izin/WFH'],['overtime','[CLOCK]','Overtime'],['hari-libur','[CAL]','Hari Libur'],['penalty','[WARN]','Penalty Point']]);
+  nav+=navGroup('Keuangan',[['penggajian','[MONEY]','Penggajian'],['reimbursement','[RECEIPT]','Reimbursement'],['kasbon','[CARD]','Kasbon & Loan'],['tunjangan','[GIFT]','Tunjangan']]);
+  nav+=navGroup('Kinerja',[['kpi','[UP]','KPI & Penilaian'],['pelatihan','[GRAD]','Pelatihan']]);
+  nav+=navGroup('Legal & Aset',[['kontrak','[DOC]','Kontrak'],['asset','[PC]','Asset'],['peraturan','[SCROLL]','Peraturan'],['surat','[MAIL]','Generator Surat']]);
+  nav+=navGroup('Komunikasi',[['meeting','[CAL]','Meeting & Invite'],['chat','[CHAT]','Obrolan Divisi'],['broadcast','[BROADCAST]','Broadcast'],['inbox','[INBOX]','Inbox Saya']]);
+  nav+=navGroup('Portal',[['portal-share','[LINK]','Download Aplikasi']]);
+  nav+=navGroup('Pengaturan',[['akun','[USER]','Manajemen Akun'],['approval-mgmt','[SETTING]','Approval Mgmt'],['qr-share','[PHONE]','QR & PWA']]);
   return nav;
 }
 
@@ -243,7 +243,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
 window.addEventListener('appinstalled', () => {
   deferredInstallPrompt = null;
-  toast('✅ Aplikasi berhasil diinstall!', 'success');
+  toast('[OK] Aplikasi berhasil diinstall!', 'success');
   const btn = document.getElementById('btnInstallPWA');
   if (btn) btn.style.display = 'none';
 });
@@ -252,7 +252,7 @@ function triggerInstallPWA() {
   if (deferredInstallPrompt) {
     deferredInstallPrompt.prompt();
     deferredInstallPrompt.userChoice.then(result => {
-      if (result.outcome === 'accepted') toast('✅ Aplikasi diinstall!', 'success');
+      if (result.outcome === 'accepted') toast('[OK] Aplikasi diinstall!', 'success');
       deferredInstallPrompt = null;
     });
   } else {
@@ -260,11 +260,11 @@ function triggerInstallPWA() {
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     const isAndroid = /Android/.test(navigator.userAgent);
     if (isIOS) {
-      toast('iOS: Tap Share (⬆️) → "Add to Home Screen"', 'info');
+      toast('iOS: Tap Share ([UP]) → "Add to Home Screen"', 'info');
     } else if (isAndroid) {
       toast('Android: Tap Menu (⋮) → "Add to Home Screen"', 'info');
     } else {
-      toast('Klik ikon install (⊕) di address bar browser Anda', 'info');
+      toast('Klik ikon install ([+]) di address bar browser Anda', 'info');
     }
   }
 }
