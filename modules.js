@@ -1994,7 +1994,7 @@ function renderDiscTestPage(){
       • <strong>Sinkron KPI:</strong> Hasil DISC bisa disinkronkan ke data KPI karyawan</p>
     </div>
   </div>
-  <div class="card"><div class="card-header"><div class="card-title">📋 Riwayat Hasil Tes</div><button class="btn btn-success btn-sm" onclick="syncAllDiscToKPI()">🔄 Sinkron Semua ke KPI</button></div>
+  <div class="card"><div class="card-header"><div class="card-title">📋 Riwayat Hasil Tes</div><div class="flex gap-8"><button class="btn btn-success btn-sm" onclick="syncAllDiscToKPI()">🔄 Sinkron Semua ke KPI</button><button class="btn btn-danger btn-sm" onclick="hapusSemuaDiscResults()">🗑️ Hapus Semua Riwayat</button></div></div>
     <div class="flex gap-8 mb-16"><input class="form-control" placeholder="Cari nama..." id="dSrc" oninput="fltDisc()" style="max-width:250px"><select class="form-control" id="dFlt" onchange="fltDisc()" style="max-width:180px"><option value="">Semua</option><option value="calon">Calon</option><option value="evaluasi">Evaluasi</option></select></div>
     <div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Nama</th><th>Mode</th><th>Posisi</th><th>Tipe</th><th>Profil</th><th>Aksi</th></tr></thead><tbody id="dTbl"><tr><td colspan="7" class="text-center">Memuat...</td></tr></tbody></table></div>
   </div>`;
@@ -2104,6 +2104,17 @@ async function deleteDiscResult(id){
   if(!confirm('Yakin hapus hasil tes DISC ini?'))return;
   await db.collection('hrd_disc_results').doc(id).delete();
   toast('Hasil tes dihapus','success');loadDiscHist();
+}
+
+async function hapusSemuaDiscResults(){
+  if(!confirm('⚠️ HAPUS SEMUA riwayat hasil tes DISC? Tindakan ini tidak bisa dibatalkan!'))return;
+  if(!confirm('Konfirmasi sekali lagi: Yakin hapus SEMUA data DISC?'))return;
+  const snap=await db.collection('hrd_disc_results').get();
+  const batch=db.batch();
+  snap.forEach(doc=>batch.delete(doc.ref));
+  await batch.commit();
+  toast(`${snap.size} hasil tes DISC dihapus`,'success');
+  loadDiscHist();
 }
 
 async function syncDiscToKPI(id){
