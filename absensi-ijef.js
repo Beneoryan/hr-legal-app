@@ -43,7 +43,8 @@ async function renderAbsenSetting(container) {
   document.getElementById('settingContent').innerHTML = `
     <div class="tabs mb-16">
       <div class="tab active" onclick="showSettingSection('lokasi')">📍 Lokasi & Radius</div>
-      <div class="tab" onclick="showSettingSection('shift')">🕐 Shift & Jam</div>
+      <div class="tab" onclick="showSettingSection('jamkerja')">⏰ Jam Kerja</div>
+      <div class="tab" onclick="showSettingSection('log')">📋 Log Lokasi</div>
     </div>
     <div id="settingSection"></div>`;
   showSettingSection('lokasi');
@@ -51,7 +52,11 @@ async function renderAbsenSetting(container) {
 
 async function showSettingSection(section) {
   document.querySelectorAll('.tabs .tab').forEach(t=>t.classList.remove('active'));
-  document.querySelectorAll('.tabs .tab').forEach(t=>{if(t.textContent.toLowerCase().includes(section==='lokasi'?'lokasi':'shift'))t.classList.add('active');});
+  document.querySelectorAll('.tabs .tab').forEach(t=>{
+    if(section==='lokasi'&&t.textContent.includes('Lokasi & Radius'))t.classList.add('active');
+    else if(section==='jamkerja'&&t.textContent.includes('Jam Kerja'))t.classList.add('active');
+    else if(section==='log'&&t.textContent.includes('Log Lokasi'))t.classList.add('active');
+  });
   const el = document.getElementById('settingSection');
   const doc = await db.collection('hrd_settings').doc('absensi').get();
   const s = doc.exists ? doc.data() : {};
@@ -71,35 +76,64 @@ async function showSettingSection(section) {
         <div class="mt-16" style="padding:12px;background:#f8f9ff;border-radius:8px">
           <div class="text-sm fw-700 mb-8">💡 Tips:</div>
           <ul class="text-xs" style="padding-left:16px;line-height:1.8;color:#666">
-            <li>Gunakan Google Maps untuk mendapatkan koordinat (klik kanan → "What's here?")</li>
+            <li>Gunakan Google Maps untuk mendapatkan koordinat (klik kanan > "What's here?")</li>
             <li>Radius 10-50m cocok untuk kantor kecil, 100-200m untuk area pabrik/kampus</li>
             <li>Jika ada beberapa cabang, tambahkan semua lokasi</li>
           </ul>
         </div>
       </div>`;
-  } else {
-    const shifts = s.shifts || [
-      { nama: 'Reguler', jamMasuk: '08:00', jamPulang: '17:00', toleransi: 10 }
-    ];
-    let shiftHtml = '';
-    shifts.forEach((sh,i) => {
-      shiftHtml += `<tr><td class="fw-700">${escHtml(sh.nama)}</td><td>${sh.jamMasuk}</td><td>${sh.jamPulang}</td><td>${sh.toleransi} menit</td><td><button class="btn btn-xs btn-info" onclick="modalEditShift(${i})">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusShift(${i})">🗑️</button></td></tr>`;
-    });
-
+  } else if (section === 'jamkerja') {
+    const flex = s.flexTime || { enabled: true, durasiKerja: 8, durasiIstirahat: 1, jamMasukMin: '06:00', jamMasukMax: '12:00' };
     el.innerHTML = `
       <div class="card">
-        <div class="card-header"><div class="card-title">🕐 Shift & Jam Operasional</div><button class="btn btn-primary btn-sm" onclick="modalTambahShift()">+ Tambah Shift</button></div>
-        <p class="text-sm mb-16" style="color:#666">Atur shift kerja dan jam operasional. Toleransi keterlambatan dihitung dari jam masuk + toleransi.</p>
-        <div class="table-wrap"><table><thead><tr><th>Nama Shift</th><th>Jam Masuk</th><th>Jam Pulang</th><th>Toleransi</th><th>Aksi</th></tr></thead><tbody id="tblShift">${shiftHtml}</tbody></table></div>
-        <div class="mt-16 card" style="background:#fff8e1;border-left:4px solid var(--warning)">
-          <div class="text-sm fw-700 mb-8">📋 Keterangan:</div>
+        <div class="card-header"><div class="card-title">⏰ Jam Kerja Fleksibel</div></div>
+        <p class="text-sm mb-16" style="color:#666">IJEF Corp menggunakan jam kerja fleksibel. Karyawan bisa clock in kapan saja, clock out setelah memenuhi durasi kerja + istirahat.</p>
+        <div class="form-group">
+          <label>Jam Kerja Fleksibel</label>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:4px">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="flexEnabled" ${flex.enabled?'checked':''}> <span class="text-sm fw-700">${flex.enabled?'Aktif':'Nonaktif'}</span></label>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="form-group"><label>Durasi Kerja per Hari (jam)</label><input class="form-control" type="number" id="flexDurasiKerja" value="${flex.durasiKerja}" min="1" max="12"></div>
+          <div class="form-group"><label>Durasi Istirahat (jam)</label><input class="form-control" type="number" id="flexDurasiIstirahat" value="${flex.durasiIstirahat}" min="0" max="3" step="0.5"></div>
+        </div>
+        <div class="grid-2">
+          <div class="form-group"><label>Jam Masuk Paling Awal</label><input class="form-control" type="time" id="flexJamMin" value="${flex.jamMasukMin||'06:00'}"></div>
+          <div class="form-group"><label>Jam Masuk Paling Akhir</label><input class="form-control" type="time" id="flexJamMax" value="${flex.jamMasukMax||'12:00'}"></div>
+        </div>
+        <button class="btn btn-primary" onclick="simpanFlexTime()">💾 Simpan Pengaturan</button>
+        <div class="mt-16 card" style="background:#e8f5e9;border-left:4px solid var(--success)">
+          <div class="text-sm fw-700 mb-8">📋 Cara Kerja:</div>
           <ul class="text-xs" style="padding-left:16px;line-height:1.8">
-            <li><b>Toleransi:</b> Waktu tambahan setelah jam masuk sebelum dianggap terlambat</li>
-            <li><b>Contoh:</b> Jam masuk 08:00, toleransi 10 menit → terlambat jika clock in setelah 08:10</li>
-            <li>Shift berlaku untuk semua karyawan. Untuk shift khusus per departemen, buat shift terpisah.</li>
+            <li>Karyawan clock in kapan saja (dalam rentang jam masuk yang diizinkan)</li>
+            <li>Total jam di kantor = durasi kerja + durasi istirahat</li>
+            <li>Contoh: Clock in 09:00, durasi 8+1=9 jam, expected clock out 18:00</li>
+            <li>Contoh: Clock in 10:30, expected clock out 19:30</li>
+            <li>Jika clock out sebelum waktunya, sistem akan menampilkan peringatan</li>
+            <li>Status: <b>lengkap</b> jika memenuhi durasi, <b>kurang_jam</b> jika pulang lebih awal</li>
           </ul>
         </div>
       </div>`;
+  } else if (section === 'log') {
+    el.innerHTML = '<div class="card"><div class="card-title mb-16">📋 Log Lokasi Absensi</div><div id="logLokasiContent">Loading...</div></div>';
+    const snap = await db.collection('hrd_absensi').orderBy('createdAt','desc').limit(50).get();
+    let logHtml = '';
+    if (snap.empty) {
+      logHtml = '<p class="text-sm" style="color:#999">Belum ada data absensi.</p>';
+    } else {
+      logHtml = '<div class="table-wrap"><table><thead><tr><th>Nama</th><th>Tanggal</th><th>Waktu</th><th>Tipe</th><th>Lokasi GPS</th><th>Kantor</th><th>Jarak</th></tr></thead><tbody>';
+      snap.forEach(d => {
+        const p = d.data();
+        const tipeLabel = p.tipe==='masuk'?'Clock In':p.tipe==='pulang'?'Clock Out':p.tipe==='dinas_luar'?'Dinas Luar':p.tipe;
+        const gps = (p.lat && p.lng) ? `${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}` : '-';
+        const office = p.officeLocation || '-';
+        const distance = p.officeDistance ? `${p.officeDistance.toFixed(1)}m` : '-';
+        logHtml += `<tr><td class="fw-700">${escHtml(p.nama||'-')}</td><td>${p.tanggal||'-'}</td><td>${p.waktu||'-'}</td><td><span class="badge badge-${p.tipe==='masuk'?'success':p.tipe==='pulang'?'info':'warning'}">${tipeLabel}</span></td><td class="text-xs">${gps}</td><td class="text-xs">${escHtml(office)}</td><td class="text-xs">${distance}</td></tr>`;
+      });
+      logHtml += '</tbody></table></div>';
+    }
+    document.getElementById('logLokasiContent').innerHTML = logHtml;
   }
 }
 
@@ -146,6 +180,18 @@ async function hapusLokasiAbsen(idx) {
   s.lokasi.splice(idx, 1);
   await db.collection('hrd_settings').doc('absensi').set(s);
   toast('Dihapus', 'success'); showSettingSection('lokasi');
+}
+
+async function simpanFlexTime() {
+  const enabled = document.getElementById('flexEnabled').checked;
+  const durasiKerja = parseFloat(document.getElementById('flexDurasiKerja').value) || 8;
+  const durasiIstirahat = parseFloat(document.getElementById('flexDurasiIstirahat').value) || 1;
+  const jamMasukMin = document.getElementById('flexJamMin').value || '06:00';
+  const jamMasukMax = document.getElementById('flexJamMax').value || '12:00';
+  const flexTime = { enabled, durasiKerja, durasiIstirahat, jamMasukMin, jamMasukMax };
+  await db.collection('hrd_settings').doc('absensi').set({ flexTime }, { merge: true });
+  toast('Pengaturan jam kerja fleksibel disimpan', 'success');
+  showSettingSection('jamkerja');
 }
 
 function modalTambahShift() { showShiftForm(-1, {}); }
@@ -213,9 +259,17 @@ function renderClockInOut(container) {
 async function loadShiftInfo() {
   const doc = await db.collection('hrd_settings').doc('absensi').get();
   const s = doc.exists ? doc.data() : {};
-  const shifts = s.shifts || [{nama:'Reguler',jamMasuk:'08:00',jamPulang:'17:00',toleransi:10}];
+  const flex = s.flexTime || { enabled: true, durasiKerja: 8, durasiIstirahat: 1, jamMasukMin: '06:00', jamMasukMax: '12:00' };
   const el = document.getElementById('shiftInfo');
-  if (el) {
+  if (!el) return;
+
+  if (flex.enabled) {
+    const totalJam = flex.durasiKerja + flex.durasiIstirahat;
+    el.innerHTML = `<div class="text-xs" style="background:#e8f5e9;padding:8px 12px;border-radius:6px"><b>⏰ Jam Kerja Fleksibel:</b><br>
+      ${flex.durasiKerja} jam kerja + ${flex.durasiIstirahat} jam istirahat = ${totalJam} jam total.<br>
+      Clock in kapan saja (${flex.jamMasukMin} - ${flex.jamMasukMax}), clock out setelah ${totalJam} jam.</div>`;
+  } else {
+    const shifts = s.shifts || [{nama:'Reguler',jamMasuk:'08:00',jamPulang:'17:00',toleransi:10}];
     let html = '<div class="text-xs" style="background:#f0f4ff;padding:8px 12px;border-radius:6px"><b>Shift Aktif:</b><br>';
     shifts.forEach(sh => { html += `• ${sh.nama}: ${sh.jamMasuk} - ${sh.jamPulang} (toleransi ${sh.toleransi} mnt)<br>`; });
     html += '</div>';
@@ -305,14 +359,38 @@ async function doClockIn() {
   const existing=await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).where('tipe','==','masuk').get();
   if(!existing.empty)return toast('Sudah clock in hari ini','warning');
   const now=new Date();
-  const shift = await getActiveShift();
-  const [h,m] = shift.jamMasuk.split(':').map(Number);
-  const batasWaktu = h*60 + m + (shift.toleransi||10);
-  const waktuSekarang = now.getHours()*60 + now.getMinutes();
-  const status = waktuSekarang > batasWaktu ? 'terlambat' : 'tepat_waktu';
 
-  await db.collection('hrd_absensi').add({userId:currentUser.id,nama:currentUser.nama,departemen:currentUser.departemen||'',tanggal:todayStr(),waktu:now.toTimeString().slice(0,5),tipe:'masuk',foto:capturedPhoto,lat:currentGPS.lat,lng:currentGPS.lng,accuracy:currentGPS.accuracy,shift:shift.nama,status,officeLocation:locationStatus.nearest.nama,officeDistance:locationStatus.dist,officeRadius:locationStatus.radius,createdAt:now.toISOString()});
-  toast(`✅ Clock In: ${now.toTimeString().slice(0,5)} (${status==='terlambat'?'⚠️ Terlambat':'Tepat Waktu'})`,'success');
+  // Check flex time settings
+  const settDoc = await db.collection('hrd_settings').doc('absensi').get();
+  const sett = settDoc.exists ? settDoc.data() : {};
+  const flex = sett.flexTime || { enabled: true, durasiKerja: 8, durasiIstirahat: 1, jamMasukMin: '06:00', jamMasukMax: '12:00' };
+
+  let status = 'tepat_waktu';
+
+  if (flex.enabled) {
+    // Flex mode: check if within allowed clock-in window
+    const waktuSekarang = now.getHours()*60 + now.getMinutes();
+    if (flex.jamMasukMin) {
+      const [hMin,mMin] = flex.jamMasukMin.split(':').map(Number);
+      if (waktuSekarang < hMin*60 + mMin) return toast(`Belum boleh clock in. Jam masuk paling awal: ${flex.jamMasukMin}`, 'warning');
+    }
+    if (flex.jamMasukMax) {
+      const [hMax,mMax] = flex.jamMasukMax.split(':').map(Number);
+      if (waktuSekarang > hMax*60 + mMax) return toast(`Sudah melewati batas clock in. Jam masuk paling akhir: ${flex.jamMasukMax}`, 'warning');
+    }
+    status = 'tepat_waktu'; // No lateness check in flex mode
+  } else {
+    // Fixed shift mode: check lateness
+    const shift = await getActiveShift();
+    const [h,m] = shift.jamMasuk.split(':').map(Number);
+    const batasWaktu = h*60 + m + (shift.toleransi||10);
+    const waktuSekarang = now.getHours()*60 + now.getMinutes();
+    status = waktuSekarang > batasWaktu ? 'terlambat' : 'tepat_waktu';
+  }
+
+  const shift = await getActiveShift();
+  await db.collection('hrd_absensi').add({userId:currentUser.id,nama:currentUser.nama,departemen:currentUser.departemen||'',tanggal:todayStr(),waktu:now.toTimeString().slice(0,5),tipe:'masuk',foto:capturedPhoto,lat:currentGPS.lat,lng:currentGPS.lng,accuracy:currentGPS.accuracy,shift:shift.nama,status,officeLocation:locationStatus.nearest.nama,officeDistance:locationStatus.dist,officeRadius:locationStatus.radius,flexMode:flex.enabled,createdAt:now.toISOString()});
+  toast(`✅ Clock In: ${now.toTimeString().slice(0,5)} ${flex.enabled?'(Jam Kerja Fleksibel)':status==='terlambat'?'(⚠️ Terlambat)':'(Tepat Waktu)'}`,'success');
   capturedPhoto=null;currentGPS=null;loadTodayHistory();checkTodayStatus();
 }
 
@@ -324,8 +402,44 @@ async function doClockOut() {
   const existing=await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).where('tipe','==','pulang').get();
   if(!existing.empty)return toast('Sudah clock out hari ini','warning');
   const now=new Date();
-  await db.collection('hrd_absensi').add({userId:currentUser.id,nama:currentUser.nama,departemen:currentUser.departemen||'',tanggal:todayStr(),waktu:now.toTimeString().slice(0,5),tipe:'pulang',foto:capturedPhoto,lat:currentGPS.lat,lng:currentGPS.lng,accuracy:currentGPS.accuracy,status:'pulang',officeLocation:locationStatus.nearest.nama,officeDistance:locationStatus.dist,officeRadius:locationStatus.radius,createdAt:now.toISOString()});
-  toast('✅ Clock Out: '+now.toTimeString().slice(0,5),'success');
+
+  // Check flex time settings
+  const settDoc = await db.collection('hrd_settings').doc('absensi').get();
+  const sett = settDoc.exists ? settDoc.data() : {};
+  const flex = sett.flexTime || { enabled: true, durasiKerja: 8, durasiIstirahat: 1, jamMasukMin: '06:00', jamMasukMax: '12:00' };
+
+  let statusPulang = 'pulang';
+  let jamKerjaActual = null;
+
+  if (flex.enabled) {
+    // Get today's clock-in record
+    const clockInSnap = await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).where('tipe','==','masuk').get();
+    if (clockInSnap.empty) return toast('Belum clock in hari ini', 'warning');
+    const clockInData = clockInSnap.docs[0].data();
+    const [ciH, ciM] = clockInData.waktu.split(':').map(Number);
+    const clockInMinutes = ciH * 60 + ciM;
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const totalMinutesWorked = nowMinutes - clockInMinutes;
+    const requiredMinutes = (flex.durasiKerja + flex.durasiIstirahat) * 60;
+
+    jamKerjaActual = totalMinutesWorked / 60;
+
+    if (totalMinutesWorked < requiredMinutes) {
+      const sisaJam = Math.floor((requiredMinutes - totalMinutesWorked) / 60);
+      const sisaMenit = (requiredMinutes - totalMinutesWorked) % 60;
+      const jamKerjaH = Math.floor(totalMinutesWorked / 60);
+      const jamKerjaM = totalMinutesWorked % 60;
+      const confirmed = confirm(`Anda baru bekerja ${jamKerjaH} jam ${jamKerjaM} menit. Minimal ${flex.durasiKerja} jam kerja + ${flex.durasiIstirahat} jam istirahat (${flex.durasiKerja+flex.durasiIstirahat} jam total). Sisa waktu: ${sisaJam} jam ${sisaMenit} menit. Yakin clock out?`);
+      if (!confirmed) return;
+      statusPulang = 'kurang_jam';
+    } else {
+      statusPulang = 'lengkap';
+    }
+  }
+
+  await db.collection('hrd_absensi').add({userId:currentUser.id,nama:currentUser.nama,departemen:currentUser.departemen||'',tanggal:todayStr(),waktu:now.toTimeString().slice(0,5),tipe:'pulang',foto:capturedPhoto,lat:currentGPS.lat,lng:currentGPS.lng,accuracy:currentGPS.accuracy,status:statusPulang,officeLocation:locationStatus.nearest.nama,officeDistance:locationStatus.dist,officeRadius:locationStatus.radius,flexMode:flex.enabled,jamKerjaActual:jamKerjaActual,createdAt:now.toISOString()});
+  const msg = flex.enabled ? (statusPulang==='lengkap'?'(✅ Jam kerja lengkap)':`(⚠️ Kurang jam - ${jamKerjaActual.toFixed(1)} jam)`) : '';
+  toast(`✅ Clock Out: ${now.toTimeString().slice(0,5)} ${msg}`,'success');
   capturedPhoto=null;currentGPS=null;loadTodayHistory();checkTodayStatus();
 }
 
@@ -494,43 +608,53 @@ async function loadRekapGrid(){
   const bulan=document.getElementById('rekapBulan')?.value||monthStr();
   const days=getMonthDays(bulan);
   const startDate=bulan+'-01',endDate=bulan+'-'+String(days).padStart(2,'0');
-  const[usersSnap,absenSnap]=await Promise.all([db.collection('hrd_users').where('status','==','aktif').get(),db.collection('hrd_absensi').where('tanggal','>=',startDate).where('tanggal','<=',endDate).get()]);
+  const[usersSnap,absenSnap,settDoc]=await Promise.all([db.collection('hrd_users').where('status','==','aktif').get(),db.collection('hrd_absensi').where('tanggal','>=',startDate).where('tanggal','<=',endDate).get(),db.collection('hrd_settings').doc('absensi').get()]);
+  const sett = settDoc.exists ? settDoc.data() : {};
+  const flex = sett.flexTime || { enabled: true, durasiKerja: 8, durasiIstirahat: 1 };
   const users=[];usersSnap.forEach(d=>users.push({id:d.id,...d.data()}));
   const absenMap={};
-  absenSnap.forEach(d=>{const p=d.data();if(!absenMap[p.userId])absenMap[p.userId]={};const day=parseInt(p.tanggal.split('-')[2]);if(p.tipe==='masuk')absenMap[p.userId][day]=p.status||'hadir';else if(p.tipe==='dinas_luar'&&!absenMap[p.userId][day])absenMap[p.userId][day]='dinas';});
+  const jamKerjaMap={};
+  absenSnap.forEach(d=>{const p=d.data();if(!absenMap[p.userId])absenMap[p.userId]={};const day=parseInt(p.tanggal.split('-')[2]);if(p.tipe==='masuk')absenMap[p.userId][day]=p.status||'hadir';else if(p.tipe==='pulang'&&p.jamKerjaActual){if(!jamKerjaMap[p.userId])jamKerjaMap[p.userId]={};jamKerjaMap[p.userId][day]=p.jamKerjaActual;}else if(p.tipe==='pulang'&&p.status==='kurang_jam')absenMap[p.userId][day]='kurang_jam';else if(p.tipe==='pulang'&&p.status==='lengkap')absenMap[p.userId][day]='lengkap';else if(p.tipe==='dinas_luar'&&!absenMap[p.userId][day])absenMap[p.userId][day]='dinas';});
 
   let h='<div class="table-wrap"><table><thead><tr><th style="min-width:120px">Nama</th>';
   for(let i=1;i<=days;i++)h+=`<th style="width:28px;text-align:center;font-size:.65rem">${i}</th>`;
   h+='<th>Total</th></tr></thead><tbody>';
-  let totalH=0,totalT=0,totalD=0;
+  let totalH=0,totalT=0,totalD=0,totalK=0,totalL=0;
 
   users.forEach(u=>{
     h+=`<tr><td class="text-sm fw-700">${escHtml(u.nama)}</td>`;
     let ut=0;
     for(let i=1;i<=days;i++){
       const st=absenMap[u.id]?.[i];
-      let color='#eee',text='-';
+      const jamKerja=jamKerjaMap[u.id]?.[i];
+      let color='#eee',text='-',title='';
       if(st==='tepat_waktu'||st==='hadir'){color='#4caf50';text='✓';ut++;totalH++;}
       else if(st==='terlambat'){color='#ff9800';text='T';ut++;totalT++;}
       else if(st==='dinas'){color='#2196f3';text='D';ut++;totalD++;}
-      h+=`<td style="text-align:center;background:${color};color:#fff;font-size:.6rem;font-weight:700;padding:3px">${text}</td>`;
+      else if(st==='lengkap'){color='#4caf50';text='✓';ut++;totalL++;}
+      else if(st==='kurang_jam'){color='#ff5722';text='K';ut++;totalK++;}
+      if(flex.enabled&&jamKerja){title=` title="${jamKerja.toFixed(1)} jam"`;}
+      h+=`<td style="text-align:center;background:${color};color:#fff;font-size:.6rem;font-weight:700;padding:3px"${title}>${text}</td>`;
     }
     h+=`<td class="fw-700 text-center">${ut}</td></tr>`;
   });
   h+='</tbody></table></div>';
   document.getElementById('rekapGrid').innerHTML=h;
-  document.getElementById('rekapSummary').innerHTML=`
-    <div class="stats-grid">
-      <div class="stat-card" style="border-left-color:var(--success)"><div class="stat-value color-success">${totalH}</div><div class="stat-label">Tepat Waktu</div></div>
-      <div class="stat-card" style="border-left-color:var(--warning)"><div class="stat-value" style="color:var(--warning)">${totalT}</div><div class="stat-label">Terlambat</div></div>
-      <div class="stat-card" style="border-left-color:var(--info)"><div class="stat-value" style="color:var(--info)">${totalD}</div><div class="stat-label">Dinas Luar</div></div>
+
+  let summaryHtml = `<div class="stats-grid">
+      <div class="stat-card" style="border-left-color:var(--success)"><div class="stat-value color-success">${totalH+totalL}</div><div class="stat-label">${flex.enabled?'Jam Lengkap':'Tepat Waktu'}</div></div>
+      <div class="stat-card" style="border-left-color:var(--warning)"><div class="stat-value" style="color:var(--warning)">${totalT}</div><div class="stat-label">Terlambat</div></div>`;
+  if(flex.enabled) summaryHtml += `<div class="stat-card" style="border-left-color:#ff5722"><div class="stat-value" style="color:#ff5722">${totalK}</div><div class="stat-label">Kurang Jam</div></div>`;
+  summaryHtml += `<div class="stat-card" style="border-left-color:var(--info)"><div class="stat-value" style="color:var(--info)">${totalD}</div><div class="stat-label">Dinas Luar</div></div>
     </div>
     <div class="flex gap-8 mt-8">
-      <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#4caf50;border-radius:2px"></span> Hadir</span>
-      <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#ff9800;border-radius:2px"></span> Terlambat</span>
-      <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#2196f3;border-radius:2px"></span> Dinas Luar</span>
+      <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#4caf50;border-radius:2px"></span> ${flex.enabled?'Lengkap':'Hadir'}</span>
+      <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#ff9800;border-radius:2px"></span> Terlambat</span>`;
+  if(flex.enabled) summaryHtml += `<span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#ff5722;border-radius:2px"></span> Kurang Jam</span>`;
+  summaryHtml += `<span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#2196f3;border-radius:2px"></span> Dinas Luar</span>
       <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#eee;border-radius:2px"></span> Tidak Hadir</span>
     </div>`;
+  document.getElementById('rekapSummary').innerHTML=summaryHtml;
 }
 
 // ── IMPORT CSV ────────────────────────────────────────────────
