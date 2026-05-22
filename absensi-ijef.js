@@ -83,11 +83,13 @@ async function showSettingSection(section) {
         </div>
       </div>`;
   } else if (section === 'jamkerja') {
-    const flex = s.flexTime || { enabled: true, durasiKerja: 8, durasiIstirahat: 1, jamMasukMin: '06:00', jamMasukMax: '12:00' };
+    const flex = s.flexTime || { enabled: true, durasiKerja: 8, durasiIstirahat: 1, jamMasukMin: '06:00', jamMasukMax: '12:00', coreHoursEnabled: true, coreHoursStart: '10:00', coreHoursEnd: '15:00', jamPulangMax: '22:00', weeklyAccEnabled: true, weeklyTarget: 40 };
     el.innerHTML = `
       <div class="card">
         <div class="card-header"><div class="card-title">⏰ Jam Kerja Fleksibel</div></div>
         <p class="text-sm mb-16" style="color:#666">IJEF Corp menggunakan jam kerja fleksibel. Karyawan bisa clock in kapan saja, clock out setelah memenuhi durasi kerja + istirahat.</p>
+
+        <div class="text-sm fw-700 mb-8" style="color:var(--primary)">Grup 1: Jam Kerja Dasar</div>
         <div class="form-group">
           <label>Jam Kerja Fleksibel</label>
           <div style="display:flex;align-items:center;gap:12px;margin-top:4px">
@@ -102,16 +104,51 @@ async function showSettingSection(section) {
           <div class="form-group"><label>Jam Masuk Paling Awal</label><input class="form-control" type="time" id="flexJamMin" value="${flex.jamMasukMin||'06:00'}"></div>
           <div class="form-group"><label>Jam Masuk Paling Akhir</label><input class="form-control" type="time" id="flexJamMax" value="${flex.jamMasukMax||'12:00'}"></div>
         </div>
-        <button class="btn btn-primary" onclick="simpanFlexTime()">💾 Simpan Pengaturan</button>
+
+        <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+        <div class="text-sm fw-700 mb-8" style="color:var(--primary)">Grup 2: Core Hours</div>
+        <div class="form-group">
+          <label>Core Hours</label>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:4px">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="flexCoreHoursEnabled" ${flex.coreHoursEnabled?'checked':''}> <span class="text-sm fw-700">${flex.coreHoursEnabled?'Aktif':'Nonaktif'}</span></label>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="form-group"><label>Core Hours Mulai</label><input class="form-control" type="time" id="flexCoreHoursStart" value="${flex.coreHoursStart||'10:00'}"></div>
+          <div class="form-group"><label>Core Hours Selesai</label><input class="form-control" type="time" id="flexCoreHoursEnd" value="${flex.coreHoursEnd||'15:00'}"></div>
+        </div>
+        <p class="text-xs mb-16" style="color:#666">Karyawan harus clock in sebelum core hours dimulai dan clock out setelah core hours berakhir.</p>
+
+        <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+        <div class="text-sm fw-700 mb-8" style="color:var(--primary)">Grup 3: Lembur & Batas</div>
+        <div class="grid-2">
+          <div class="form-group"><label>Jam Pulang Maksimal</label><input class="form-control" type="time" id="flexJamPulangMax" value="${flex.jamPulangMax||'22:00'}"></div>
+          <div class="form-group" style="display:flex;align-items:center">
+            <p class="text-xs" style="color:#666;margin-top:20px">Auto-deteksi lembur selalu aktif. Jika kerja > durasi kerja, otomatis ditandai lembur.</p>
+          </div>
+        </div>
+
+        <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+        <div class="text-sm fw-700 mb-8" style="color:var(--primary)">Grup 4: Akumulasi Mingguan</div>
+        <div class="form-group">
+          <label>Akumulasi Mingguan</label>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:4px">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="flexWeeklyAccEnabled" ${flex.weeklyAccEnabled?'checked':''}> <span class="text-sm fw-700">${flex.weeklyAccEnabled?'Aktif':'Nonaktif'}</span></label>
+          </div>
+        </div>
+        <div class="form-group"><label>Target Jam per Minggu</label><input class="form-control" type="number" id="flexWeeklyTarget" value="${flex.weeklyTarget||40}" min="1" max="80"></div>
+
+        <button class="btn btn-primary mt-16" onclick="simpanFlexTime()">💾 Simpan Pengaturan</button>
         <div class="mt-16 card" style="background:#e8f5e9;border-left:4px solid var(--success)">
           <div class="text-sm fw-700 mb-8">📋 Cara Kerja:</div>
           <ul class="text-xs" style="padding-left:16px;line-height:1.8">
             <li>Karyawan clock in kapan saja (dalam rentang jam masuk yang diizinkan)</li>
             <li>Total jam di kantor = durasi kerja + durasi istirahat</li>
             <li>Contoh: Clock in 09:00, durasi 8+1=9 jam, expected clock out 18:00</li>
-            <li>Contoh: Clock in 10:30, expected clock out 19:30</li>
             <li>Jika clock out sebelum waktunya, sistem akan menampilkan peringatan</li>
-            <li>Status: <b>lengkap</b> jika memenuhi durasi, <b>kurang_jam</b> jika pulang lebih awal</li>
+            <li>Lembur otomatis terdeteksi jika jam kerja > durasi kerja yang ditentukan</li>
+            <li>Core hours: karyawan wajib hadir dalam rentang core hours</li>
+            <li>Akumulasi mingguan menampilkan progres jam kerja per minggu</li>
           </ul>
         </div>
       </div>`;
@@ -125,7 +162,7 @@ async function showSettingSection(section) {
       logHtml = '<div class="table-wrap"><table><thead><tr><th>Nama</th><th>Tanggal</th><th>Waktu</th><th>Tipe</th><th>Lokasi GPS</th><th>Kantor</th><th>Jarak</th></tr></thead><tbody>';
       snap.forEach(d => {
         const p = d.data();
-        const tipeLabel = p.tipe==='masuk'?'Clock In':p.tipe==='pulang'?'Clock Out':p.tipe==='dinas_luar'?'Dinas Luar':p.tipe;
+        const tipeLabel = p.tipe==='masuk'?'Clock In':p.tipe==='pulang'?'Clock Out':p.tipe==='dinas_luar'?'Dinas Luar':p.tipe==='istirahat_mulai'?'Mulai Istirahat':p.tipe==='istirahat_selesai'?'Selesai Istirahat':p.tipe;
         const gps = (p.lat && p.lng) ? `${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}` : '-';
         const office = p.officeLocation || '-';
         const distance = p.officeDistance ? `${p.officeDistance.toFixed(1)}m` : '-';
@@ -188,7 +225,13 @@ async function simpanFlexTime() {
   const durasiIstirahat = parseFloat(document.getElementById('flexDurasiIstirahat').value) || 1;
   const jamMasukMin = document.getElementById('flexJamMin').value || '06:00';
   const jamMasukMax = document.getElementById('flexJamMax').value || '12:00';
-  const flexTime = { enabled, durasiKerja, durasiIstirahat, jamMasukMin, jamMasukMax };
+  const coreHoursEnabled = document.getElementById('flexCoreHoursEnabled').checked;
+  const coreHoursStart = document.getElementById('flexCoreHoursStart').value || '10:00';
+  const coreHoursEnd = document.getElementById('flexCoreHoursEnd').value || '15:00';
+  const jamPulangMax = document.getElementById('flexJamPulangMax').value || '22:00';
+  const weeklyAccEnabled = document.getElementById('flexWeeklyAccEnabled').checked;
+  const weeklyTarget = parseInt(document.getElementById('flexWeeklyTarget').value) || 40;
+  const flexTime = { enabled, durasiKerja, durasiIstirahat, jamMasukMin, jamMasukMax, coreHoursEnabled, coreHoursStart, coreHoursEnd, jamPulangMax, weeklyAccEnabled, weeklyTarget };
   await db.collection('hrd_settings').doc('absensi').set({ flexTime }, { merge: true });
   toast('Pengaturan jam kerja fleksibel disimpan', 'success');
   showSettingSection('jamkerja');
@@ -249,11 +292,15 @@ function renderClockInOut(container) {
       <div class="form-group"><label>Jarak ke Lokasi Terdekat</label><div id="gpsDistance" class="text-sm">-</div></div>
       <button class="btn btn-success btn-sm mb-8" onclick="getGPSLocation()">📍 Deteksi Lokasi</button>
       <div id="shiftInfo" class="mt-8 mb-8"></div>
+      <div id="coreHoursStatus" class="mb-8"></div>
       <div class="mt-16" id="clockActions"><button class="btn btn-success" onclick="doClockIn()">⏰ Clock In</button> <button class="btn btn-warning" onclick="doClockOut()">🏠 Clock Out</button></div>
+      <div id="breakActions" class="mt-8"></div>
+      <div id="breakStatus" class="mt-8"></div>
       <div id="clockStatus" class="mt-16"></div>
     </div></div></div>
+    <div id="weeklyAccCard" class="card mt-16" style="display:none"></div>
     <div class="card mt-16"><div class="card-title mb-8">📋 Riwayat Hari Ini</div><div id="todayHistory"></div></div>`;
-  loadTodayHistory(); checkTodayStatus(); loadShiftInfo();
+  loadTodayHistory(); checkTodayStatus(); loadShiftInfo(); loadBreakStatus(); loadWeeklyAccumulation(); loadCoreHoursStatus();
 }
 
 async function loadShiftInfo() {
@@ -366,6 +413,7 @@ async function doClockIn() {
   const flex = sett.flexTime || { enabled: true, durasiKerja: 8, durasiIstirahat: 1, jamMasukMin: '06:00', jamMasukMax: '12:00' };
 
   let status = 'tepat_waktu';
+  let coreHoursViolation = false;
 
   if (flex.enabled) {
     // Flex mode: check if within allowed clock-in window
@@ -378,6 +426,13 @@ async function doClockIn() {
       const [hMax,mMax] = flex.jamMasukMax.split(':').map(Number);
       if (waktuSekarang > hMax*60 + mMax) return toast(`Sudah melewati batas clock in. Jam masuk paling akhir: ${flex.jamMasukMax}`, 'warning');
     }
+    // Core hours check
+    if (flex.coreHoursEnabled && flex.coreHoursStart) {
+      const [chH, chM] = flex.coreHoursStart.split(':').map(Number);
+      if (waktuSekarang > chH*60 + chM) {
+        coreHoursViolation = true;
+      }
+    }
     status = 'tepat_waktu'; // No lateness check in flex mode
   } else {
     // Fixed shift mode: check lateness
@@ -389,9 +444,11 @@ async function doClockIn() {
   }
 
   const shift = await getActiveShift();
-  await db.collection('hrd_absensi').add({userId:currentUser.id,nama:currentUser.nama,departemen:currentUser.departemen||'',tanggal:todayStr(),waktu:now.toTimeString().slice(0,5),tipe:'masuk',foto:capturedPhoto,lat:currentGPS.lat,lng:currentGPS.lng,accuracy:currentGPS.accuracy,shift:shift.nama,status,officeLocation:locationStatus.nearest.nama,officeDistance:locationStatus.dist,officeRadius:locationStatus.radius,flexMode:flex.enabled,createdAt:now.toISOString()});
-  toast(`✅ Clock In: ${now.toTimeString().slice(0,5)} ${flex.enabled?'(Jam Kerja Fleksibel)':status==='terlambat'?'(⚠️ Terlambat)':'(Tepat Waktu)'}`,'success');
-  capturedPhoto=null;currentGPS=null;loadTodayHistory();checkTodayStatus();
+  await db.collection('hrd_absensi').add({userId:currentUser.id,nama:currentUser.nama,departemen:currentUser.departemen||'',tanggal:todayStr(),waktu:now.toTimeString().slice(0,5),tipe:'masuk',foto:capturedPhoto,lat:currentGPS.lat,lng:currentGPS.lng,accuracy:currentGPS.accuracy,shift:shift.nama,status,coreHoursViolation,officeLocation:locationStatus.nearest.nama,officeDistance:locationStatus.dist,officeRadius:locationStatus.radius,flexMode:flex.enabled,createdAt:now.toISOString()});
+  let clockInMsg = `✅ Clock In: ${now.toTimeString().slice(0,5)} ${flex.enabled?'(Jam Kerja Fleksibel)':status==='terlambat'?'(⚠️ Terlambat)':'(Tepat Waktu)'}`;
+  if (coreHoursViolation) clockInMsg += ` ⚠️ Melewati core hours (${flex.coreHoursStart})`;
+  toast(clockInMsg,'success');
+  capturedPhoto=null;currentGPS=null;loadTodayHistory();checkTodayStatus();loadBreakStatus();loadCoreHoursStatus();
 }
 
 async function doClockOut() {
@@ -410,6 +467,9 @@ async function doClockOut() {
 
   let statusPulang = 'pulang';
   let jamKerjaActual = null;
+  let lembur = false;
+  let lemburJam = 0;
+  let coreHoursViolation = false;
 
   if (flex.enabled) {
     // Get today's clock-in record
@@ -419,33 +479,226 @@ async function doClockOut() {
     const [ciH, ciM] = clockInData.waktu.split(':').map(Number);
     const clockInMinutes = ciH * 60 + ciM;
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
-    const totalMinutesWorked = nowMinutes - clockInMinutes;
-    const requiredMinutes = (flex.durasiKerja + flex.durasiIstirahat) * 60;
+    const totalMinutesPresent = nowMinutes - clockInMinutes;
 
-    jamKerjaActual = totalMinutesWorked / 60;
+    // Calculate actual break duration from break records
+    const breakStartSnap = await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).where('tipe','==','istirahat_mulai').get();
+    const breakEndSnap = await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).where('tipe','==','istirahat_selesai').get();
+    let actualBreakMinutes = 0;
+    if (!breakStartSnap.empty && !breakEndSnap.empty) {
+      const breakStarts = [];
+      breakStartSnap.forEach(d => breakStarts.push(d.data()));
+      const breakEnds = [];
+      breakEndSnap.forEach(d => breakEnds.push(d.data()));
+      for (let i = 0; i < Math.min(breakStarts.length, breakEnds.length); i++) {
+        const [bsH, bsM] = breakStarts[i].waktu.split(':').map(Number);
+        const [beH, beM] = breakEnds[i].waktu.split(':').map(Number);
+        actualBreakMinutes += (beH*60 + beM) - (bsH*60 + bsM);
+      }
+    } else if (!breakStartSnap.empty && breakEndSnap.empty) {
+      // Still on break - count from break start to now
+      const bData = breakStartSnap.docs[0].data();
+      const [bsH, bsM] = bData.waktu.split(':').map(Number);
+      actualBreakMinutes = nowMinutes - (bsH*60 + bsM);
+    }
 
-    if (totalMinutesWorked < requiredMinutes) {
-      const sisaJam = Math.floor((requiredMinutes - totalMinutesWorked) / 60);
-      const sisaMenit = (requiredMinutes - totalMinutesWorked) % 60;
-      const jamKerjaH = Math.floor(totalMinutesWorked / 60);
-      const jamKerjaM = totalMinutesWorked % 60;
-      const confirmed = confirm(`Anda baru bekerja ${jamKerjaH} jam ${jamKerjaM} menit. Minimal ${flex.durasiKerja} jam kerja + ${flex.durasiIstirahat} jam istirahat (${flex.durasiKerja+flex.durasiIstirahat} jam total). Sisa waktu: ${sisaJam} jam ${sisaMenit} menit. Yakin clock out?`);
+    const configuredBreakMinutes = flex.durasiIstirahat * 60;
+    const excessBreak = Math.max(0, actualBreakMinutes - configuredBreakMinutes);
+    const effectiveWorkMinutes = totalMinutesPresent - actualBreakMinutes;
+    const requiredWorkMinutes = flex.durasiKerja * 60;
+
+    jamKerjaActual = effectiveWorkMinutes / 60;
+
+    // Check overtime
+    if (effectiveWorkMinutes > requiredWorkMinutes) {
+      lembur = true;
+      lemburJam = parseFloat(((effectiveWorkMinutes - requiredWorkMinutes) / 60).toFixed(1));
+      statusPulang = 'lengkap';
+    } else if (effectiveWorkMinutes >= requiredWorkMinutes) {
+      statusPulang = 'lengkap';
+    } else {
+      const sisaJam = Math.floor((requiredWorkMinutes - effectiveWorkMinutes) / 60);
+      const sisaMenit = (requiredWorkMinutes - effectiveWorkMinutes) % 60;
+      const jamKerjaH = Math.floor(effectiveWorkMinutes / 60);
+      const jamKerjaM = Math.round(effectiveWorkMinutes % 60);
+      const confirmed = confirm(`Anda baru bekerja ${jamKerjaH} jam ${jamKerjaM} menit (ekskl. istirahat). Minimal ${flex.durasiKerja} jam kerja. Sisa waktu: ${sisaJam} jam ${Math.round(sisaMenit)} menit. Yakin clock out?`);
       if (!confirmed) return;
       statusPulang = 'kurang_jam';
-    } else {
-      statusPulang = 'lengkap';
+    }
+
+    // Core hours violation on clock-out
+    if (flex.coreHoursEnabled && flex.coreHoursEnd) {
+      const [ceH, ceM] = flex.coreHoursEnd.split(':').map(Number);
+      if (nowMinutes < ceH*60 + ceM) {
+        coreHoursViolation = true;
+        toast(`⚠️ Anda keluar sebelum core hours berakhir (${flex.coreHoursEnd})`, 'warning');
+      }
+    }
+
+    // Max clock-out time warning
+    if (flex.jamPulangMax) {
+      const [pmH, pmM] = flex.jamPulangMax.split(':').map(Number);
+      if (nowMinutes > pmH*60 + pmM) {
+        toast(`⚠️ Clock out melewati jam pulang maksimal (${flex.jamPulangMax})`, 'warning');
+      }
     }
   }
 
-  await db.collection('hrd_absensi').add({userId:currentUser.id,nama:currentUser.nama,departemen:currentUser.departemen||'',tanggal:todayStr(),waktu:now.toTimeString().slice(0,5),tipe:'pulang',foto:capturedPhoto,lat:currentGPS.lat,lng:currentGPS.lng,accuracy:currentGPS.accuracy,status:statusPulang,officeLocation:locationStatus.nearest.nama,officeDistance:locationStatus.dist,officeRadius:locationStatus.radius,flexMode:flex.enabled,jamKerjaActual:jamKerjaActual,createdAt:now.toISOString()});
-  const msg = flex.enabled ? (statusPulang==='lengkap'?'(✅ Jam kerja lengkap)':`(⚠️ Kurang jam - ${jamKerjaActual.toFixed(1)} jam)`) : '';
+  await db.collection('hrd_absensi').add({userId:currentUser.id,nama:currentUser.nama,departemen:currentUser.departemen||'',tanggal:todayStr(),waktu:now.toTimeString().slice(0,5),tipe:'pulang',foto:capturedPhoto,lat:currentGPS.lat,lng:currentGPS.lng,accuracy:currentGPS.accuracy,status:statusPulang,officeLocation:locationStatus.nearest.nama,officeDistance:locationStatus.dist,officeRadius:locationStatus.radius,flexMode:flex.enabled,jamKerjaActual:jamKerjaActual,lembur:lembur,lemburJam:lemburJam,coreHoursViolation:coreHoursViolation,createdAt:now.toISOString()});
+  let msg = '';
+  if (flex.enabled) {
+    if (lembur) msg = `(🟣 Lembur ${lemburJam} jam)`;
+    else if (statusPulang==='lengkap') msg = '(✅ Jam kerja lengkap)';
+    else msg = `(⚠️ Kurang jam - ${jamKerjaActual.toFixed(1)} jam)`;
+  }
   toast(`✅ Clock Out: ${now.toTimeString().slice(0,5)} ${msg}`,'success');
-  capturedPhoto=null;currentGPS=null;loadTodayHistory();checkTodayStatus();
+  capturedPhoto=null;currentGPS=null;loadTodayHistory();checkTodayStatus();loadBreakStatus();loadWeeklyAccumulation();
 }
 
 async function checkTodayStatus(){const snap=await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).get();let masuk=false,pulang=false;snap.forEach(d=>{if(d.data().tipe==='masuk')masuk=true;if(d.data().tipe==='pulang')pulang=true;});const el=document.getElementById('clockStatus');if(el){if(masuk&&pulang)el.innerHTML='<div class="badge badge-success" style="font-size:.9rem;padding:8px 16px">✅ Sudah In & Out</div>';else if(masuk)el.innerHTML='<div class="badge badge-info" style="font-size:.9rem;padding:8px 16px">⏰ Sudah In, belum Out</div>';else el.innerHTML='<div class="badge badge-warning" style="font-size:.9rem;padding:8px 16px">⚠️ Belum absen</div>';}}
 
-async function loadTodayHistory(){const snap=await db.collection('hrd_absensi').where('tanggal','==',todayStr()).orderBy('createdAt','desc').limit(20).get();let h='';if(snap.empty)h='<p class="text-sm" style="color:#999">Belum ada absensi hari ini</p>';else snap.forEach(d=>{const p=d.data();h+=`<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">${p.foto?`<img src="${p.foto}" style="width:36px;height:36px;border-radius:50%;object-fit:cover">`:'<div style="width:36px;height:36px;border-radius:50%;background:#eee;display:flex;align-items:center;justify-content:center">👤</div>'}<div style="flex:1"><div class="fw-700 text-sm">${escHtml(p.nama)} ${p.tipe==='dinas_luar'?'<span class="badge badge-info">Dinas Luar</span>':''}</div><div class="text-xs" style="color:#999">${p.tipe==='masuk'?'Clock In':p.tipe==='pulang'?'Clock Out':'Dinas'} — ${p.waktu}</div></div><span class="badge badge-${p.status==='terlambat'?'warning':'success'}">${p.status||p.tipe}</span></div>`;});const el=document.getElementById('todayHistory');if(el)el.innerHTML=h;}
+async function loadTodayHistory(){const snap=await db.collection('hrd_absensi').where('tanggal','==',todayStr()).orderBy('createdAt','desc').limit(20).get();let h='';if(snap.empty)h='<p class="text-sm" style="color:#999">Belum ada absensi hari ini</p>';else snap.forEach(d=>{const p=d.data();const tipeLabel=p.tipe==='masuk'?'Clock In':p.tipe==='pulang'?'Clock Out':p.tipe==='dinas_luar'?'Dinas Luar':p.tipe==='istirahat_mulai'?'Mulai Istirahat':p.tipe==='istirahat_selesai'?'Selesai Istirahat':p.tipe;const badgeColor=p.tipe==='masuk'?'success':p.tipe==='pulang'?'info':p.tipe==='istirahat_mulai'?'warning':p.tipe==='istirahat_selesai'?'info':'warning';let lemburBadge='';if(p.lembur&&p.lemburJam)lemburBadge=` <span class="badge" style="background:#f3e5f5;color:#7b1fa2">Lembur ${p.lemburJam} jam</span>`;let coreViolBadge='';if(p.coreHoursViolation)coreViolBadge=' <span class="badge badge-warning">⚠️ Core Hours</span>';h+=`<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">${p.foto?`<img src="${p.foto}" style="width:36px;height:36px;border-radius:50%;object-fit:cover">`:'<div style="width:36px;height:36px;border-radius:50%;background:#eee;display:flex;align-items:center;justify-content:center">👤</div>'}<div style="flex:1"><div class="fw-700 text-sm">${escHtml(p.nama)} ${p.tipe==='dinas_luar'?'<span class="badge badge-info">Dinas Luar</span>':''}${lemburBadge}${coreViolBadge}</div><div class="text-xs" style="color:#999">${tipeLabel} — ${p.waktu}</div></div><span class="badge badge-${badgeColor}">${p.status||p.tipe}</span></div>`;});const el=document.getElementById('todayHistory');if(el)el.innerHTML=h;}
+
+// ── BREAK TRACKING ────────────────────────────────────────────
+
+async function loadBreakStatus() {
+  const breakActionsEl = document.getElementById('breakActions');
+  const breakStatusEl = document.getElementById('breakStatus');
+  if (!breakActionsEl || !breakStatusEl) return;
+
+  // Check if clocked in today
+  const masukSnap = await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).where('tipe','==','masuk').get();
+  const pulangSnap = await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).where('tipe','==','pulang').get();
+
+  if (masukSnap.empty || !pulangSnap.empty) {
+    breakActionsEl.innerHTML = '';
+    breakStatusEl.innerHTML = '';
+    return;
+  }
+
+  // Check break status
+  const breakStartSnap = await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).where('tipe','==','istirahat_mulai').get();
+  const breakEndSnap = await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).where('tipe','==','istirahat_selesai').get();
+
+  const startCount = breakStartSnap.size;
+  const endCount = breakEndSnap.size;
+  const isOnBreak = startCount > endCount;
+
+  if (isOnBreak) {
+    const lastBreakStart = breakStartSnap.docs[breakStartSnap.size - 1].data();
+    breakActionsEl.innerHTML = `<button class="btn btn-info btn-sm" onclick="doEndBreak()">🔙 Selesai Istirahat</button>`;
+    breakStatusEl.innerHTML = `<div class="text-xs" style="background:#fff3e0;padding:6px 10px;border-radius:6px">☕ Sedang istirahat sejak ${lastBreakStart.waktu}</div>`;
+  } else {
+    breakActionsEl.innerHTML = `<button class="btn btn-sm" style="background:#795548;color:#fff" onclick="doStartBreak()">☕ Mulai Istirahat</button>`;
+    if (endCount > 0) {
+      // Calculate total break time
+      let totalBreakMin = 0;
+      const starts = []; breakStartSnap.forEach(d => starts.push(d.data()));
+      const ends = []; breakEndSnap.forEach(d => ends.push(d.data()));
+      for (let i = 0; i < Math.min(starts.length, ends.length); i++) {
+        const [bsH, bsM] = starts[i].waktu.split(':').map(Number);
+        const [beH, beM] = ends[i].waktu.split(':').map(Number);
+        totalBreakMin += (beH*60 + beM) - (bsH*60 + bsM);
+      }
+      breakStatusEl.innerHTML = `<div class="text-xs" style="background:#e8f5e9;padding:6px 10px;border-radius:6px">Istirahat: ${totalBreakMin} menit</div>`;
+    } else {
+      breakStatusEl.innerHTML = '';
+    }
+  }
+}
+
+async function doStartBreak() {
+  const now = new Date();
+  await db.collection('hrd_absensi').add({userId:currentUser.id,nama:currentUser.nama,departemen:currentUser.departemen||'',tanggal:todayStr(),waktu:now.toTimeString().slice(0,5),tipe:'istirahat_mulai',createdAt:now.toISOString()});
+  toast('☕ Istirahat dimulai', 'info');
+  loadBreakStatus(); loadTodayHistory();
+}
+
+async function doEndBreak() {
+  const now = new Date();
+  await db.collection('hrd_absensi').add({userId:currentUser.id,nama:currentUser.nama,departemen:currentUser.departemen||'',tanggal:todayStr(),waktu:now.toTimeString().slice(0,5),tipe:'istirahat_selesai',createdAt:now.toISOString()});
+  toast('🔙 Istirahat selesai', 'success');
+  loadBreakStatus(); loadTodayHistory();
+}
+
+// ── WEEKLY ACCUMULATION ───────────────────────────────────────
+
+function getWeekDates() {
+  const today = new Date();
+  const day = today.getDay();
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - (day === 0 ? 6 : day - 1));
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  const fmt = d => d.toISOString().split('T')[0];
+  return { start: fmt(monday), end: fmt(sunday) };
+}
+
+async function loadWeeklyAccumulation() {
+  const el = document.getElementById('weeklyAccCard');
+  if (!el) return;
+
+  const settDoc = await db.collection('hrd_settings').doc('absensi').get();
+  const sett = settDoc.exists ? settDoc.data() : {};
+  const flex = sett.flexTime || {};
+  if (!flex.weeklyAccEnabled) { el.style.display = 'none'; return; }
+
+  const target = flex.weeklyTarget || 40;
+  const { start, end } = getWeekDates();
+
+  const snap = await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','>=',start).where('tanggal','<=',end).where('tipe','==','pulang').get();
+  let totalHours = 0;
+  snap.forEach(d => {
+    const p = d.data();
+    if (p.jamKerjaActual) totalHours += p.jamKerjaActual;
+  });
+
+  const pct = Math.min(100, (totalHours / target) * 100);
+  const today = new Date();
+  const dayOfWeek = today.getDay() === 0 ? 7 : today.getDay(); // 1=Monday...7=Sunday
+  const expectedByNow = (target / 5) * Math.min(dayOfWeek, 5);
+  let color = '#4caf50'; // green
+  if (totalHours < expectedByNow * 0.7) color = '#f44336'; // red - significantly behind
+  else if (totalHours < expectedByNow * 0.9) color = '#ff9800'; // yellow - behind
+
+  let warningHtml = '';
+  if (dayOfWeek >= 5 && totalHours < target) {
+    warningHtml = `<div class="text-xs mt-8" style="color:#f57f17">⚠️ Target mingguan belum tercapai (${totalHours.toFixed(1)}/${target} jam)</div>`;
+  }
+
+  el.style.display = 'block';
+  el.innerHTML = `<div class="card-title mb-8">📊 Akumulasi Minggu Ini</div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="flex:1;background:#eee;border-radius:8px;height:20px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;background:${color};border-radius:8px;transition:width .3s"></div>
+      </div>
+      <span class="fw-700" style="color:${color}">${totalHours.toFixed(1)}/${target} jam</span>
+    </div>
+    ${warningHtml}
+    <div class="text-xs mt-8" style="color:#999">Senin - Minggu (${start} s/d ${end})</div>`;
+}
+
+// ── CORE HOURS STATUS ─────────────────────────────────────────
+
+async function loadCoreHoursStatus() {
+  const el = document.getElementById('coreHoursStatus');
+  if (!el) return;
+
+  const settDoc = await db.collection('hrd_settings').doc('absensi').get();
+  const sett = settDoc.exists ? settDoc.data() : {};
+  const flex = sett.flexTime || {};
+  if (!flex.coreHoursEnabled) { el.innerHTML = ''; return; }
+
+  const masukSnap = await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).where('tipe','==','masuk').get();
+  if (masukSnap.empty) { el.innerHTML = ''; return; }
+
+  const clockInData = masukSnap.docs[0].data();
+  if (clockInData.coreHoursViolation) {
+    el.innerHTML = `<div class="text-xs" style="background:#fff3e0;padding:6px 10px;border-radius:6px;color:#e65100">⚠️ Melewati core hours (${flex.coreHoursStart})</div>`;
+  } else {
+    el.innerHTML = `<div class="text-xs" style="background:#e8f5e9;padding:6px 10px;border-radius:6px;color:#2e7d32">✅ Core hours: ${flex.coreHoursStart} - ${flex.coreHoursEnd}</div>`;
+  }
+}
 
 // ══════════════════════════════════════════════════════════════
 // ── DINAS LUAR — Form Pengajuan + Absen Selfie+GPS di Lokasi ──
@@ -614,21 +867,25 @@ async function loadRekapGrid(){
   const users=[];usersSnap.forEach(d=>users.push({id:d.id,...d.data()}));
   const absenMap={};
   const jamKerjaMap={};
-  absenSnap.forEach(d=>{const p=d.data();if(!absenMap[p.userId])absenMap[p.userId]={};const day=parseInt(p.tanggal.split('-')[2]);if(p.tipe==='masuk')absenMap[p.userId][day]=p.status||'hadir';else if(p.tipe==='pulang'&&p.jamKerjaActual){if(!jamKerjaMap[p.userId])jamKerjaMap[p.userId]={};jamKerjaMap[p.userId][day]=p.jamKerjaActual;}else if(p.tipe==='pulang'&&p.status==='kurang_jam')absenMap[p.userId][day]='kurang_jam';else if(p.tipe==='pulang'&&p.status==='lengkap')absenMap[p.userId][day]='lengkap';else if(p.tipe==='dinas_luar'&&!absenMap[p.userId][day])absenMap[p.userId][day]='dinas';});
+  const lemburMap={};
+  absenSnap.forEach(d=>{const p=d.data();if(!absenMap[p.userId])absenMap[p.userId]={};const day=parseInt(p.tanggal.split('-')[2]);if(p.tipe==='masuk')absenMap[p.userId][day]=p.status||'hadir';else if(p.tipe==='pulang'&&p.lembur){absenMap[p.userId][day]='lembur';if(!lemburMap[p.userId])lemburMap[p.userId]={};lemburMap[p.userId][day]=p.lemburJam||0;if(p.jamKerjaActual){if(!jamKerjaMap[p.userId])jamKerjaMap[p.userId]={};jamKerjaMap[p.userId][day]=p.jamKerjaActual;}}else if(p.tipe==='pulang'&&p.jamKerjaActual){if(!jamKerjaMap[p.userId])jamKerjaMap[p.userId]={};jamKerjaMap[p.userId][day]=p.jamKerjaActual;if(p.status==='kurang_jam')absenMap[p.userId][day]='kurang_jam';else if(p.status==='lengkap')absenMap[p.userId][day]='lengkap';}else if(p.tipe==='pulang'&&p.status==='kurang_jam')absenMap[p.userId][day]='kurang_jam';else if(p.tipe==='pulang'&&p.status==='lengkap')absenMap[p.userId][day]='lengkap';else if(p.tipe==='dinas_luar'&&!absenMap[p.userId][day])absenMap[p.userId][day]='dinas';});
 
   let h='<div class="table-wrap"><table><thead><tr><th style="min-width:120px">Nama</th>';
   for(let i=1;i<=days;i++)h+=`<th style="width:28px;text-align:center;font-size:.65rem">${i}</th>`;
-  h+='<th>Total</th></tr></thead><tbody>';
-  let totalH=0,totalT=0,totalD=0,totalK=0,totalL=0;
+  h+='<th>Total</th><th>Lembur</th></tr></thead><tbody>';
+  let totalH=0,totalT=0,totalD=0,totalK=0,totalL=0,totalLembur=0,totalLemburJam=0;
 
   users.forEach(u=>{
     h+=`<tr><td class="text-sm fw-700">${escHtml(u.nama)}</td>`;
     let ut=0;
+    let userLemburJam=0;
     for(let i=1;i<=days;i++){
       const st=absenMap[u.id]?.[i];
       const jamKerja=jamKerjaMap[u.id]?.[i];
+      const lemburJam=lemburMap[u.id]?.[i];
       let color='#eee',text='-',title='';
-      if(st==='tepat_waktu'||st==='hadir'){color='#4caf50';text='✓';ut++;totalH++;}
+      if(st==='lembur'){color='#7b1fa2';text='L';ut++;totalLembur++;if(lemburJam){userLemburJam+=lemburJam;totalLemburJam+=lemburJam;}}
+      else if(st==='tepat_waktu'||st==='hadir'){color='#4caf50';text='✓';ut++;totalH++;}
       else if(st==='terlambat'){color='#ff9800';text='T';ut++;totalT++;}
       else if(st==='dinas'){color='#2196f3';text='D';ut++;totalD++;}
       else if(st==='lengkap'){color='#4caf50';text='✓';ut++;totalL++;}
@@ -636,7 +893,8 @@ async function loadRekapGrid(){
       if(flex.enabled&&jamKerja){title=` title="${jamKerja.toFixed(1)} jam"`;}
       h+=`<td style="text-align:center;background:${color};color:#fff;font-size:.6rem;font-weight:700;padding:3px"${title}>${text}</td>`;
     }
-    h+=`<td class="fw-700 text-center">${ut}</td></tr>`;
+    h+=`<td class="fw-700 text-center">${ut}</td>`;
+    h+=`<td class="fw-700 text-center" style="color:#7b1fa2">${userLemburJam>0?userLemburJam.toFixed(1)+'j':'-'}</td></tr>`;
   });
   h+='</tbody></table></div>';
   document.getElementById('rekapGrid').innerHTML=h;
@@ -646,12 +904,14 @@ async function loadRekapGrid(){
       <div class="stat-card" style="border-left-color:var(--warning)"><div class="stat-value" style="color:var(--warning)">${totalT}</div><div class="stat-label">Terlambat</div></div>`;
   if(flex.enabled) summaryHtml += `<div class="stat-card" style="border-left-color:#ff5722"><div class="stat-value" style="color:#ff5722">${totalK}</div><div class="stat-label">Kurang Jam</div></div>`;
   summaryHtml += `<div class="stat-card" style="border-left-color:var(--info)"><div class="stat-value" style="color:var(--info)">${totalD}</div><div class="stat-label">Dinas Luar</div></div>
+      <div class="stat-card" style="border-left-color:#7b1fa2"><div class="stat-value" style="color:#7b1fa2">${totalLembur}</div><div class="stat-label">Lembur (${totalLemburJam.toFixed(1)} jam)</div></div>
     </div>
-    <div class="flex gap-8 mt-8">
+    <div class="flex gap-8 mt-8 flex-wrap">
       <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#4caf50;border-radius:2px"></span> ${flex.enabled?'Lengkap':'Hadir'}</span>
       <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#ff9800;border-radius:2px"></span> Terlambat</span>`;
   if(flex.enabled) summaryHtml += `<span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#ff5722;border-radius:2px"></span> Kurang Jam</span>`;
-  summaryHtml += `<span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#2196f3;border-radius:2px"></span> Dinas Luar</span>
+  summaryHtml += `<span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#7b1fa2;border-radius:2px"></span> Lembur</span>
+      <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#2196f3;border-radius:2px"></span> Dinas Luar</span>
       <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#eee;border-radius:2px"></span> Tidak Hadir</span>
     </div>`;
   document.getElementById('rekapSummary').innerHTML=summaryHtml;
