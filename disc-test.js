@@ -144,14 +144,14 @@ function renderCalonForm(){
 }
 async function loadLowonganOptions(){
   try{
-    const snap=await db.collection('hrd_lowongan').where('status','==','aktif').get();
+    const snap=await db.collection('hrd_lowongan').where('status','==','open').get();
     const sel=document.getElementById('fPosisi');if(!sel)return;
     let opts='<option value="">-- Pilih Posisi Lowongan --</option>';
     if(snap.empty){opts+='<option value="General">General (Belum ada lowongan aktif)</option>';}
-    else{snap.forEach(d=>{const p=d.data();opts+=`<option value="${p.posisi||p.judul||''}">${p.posisi||p.judul||'-'} — ${p.departemen||''}</option>`;});}
+    else{snap.forEach(d=>{const p=d.data();opts+=`<option value="${p.posisi||''}">${p.posisi||'-'}${p.departemen?' — '+p.departemen:''}</option>`;});}
     opts+='<option value="Lainnya">Lainnya (Posisi tidak terdaftar)</option>';
     sel.innerHTML=opts;
-  }catch(e){const sel=document.getElementById('fPosisi');if(sel)sel.innerHTML='<option value="">-- Ketik posisi --</option>';}
+  }catch(e){const sel=document.getElementById('fPosisi');if(sel)sel.innerHTML='<option value="">-- Pilih posisi --</option>';}
 }
 
 function renderEvaluasiForm(){
