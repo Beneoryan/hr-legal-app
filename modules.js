@@ -2062,15 +2062,16 @@ async function deleteDiscResult(id){
 async function syncDiscToKPI(id){
   const doc=await db.collection('hrd_disc_results').doc(id).get();if(!doc.exists)return toast('Data tidak ditemukan','error');
   const r=doc.data();
-  // Add/update KPI entry with DISC personality data
+  const kpiScore=r.kpiScore||70;
+  const grade=kpiScore>=90?'A':kpiScore>=80?'B':kpiScore>=70?'C':kpiScore>=60?'D':'E';
   await db.collection('hrd_kpi').add({
     nama:r.nama,periode:r.evaluasiPeriode||r.tanggalTes||todayStr(),
-    produktivitas:0,kualitas:0,kedisiplinan:0,kerjasama:0,skor:0,
-    catatan:`[DISC] Tipe: ${r.pattern||'-'} | Profil: ${r.profileName||'-'} | D:${r.seg3?.D||0} I:${r.seg3?.I||0} S:${r.seg3?.S||0} C:${r.seg3?.C||0}`,
+    produktivitas:kpiScore,kualitas:kpiScore,kedisiplinan:kpiScore,kerjasama:kpiScore,skor:kpiScore,
+    catatan:`[DISC] Tipe: ${r.pattern||'-'} | Profil: ${r.profileName||'-'} | Grade: ${grade}\nPositif: ${(r.positiveTraits||[]).join(', ')}\nNegatif: ${(r.negativeTraits||[]).join(', ')}\nKarir: ${(r.career||'').substring(0,100)}`,
     penilai:'DISC Auto-Sync',discResultId:id,discPattern:r.pattern||'',discProfile:r.profileName||'',
     createdAt:new Date().toISOString()
   });
-  toast(`DISC ${r.nama} disinkronkan ke KPI`,'success');
+  toast(`DISC ${r.nama} disinkronkan ke KPI (Skor: ${kpiScore}, Grade: ${grade})`,'success');
 }
 
 async function syncAllDiscToKPI(){
@@ -2079,10 +2080,10 @@ async function syncAllDiscToKPI(){
   let count=0;
   for(const doc of snap.docs){
     const r=doc.data();
-    // Check if already synced
     const existing=await db.collection('hrd_kpi').where('discResultId','==',doc.id).limit(1).get();
     if(existing.empty){
-      await db.collection('hrd_kpi').add({nama:r.nama,periode:r.evaluasiPeriode||r.tanggalTes||todayStr(),produktivitas:0,kualitas:0,kedisiplinan:0,kerjasama:0,skor:0,catatan:`[DISC] Tipe: ${r.pattern||'-'} | Profil: ${r.profileName||'-'}`,penilai:'DISC Auto-Sync',discResultId:doc.id,discPattern:r.pattern||'',discProfile:r.profileName||'',createdAt:new Date().toISOString()});
+      const kpiScore=r.kpiScore||70;
+      await db.collection('hrd_kpi').add({nama:r.nama,periode:r.evaluasiPeriode||r.tanggalTes||todayStr(),produktivitas:kpiScore,kualitas:kpiScore,kedisiplinan:kpiScore,kerjasama:kpiScore,skor:kpiScore,catatan:`[DISC] Tipe: ${r.pattern||'-'} | Profil: ${r.profileName||'-'}`,penilai:'DISC Auto-Sync',discResultId:doc.id,discPattern:r.pattern||'',discProfile:r.profileName||'',createdAt:new Date().toISOString()});
       count++;
     }
   }

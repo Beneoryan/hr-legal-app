@@ -36,48 +36,49 @@ const Q=[
 const SEG1={D:[-6,-5.3,-4,-2.5,-1.7,-1.3,0,0.5,1,2,3,3.5,4,4.7,5.3,6.5,7,7,7,7.5,7.5],I:[-7,-4.6,-2.5,-1.3,1,3,3.5,5.3,5.7,6,6.5,7,7,7,7,7,7.5,7.5,7.5,7.5,8],S:[-5.7,-4.3,-3.5,-1.5,-0.7,0.5,1,2.5,3,4,4.6,5,5.7,6,6.5,6.5,7,7,7,7.5,7.5],C:[-6,-4.7,-3.5,-1.5,0.5,2,3,5.3,5.7,6,6.3,6.5,6.7,7,7.3,7.3,7.3,7.5,8,8,8]};
 const SEG2={D:[7.5,6.5,4.3,2.5,1.5,0.5,0,-1.3,-1.5,-2.5,-3,-3.5,-4.3,-5.3,-5.7,-6,-6.5,-6.7,-7,-7.3,-7.5],I:[7,6,4,2.5,0.5,0,-2,-3.5,-4.3,-5.3,-6,-6.5,-7,-7.2,-7.2,-7.2,-7.3,-7.3,-7.3,-7.5,-8],S:[7.5,7,6,4,2.5,1.5,0.5,-1.3,-2,-3,-4.3,-5.3,-6,-6.5,-6.7,-6.7,-7,-7.2,-7.3,-7.5,-8],C:[7.5,7,5.6,4,2.5,1.5,0.5,0,-1.3,-2.5,-3.5,-5.3,-5.7,-6,-6.5,-7,-7.3,-7.5,-7.7,-7.9,-8]};
 
-// Profile database
+// Profile database with positive, negative traits and career recommendations
 const PROFILES={
-'D':{name:'ESTABLISHER',traits:['Individualis','Ego Tinggi','Efektif','High Motivation','Bersemangat Tinggi','Percaya Diri','Kreatif','Agresif']},
-'I':{name:'COMMUNICATOR',traits:['Antusias','Percaya','Optimis','Persuasif','Bicara aktif','Ramah','Inspirasional','Emosional']},
-'S':{name:'SPECIALIST',traits:['Stabil & Konsisten','Terkendali','Sabar','Loyal','Teguh','Process Oriented','Anti Perubahan']},
-'C':{name:'LOGICAL THINKER',traits:['Pendiam','Perfeksionis','Detail','Empati','Rapi','Organized','Sistematis','Analitis']},
-'D-I':{name:'PENGAMBIL KEPUTUSAN',traits:['Pekerja Keras','Leader','Banyak Minat','Tegas','Suka Tantangan','Cepat Bosan']},
-'D-S':{name:'SELF-MOTIVATED',traits:['Objektif & Analitis','Mandiri','Good Planner','Komitmen thd Target','Menghindari Konflik']},
-'D-C':{name:'CHALLENGER',traits:['Tekun','Sensitif terhadap permasalahan','Keputusan kuat','Kreatif memecahkan masalah','Reaksi cepat','Perfeksionis']},
-'D-I-S':{name:'DIRECTOR',traits:['Pengelola','Enerjik','Kurang Detail','Mudah Bosan','Motivator']},
-'D-I-C':{name:'CHANCELLOR',traits:['Ramah secara alami','Menggabungkan kesenangan dengan pekerjaan','Detail','Interaktif']},
-'D-S-I':{name:'DIRECTOR',traits:['Obyektif dan analitis','Ingin terlibat','Termotivasi target pribadi','Tenang','Stabil','Ulet']},
-'D-S-C':{name:'DIRECTOR',traits:['Obyektif','Analitis','Bantuan & dukungan','Termotivasi target','Stabil']},
-'D-C-I':{name:'CHALLENGER',traits:['Tekun','Sensitif','Keputusan kuat','Kreatif','Reaksi cepat']},
-'D-C-S':{name:'CHALLENGER',traits:['Tekun','Sensitif','Keputusan kuat','Perfeksionis','Ide-ide banyak']},
-'I-S':{name:'ADVISOR',traits:['Hangat','Simpati','Tenang','Pendengar baik','Toleran','Penjaga damai']},
-'I-C':{name:'ASSESSOR',traits:['Ramah','Suka berteman','Nyaman dengan orang asing','Dapat mengendalikan diri','Perfeksionis alamiah']},
-'I-D':{name:'NEGOTIATOR',traits:['Suka Bergaul','Anti Rutin','Aktif','Percaya Diri','Optimis','Result Oriented']},
-'I-S-C':{name:'RESPONSIVE & THOUGHTFUL',traits:['High Energy','Good Communication','Sensitif','Need Recognition']},
-'I-S-D':{name:'MOTIVATOR',traits:['Leader Kelompok Kecil','Supporter','Sosialisasi Baik','Butuh Penghargaan']},
-'I-D-C':{name:'CONFIDENT & DETERMINED',traits:['Pandai Memilih Orang','Leader','Good Interpersonal','Dominan','Perfeksionis']},
-'I-D-S':{name:'REFORMER',traits:['Mudah Bergaul','Leader','Sadar Diri','Motivator','Optimis & Positif']},
-'I-C-D':{name:'ASSESSOR',traits:['Analitis','Hati-hati','Ramah saat nyaman','Perfeksionis alami','Berorientasi kualitas']},
-'I-C-S':{name:'RESPONSIVE & THOUGHTFUL',traits:['High Energy','Good Communication','Sensitif','Banyak Bicara']},
-'S-D':{name:'SELF-MOTIVATED',traits:['Objektif','Analitis','Mandiri','Komitmen target','Stabil','Tekun']},
-'S-I':{name:'ADVISOR',traits:['Hangat','Simpati','Pendengar baik','Toleran','Penjaga damai','Moderat']},
-'S-C':{name:'PEACEMAKER',traits:['Anti Kritik','Detail','Empati','Loyal','Introvert','Sulit Adaptasi']},
-'S-D-I':{name:'DIRECTOR',traits:['Obyektif','Analitis','Termotivasi target','Ulet','Mandiri']},
-'S-D-C':{name:'INQUIRER',traits:['Full Self Control','Sabar','Penuh Pertimbangan','Good Interpersonal','Result Oriented']},
-'S-I-D':{name:'ADVISOR',traits:['Hangat','Simpati','Tenang','Pendengar baik','Toleran','Berusaha keras']},
-'S-I-C':{name:'ADVOCATE',traits:['Stabil','Ramah','Detail saat dibutuhkan','Teguh pendirian','Mendukung pihak lemah']},
-'S-C-D':{name:'INQUIRER',traits:['Baik secara alamiah','Berorientasi detil','Teliti','Sangat berhati-hati']},
-'S-C-I':{name:'ADVOCATE',traits:['Stabil','Ramah','Individualis','Teguh pendirian','Moderat','Cermat']},
-'C-D':{name:'DESIGNER',traits:['Sensitif','Berorientasi tugas','Kukuh','Efektif memecahkan masalah','Dingin','Berdasar fakta']},
-'C-I':{name:'ASSESSOR',traits:['Analitis','Hati-hati','Ramah saat nyaman','Perfeksionis alami','Berorientasi kualitas']},
-'C-S':{name:'PERFECTIONIST',traits:['Detail & Teliti','Sistematik','Menghindari Konflik','Lambat Memutuskan','Anti Perubahan']},
-'C-D-I':{name:'CHALLENGER',traits:['Berorientasi tugas','Sensitif','Kukuh','Efektif','Berdasar fakta','Pendiam']},
-'C-D-S':{name:'CONTEMPLATOR',traits:['Berorientasi detil','Standard tinggi','Logis','Kompetitif','Mantap','Dapat diandalkan']},
-'C-I-D':{name:'ASSESSOR',traits:['Analitis','Hati-hati','Ramah','Perfeksionis','Berorientasi kualitas']},
-'C-I-S':{name:'MEDIATOR',traits:['Loyal','Curious','Sensitif','Good Communication','Good Analytical Think','Cepat Beradaptasi']},
-'C-S-I':{name:'PRACTITIONER',traits:['Perfeksionis','Quality Oriented','Scheduled','Sistematis']},
-'C-S-D':{name:'PRECISIONIST',traits:['Sistematis','Teratur','Teliti','Bijaksana','Diplomatis','Akurasi tinggi']}
+'D':{name:'ESTABLISHER',pos:['Individualis','High Motivation','Bersemangat Tinggi','Percaya Diri','Kreatif','Efektif','Leader'],neg:['Ego Tinggi','Kurang Sensitif','Kurang Pertimbangan','Agresif','Terlalu Dominan','Terlalu Dinamis'],career:'Attorney, Sales Representative, Production Director/Manager, Strategic Planning, Trouble Shooting, Self-Employment, Marketing Services, Consultant.'},
+'I':{name:'COMMUNICATOR',pos:['Antusias','Optimis','Persuasif','Ramah','Inspirasional','Bicara aktif','Penjaga damai'],neg:['Emosional','Impulsif','Kurang fokus','Terlalu banyak bersosialisasi','Tidak terorganisir'],career:'Promoting, Public Relations, Lecturing, Advertising, Hospitality, Retail, Human Resources, Journalist, Travel Agent, Politician.'},
+'S':{name:'SPECIALIST',pos:['Stabil & Konsisten','Terkendali','Sabar','Loyal','Teguh','Pendengar baik','Dapat diandalkan'],neg:['Anti Perubahan','Sulit Adaptasi','Menghindari Konflik','Lambat Memutuskan','Process Oriented'],career:'Administrative Work, Engineering (Sales, Services, Project), Chef, Accounting, Research and Development, Retail, Landscape Gardener.'},
+'C':{name:'LOGICAL THINKER',pos:['Detail','Analitis','Rapi','Organized','Sistematis','Empati','Perfeksionis'],neg:['Pendiam','Anti Kritik','Kaku pada Metode','Cenderung Santai','Terlalu Detail'],career:'Planner, Engineer, Technical/Research, Academic, Statistician, IT Management, Quality Controller, Accountant.'},
+'D-I':{name:'PENGAMBIL KEPUTUSAN',pos:['Pekerja Keras','Leader','Banyak Minat','Tegas','Logis','Kritis','Imajinatif'],neg:['Cepat Bosan','Dingin/Task Oriented','Kurang Pergaulan','Keras kepala','Anti Aturan'],career:'General Management, Public Relations, Business Management, Sales Management, Marketing, Production Director, Consultancy, Self-Employment.'},
+'D-S':{name:'SELF-MOTIVATED',pos:['Objektif & Analitis','Mandiri','Good Planner','Komitmen thd Target','Stabil','Ulet'],neg:['Menghindari Konflik','Kurang fleksibel','Terlalu mandiri','Kurang sosial'],career:'Engineering (Directing, Managing), Project Management, Researcher, Systems Analyst, Computer Engineer, Programmer, IT, Lawyer.'},
+'D-C':{name:'CHALLENGER',pos:['Tekun','Sensitif terhadap permasalahan','Keputusan kuat','Kreatif memecahkan masalah','Reaksi cepat'],neg:['Perfeksionis','Lambat mengambil keputusan','Terlalu fokus pada ketepatan'],career:'Engineering (Management, Research), Actuaries, Planning, Accountancy, Fund Management, Specialist Finance, Quality Control, Strategic Planning.'},
+'D-I-S':{name:'DIRECTOR',pos:['Pengelola','Enerjik','Motivator','Percaya diri','Meyakinkan orang'],neg:['Kurang Detail','Mudah Bosan','Agresif','Arogan','Kurang Focus'],career:'Engineering and Production (Directing, Managing), Sales Management, Service Manager, Distribution, Public Relations, Office Management.'},
+'D-I-C':{name:'CHANCELLOR',pos:['Ramah secara alami','Detail','Interaktif','Menilai hati-hati','Tepat'],neg:['Sering melalaikan perencanaan','Mudah beralih proyek','Kurang pertimbangan menyeluruh'],career:'Technical/Scientific (Directing, Management), Engineering, Finance, Production Planning, Self-Employment, IT, Banking, Consultancy.'},
+'D-S-I':{name:'DIRECTOR',pos:['Obyektif dan analitis','Termotivasi target pribadi','Tenang','Stabil','Ulet','Mandiri'],neg:['Kurang fleksibel','Terlalu mandiri','Kurang ekspresif'],career:'Engineering and Production (Directing, Managing), Sales Management, Distribution, Office Management, Customer Service, Projects Manager.'},
+'D-S-C':{name:'DIRECTOR',pos:['Obyektif','Analitis','Bantuan & dukungan','Termotivasi target','Stabil'],neg:['Terlalu analitis','Lambat bertindak','Kurang spontan'],career:'Engineering and Production (Directing, Managing), Sales, Creative Designer, Chief Engineer, Business Consultant, Research Planning.'},
+'D-C-I':{name:'CHALLENGER',pos:['Tekun','Sensitif','Keputusan kuat','Kreatif','Reaksi cepat'],neg:['Perfeksionis','Terlalu fokus tugas','Kurang peduli perasaan orang'],career:'Technical/Scientific (Directing, Management), Engineering, Finance, Production Planning, Consultancy, Industrial Relations.'},
+'D-C-S':{name:'CHALLENGER',pos:['Tekun','Sensitif','Keputusan kuat','Perfeksionis','Ide-ide banyak'],neg:['Lambat keputusan','Terlalu detail','Kurang fleksibel'],career:'Engineering, Production and Finance (Directing, Managing), Work Study, Accountant, Quality Controller, Safety Officer, Planner.'},
+'I-S':{name:'ADVISOR',pos:['Hangat','Simpati','Tenang','Pendengar baik','Toleran','Penjaga damai','Demonstratif'],neg:['Kurang tegas','Menerima kritik sebagai serangan pribadi','Terlalu toleran pada yang tidak produktif'],career:'Personnel, Welfare, Training, Hotelier, Promoting, Travel Agent, Lecturing, Soft/Service Selling, Psychologist, Nursing, Social Work.'},
+'I-C':{name:'ASSESSOR',pos:['Ramah','Suka berteman','Nyaman dengan orang asing','Dapat mengendalikan diri','Perfeksionis alamiah'],neg:['Kadang salah menilai kemampuan orang','Terlalu optimis','Kurang fokus saat tugas'],career:'Teaching, Training, Specialist Selling, Project Engineer, Finance, Service Engineer, Public Relations, Marketing, Conference Organiser.'},
+'I-D':{name:'NEGOTIATOR',pos:['Suka Bergaul','Aktif','Percaya Diri','Optimis','Result Oriented','Perhatian tinggi'],neg:['Anti Rutin','Kurang Detail','Terlalu Percaya Diri','Impulsif','Terlalu antusias'],career:'Sales and Marketing, Public Relations, Recruitment Consultant, Director, Self-Employed, Hotelier, Trainer, Hospitality, Lawyer, Team Leader.'},
+'I-S-C':{name:'RESPONSIVE & THOUGHTFUL',pos:['High Energy','Good Communication','Sensitif','Loyal','Cerdas berbagai hal'],neg:['Need Recognition','Anti Kritik','Terlalu banyak bersosialisasi','Leadership kurang'],career:'Personnel, Welfare, Training, Teaching, Accounting, Customer Services, Public Relations, Engineering (Sales, Service), Selling, Purchasing.'},
+'I-S-D':{name:'MOTIVATOR',pos:['Leader Kelompok Kecil','Supporter','Sosialisasi Baik','Peduli','Komunikasi baik'],neg:['Butuh Penghargaan','Kurang Detail','Agak Kaku','Butuh Ketegasan'],career:'Hotelier, Community Counseling, Customer Service, Recruitment Consultant, Hospitality, Teacher, Production Manager, Call Centre Manager.'},
+'I-D-C':{name:'CONFIDENT & DETERMINED',pos:['Pandai Memilih Orang','Leader','Good Interpersonal','Good Communication','Logika tinggi'],neg:['Dominan','Agresif','Perfeksionis','Tidak konsisten','Kurang mendengarkan'],career:'Specialist/Technical Selling, Financial Manager, Engineering Manager, Project Engineer, Sales Engineer, Consultant, Trainer, Lecturer.'},
+'I-D-S':{name:'REFORMER',pos:['Mudah Bergaul','Leader','Sadar Diri','Motivator','Optimis & Positif','Peduli'],neg:['Cepat Percaya Orang','Anti Aturan','Kurang Detail','Terlalu Selektif'],career:'Hotelier, Customer Service, Sales Manager, Marketing Services, Public Relations, Computer Software Sales, Lecturer, Engineering Manager.'},
+'I-C-D':{name:'ASSESSOR',pos:['Analitis','Hati-hati','Ramah saat nyaman','Perfeksionis alami','Berorientasi kualitas'],neg:['Sangat biasa dengan orang asing','Suka situasi yang dapat diramalkan','Kurang spontan'],career:'Specialist/Technical Selling, Financial Manager, Engineering Manager, Project Engineer, Sales Engineer, Consultant, Trainer.'},
+'I-C-S':{name:'RESPONSIVE & THOUGHTFUL',pos:['High Energy','Good Communication','Sensitif','Banyak Bicara','Cerdas'],neg:['Need Recognition','Anti Kritik','Terlalu khawatir pendapat orang'],career:'Personnel, Welfare, Training, Teaching, Customer Services, Public Relations, Engineering, Selling, Purchasing, Administration.'},
+
+'S-D':{name:'SELF-MOTIVATED',pos:['Objektif','Analitis','Mandiri','Komitmen target','Stabil','Tekun'],neg:['Menghindari Konflik','Kurang fleksibel','Terlalu mandiri'],career:'Investigator, Researcher, Accountant, Engineering, Computer Specialist, Architect, Quality Controller, Property Manager, Attorney.'},
+'S-I':{name:'ADVISOR',pos:['Hangat','Simpati','Pendengar baik','Toleran','Penjaga damai','Moderat'],neg:['Kurang tegas','Terlalu toleran','Sulit membuat keputusan','Mudah diramalkan'],career:'Personnel Welfare, Training, Hotelier, Promoting, Travel Agent, Lecturing, Child Care, Charitable Organizations, Psychologist, Therapist, Nurse.'},
+'S-C':{name:'PEACEMAKER',pos:['Detail','Empati','Loyal','Teliti','Peduli orang sekitar'],neg:['Anti Kritik','Sulit Adaptasi','Introvert','Pendendam','Terlalu Mendalam Berpikir'],career:'Office Manager, Chief Clerk, General Administrator, Production Supervisor, Planner, Accountant, Computer Programmer, Doctor, Receptionist, Health Care.'},
+'S-D-I':{name:'DIRECTOR',pos:['Obyektif','Analitis','Termotivasi target','Ulet','Mandiri','Cermat'],neg:['Kurang ekspresif','Terlalu mandiri','Kurang spontan'],career:'Engineering and Production (Supervision), Service Selling, Distribution, Office Management, Customer Service, System Analyst, Programmer.'},
+'S-D-C':{name:'INQUIRER',pos:['Full Self Control','Sabar','Penuh Pertimbangan','Good Interpersonal','Result Oriented'],neg:['Lambat Adaptasi','Inisiatif kurang','Kaku dan Keras Kepala'],career:'Directing, Managing or Supervising (Engineering, Accountancy, R&D, Computing), Research Manager, Accountant, Project Engineer, Designer, Analyst.'},
+'S-I-D':{name:'ADVISOR',pos:['Hangat','Simpati','Tenang','Pendengar baik','Toleran','Berusaha keras'],neg:['Kurang tegas','Mudah diramalkan','Terlalu moderat'],career:'Engineering and Production (Supervision), Service Selling, Distribution, Office Management, Customer Service, System Analyst, Programmer.'},
+'S-I-C':{name:'ADVOCATE',pos:['Stabil','Ramah','Detail saat dibutuhkan','Teguh pendirian','Mendukung pihak lemah'],neg:['Cenderung individualis','Sulit membuat keputusan','Terlalu moderat'],career:'Personnel Welfare, Training, Teaching, Customer Service, Public Relations, Engineer (Sales, Service), Selling, Purchasing, Administration.'},
+'S-C-D':{name:'INQUIRER',pos:['Baik secara alamiah','Berorientasi detil','Teliti','Sangat berhati-hati'],neg:['Lambat adaptasi','Kaku dan keras kepala','Terlalu hati-hati'],career:'Directing, Managing or Supervising (Engineering, Accountancy, R&D), Accountant, Project Engineer, Designer, Analyst, Technician, Service Engineer.'},
+'S-C-I':{name:'ADVOCATE',pos:['Stabil','Ramah','Individualis','Teguh pendirian','Moderat','Cermat'],neg:['Sulit membuat keputusan','Terlalu moderat','Ingin orang lain menyukainya'],career:'Personnel Welfare, Training, Teaching, Customer Service, Public Relations, Counseling, Accounting, Sales Engineer, Legal, Negotiator.'},
+'C-D':{name:'DESIGNER',pos:['Sensitif','Berorientasi tugas','Kukuh','Efektif memecahkan masalah','Berdasar fakta'],neg:['Dingin','Tidak berperasaan','Menjaga jarak','Pendiam','Tidak mudah percaya'],career:'Engineering (Management, Research, Design), Research (R&D), Planning, Chemist, Accountancy, Specialist Finance, Quality Control, Production Planning.'},
+'C-I':{name:'ASSESSOR',pos:['Analitis','Hati-hati','Ramah saat nyaman','Perfeksionis alami','Berorientasi kualitas'],neg:['Sangat biasa dengan orang asing','Mengisolasi diri','Suka situasi yang dapat diramalkan'],career:'Sales (Technical/Specialist), Public Relations, Lecturer, Academic, Personnel Administration, Purchasing, Travel Agent, Training, Teaching.'},
+'C-S':{name:'PERFECTIONIST',pos:['Detail & Teliti','Sistematik','Bijaksana','Diplomatis','Akurasi tinggi'],neg:['Menghindari Konflik','Lambat Memutuskan','Anti Perubahan','Terjebak dalam detail'],career:'Researcher, Engineer (Project, Draughtsman), Statistician, Medical Specialist, IT Management, Planner, Technical Writing, Quality Control, Dentist, Architect.'},
+'C-D-I':{name:'CHALLENGER',pos:['Berorientasi tugas','Sensitif','Kukuh','Efektif','Berdasar fakta'],neg:['Pendiam','Dingin','Tidak mudah percaya','Menjaga jarak'],career:'Engineering (Management, Research, Design), Actuaries, Research (R&D), Planning, Accountancy, Fund Management, Quality Control, Strategic Planning.'},
+'C-D-S':{name:'CONTEMPLATOR',pos:['Berorientasi detil','Standard tinggi','Logis','Kompetitif','Mantap','Dapat diandalkan'],neg:['Terlalu fokus tugas','Sensitif tapi tertutupi logika','Kurang spontan'],career:'Directing, Managing or Supervising (Engineering, Research, Finance, Planning), Designer, Work Study, Sales (Technical/Specialist), Logistic Support, Systems Analyst.'},
+'C-I-D':{name:'ASSESSOR',pos:['Analitis','Hati-hati','Ramah','Perfeksionis','Berorientasi kualitas'],neg:['Mengisolasi diri','Kurang spontan','Terlalu hati-hati'],career:'Directing, Managing or Supervising (Engineering, Research, Finance, Planning), Designer, Work Study, Sales (Technical/Specialist), Lecturer.'},
+'C-I-S':{name:'MEDIATOR',pos:['Loyal','Curious','Sensitif','Good Communication','Good Analytical Think','Cepat Beradaptasi'],neg:['Anti Kritik','Not Leader','Work/Play Conflict','Terlalu khawatir pendapat orang'],career:'Engineering and Production (Supervisor, Installer, Technician), Research, Trainer, Finance, Public Relations, Administration, System Analyst, Programmer.'},
+'C-S-I':{name:'PRACTITIONER',pos:['Perfeksionis','Quality Oriented','Scheduled','Sistematis'],neg:['Kaku/Tidak fleksibel','Monoton','Anti Deadline','Terlalu Detail'],career:'Engineering and Production (Supervisor, Installer, Technician), Research, Finance (Manager, Accountant), Public Relations, Purchasing, Office Administrator, Programmer.'},
+'C-S-D':{name:'PRECISIONIST',pos:['Sistematis','Teratur','Teliti','Bijaksana','Diplomatis','Akurasi tinggi'],neg:['Terjebak dalam detail','Menginginkan petunjuk standard','Tidak menginginkan perubahan mendadak'],career:'Engineering, Research, Production and Finance (Director, Manager, Supervisor), Work Study, Accountant, Administrator, Quality Controller, Safety Officer, Planner.'}
 };
 
 const DESC={
@@ -311,19 +312,39 @@ function getPattern(s3){
 }
 
 async function saveResult(r){
-  try{await db.collection('hrd_disc_results').add({mode:testState.mode,nama:testState.nama,usia:testState.usia,jenisKelamin:testState.jenisKelamin,posisi:testState.posisi,tanggalTes:testState.tanggalTes,nip:testState.nip||'',departemen:testState.departemen||'',evaluasiPeriode:testState.evaluasiPeriode||'',kontak:testState.kontak||'',rawP:r.rawP,rawK:r.rawK,seg1:r.s1,seg2:r.s2,seg3:r.s3,pattern:r.pattern,profileName:r.profile.name,createdAt:new Date().toISOString()});toast('Hasil tes berhasil disimpan','success');}
+  try{
+    const posCount=r.profile.pos?r.profile.pos.length:0;
+    const negCount=r.profile.neg?r.profile.neg.length:0;
+    const kpiScore=Math.min(100,Math.max(0,70+Math.min(posCount*3,20)-Math.min(negCount*2,15)));
+    await db.collection('hrd_disc_results').add({mode:testState.mode,nama:testState.nama,usia:testState.usia,jenisKelamin:testState.jenisKelamin,posisi:testState.posisi,tanggalTes:testState.tanggalTes,nip:testState.nip||'',departemen:testState.departemen||'',evaluasiPeriode:testState.evaluasiPeriode||'',kontak:testState.kontak||'',rawP:r.rawP,rawK:r.rawK,seg1:r.s1,seg2:r.s2,seg3:r.s3,pattern:r.pattern,profileName:r.profile.name,positiveTraits:r.profile.pos||[],negativeTraits:r.profile.neg||[],career:r.profile.career||'',kpiScore,createdAt:new Date().toISOString()});toast('Hasil tes berhasil disimpan','success');}
   catch(e){console.error(e);toast('Gagal menyimpan','error');}
 }
 
 function renderResult(r){
   const{s1,s2,s3,pattern,profile,desc,rawP,rawK}=r;
-  let graphHtml='';
-  ['D','I','S','C'].forEach(t=>{
-    const v=s3[t],pct=(Math.abs(v)/8*45).toFixed(0);
-    const style=v>=0?`position:absolute;bottom:50%;width:100%;height:${pct}%;background:#4caf50;border-radius:6px 6px 0 0`:`position:absolute;top:50%;width:100%;height:${pct}%;background:#ef5350;border-radius:0 0 6px 6px`;
-    graphHtml+=`<div style="display:flex;flex-direction:column;align-items:center;gap:4px"><div style="font-size:.75rem;font-weight:600;color:${v>=0?'var(--success)':'var(--danger)'}">${v>0?'+':''}${v.toFixed(1)}</div><div style="width:50px;height:160px;background:#f5f5f5;border-radius:8px;position:relative;border:1px solid var(--border)"><div style="position:absolute;top:50%;left:0;right:0;height:1px;background:#999"></div><div style="${style}"></div></div><div style="font-size:.85rem;font-weight:700;color:var(--primary)">${t}</div></div>`;
-  });
-  let traits='';(profile.traits||[]).forEach(t=>{traits+=`<div style="padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:.85rem">• ${esc(t)}</div>`;});
+  // Build 3 graphs
+  function buildGraph(data,title,subtitle){
+    let bars='';['D','I','S','C'].forEach(t=>{const v=data[t]||0;const pct=(Math.abs(v)/8*45).toFixed(0);const col=v>=0?'#4caf50':'#ef5350';const style=v>=0?`position:absolute;bottom:50%;width:100%;height:${pct}%;background:${col};border-radius:4px 4px 0 0`:`position:absolute;top:50%;width:100%;height:${pct}%;background:${col};border-radius:0 0 4px 4px`;bars+=`<div style="display:flex;flex-direction:column;align-items:center;gap:2px"><div style="font-size:.68rem;font-weight:600;color:${v>=0?'#2e7d32':'#c62828'}">${v>0?'+':''}${typeof v==='number'?v.toFixed(1):v}</div><div style="width:40px;height:120px;background:#f5f5f5;border-radius:6px;position:relative;border:1px solid #e0e0e0"><div style="position:absolute;top:50%;left:0;right:0;height:1px;background:#999"></div><div style="${style}"></div></div><div style="font-size:.78rem;font-weight:700;color:var(--primary)">${t}</div></div>`;});
+    return`<div style="flex:1;min-width:180px;text-align:center"><div style="font-size:.75rem;font-weight:700;color:var(--primary);margin-bottom:4px">${title}</div><div style="font-size:.68rem;color:var(--text-light);margin-bottom:8px">${subtitle}</div><div style="display:flex;justify-content:center;gap:12px">${bars}</div></div>`;
+  }
+  const graph1=buildGraph(s1,'GRAPH 1 — MOST','Mask Public Self');
+  const graph2=buildGraph(s2,'GRAPH 2 — LEAST','Core Private Self');
+  const graph3=buildGraph(s3,'GRAPH 3 — CHANGE','Mirror Perceived Self');
+
+  // Positive & Negative traits
+  let posHtml='',negHtml='';
+  (profile.pos||[]).forEach(t=>{posHtml+=`<div style="padding:5px 0;border-bottom:1px solid #e8f5e9;font-size:.83rem;color:#2e7d32">✅ ${esc(t)}</div>`;});
+  (profile.neg||[]).forEach(t=>{negHtml+=`<div style="padding:5px 0;border-bottom:1px solid #ffebee;font-size:.83rem;color:#c62828">⚠️ ${esc(t)}</div>`;});
+
+  // KPI Impact Score calculation
+  const posCount=profile.pos?profile.pos.length:0;
+  const negCount=profile.neg?profile.neg.length:0;
+  const kpiBase=70;
+  const kpiBonus=Math.min(posCount*3,20);
+  const kpiPenalty=Math.min(negCount*2,15);
+  const kpiScore=Math.min(100,Math.max(0,kpiBase+kpiBonus-kpiPenalty));
+  const kpiGrade=kpiScore>=90?'A':kpiScore>=80?'B':kpiScore>=70?'C':kpiScore>=60?'D':'E';
+
   document.getElementById('app').innerHTML=`
   <div style="max-width:800px;margin:0 auto">
     <div style="background:#fff;border-radius:10px;padding:24px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06);text-align:center">
@@ -331,20 +352,55 @@ function renderResult(r){
       <p style="color:var(--text-light);font-size:.85rem">${esc(testState.nama)} — ${testState.tanggalTes}</p>
       ${testState.mode==='evaluasi'?`<p style="font-size:.78rem;color:var(--text-light)">Periode: ${esc(testState.evaluasiPeriode)} | Dept: ${esc(testState.departemen)}</p>`:''}
       <div style="display:inline-block;padding:8px 20px;background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;border-radius:20px;font-size:1rem;font-weight:700;margin:12px 0">${esc(profile.name)} (${pattern})</div>
-      <h4 style="margin-top:20px;color:var(--primary)">📊 Grafik Kepribadian</h4>
-      <div style="display:flex;justify-content:center;gap:24px;margin:16px 0;flex-wrap:wrap">${graphHtml}</div>
-      <div style="font-size:.75rem;color:var(--text-light)">D=Dominance | I=Influence | S=Steadiness | C=Compliance</div>
     </div>
+
+    <div style="background:#fff;border-radius:10px;padding:20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
+      <h4 style="color:var(--primary);margin-bottom:16px;text-align:center">📊 Personality System Graph</h4>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">${graph1}${graph2}${graph3}</div>
+      <div style="text-align:center;margin-top:12px;font-size:.72rem;color:var(--text-light)">D=Dominance | I=Influence | S=Steadiness | C=Compliance</div>
+    </div>
+
     <div style="background:#fff;border-radius:10px;padding:20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
       <h4 style="color:var(--primary);margin-bottom:12px">📝 Deskripsi Kepribadian</h4>
       <div style="background:#f8f9ff;border-radius:8px;padding:16px;font-size:.85rem;line-height:1.7">${esc(desc)}</div>
     </div>
-    <div style="background:#fff;border-radius:10px;padding:20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
-      <h4 style="color:var(--primary);margin-bottom:12px">🎯 Karakteristik</h4>
-      ${traits}
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <div style="background:#fff;border-radius:10px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
+        <h4 style="color:var(--success);margin-bottom:12px">✅ Sifat Positif</h4>
+        ${posHtml||'<p style="font-size:.82rem;color:#999">-</p>'}
+      </div>
+      <div style="background:#fff;border-radius:10px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
+        <h4 style="color:var(--danger);margin-bottom:12px">⚠️ Sifat Negatif</h4>
+        ${negHtml||'<p style="font-size:.82rem;color:#999">-</p>'}
+      </div>
     </div>
+
     <div style="background:#fff;border-radius:10px;padding:20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
-      <h4 style="color:var(--primary);margin-bottom:12px">📈 Detail Skor</h4>
+      <h4 style="color:var(--primary);margin-bottom:12px">💼 Rekomendasi Bidang Pekerjaan</h4>
+      <div style="background:#e8f5e9;border-radius:8px;padding:16px;font-size:.85rem;line-height:1.7;color:#1b5e20">${esc(profile.career||'Belum tersedia untuk profil ini.')}</div>
+    </div>
+
+    <div style="background:#fff;border-radius:10px;padding:20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
+      <h4 style="color:var(--primary);margin-bottom:12px">📈 Dampak terhadap KPI</h4>
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <div style="text-align:center;padding:16px 24px;background:linear-gradient(135deg,${kpiScore>=80?'#e8f5e9':'#fff8e1'},#fff);border-radius:10px;border:2px solid ${kpiScore>=80?'var(--success)':kpiScore>=60?'var(--warning)':'var(--danger)'}">
+          <div style="font-size:2rem;font-weight:700;color:${kpiScore>=80?'var(--success)':kpiScore>=60?'var(--warning)':'var(--danger)'}">${kpiScore}</div>
+          <div style="font-size:.75rem;color:var(--text-light)">Skor Kepribadian</div>
+          <div style="font-size:1.2rem;font-weight:700;margin-top:4px">Grade ${kpiGrade}</div>
+        </div>
+        <div style="flex:1;font-size:.82rem;line-height:1.8">
+          <div><strong>Sifat Positif:</strong> ${posCount} poin (+${kpiBonus} skor)</div>
+          <div><strong>Sifat Negatif:</strong> ${negCount} poin (-${kpiPenalty} skor)</div>
+          <div style="margin-top:8px;padding:8px;background:#f5f5f5;border-radius:6px;font-size:.78rem;color:var(--text-light)">
+            <strong>Catatan:</strong> Skor ini merepresentasikan potensi kepribadian terhadap performa kerja. Skor tinggi menunjukkan keseimbangan positif yang baik untuk produktivitas dan kerjasama tim.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:#fff;border-radius:10px;padding:20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
+      <h4 style="color:var(--primary);margin-bottom:12px">📊 Detail Skor</h4>
       <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.82rem"><thead><tr style="background:var(--primary);color:#fff"><th style="padding:10px">Dimensi</th><th style="padding:10px">Raw P</th><th style="padding:10px">Raw K</th><th style="padding:10px">Seg1</th><th style="padding:10px">Seg2</th><th style="padding:10px">Final</th></tr></thead><tbody>
       <tr><td style="padding:8px;border-bottom:1px solid #eee;font-weight:700">D</td><td style="padding:8px;border-bottom:1px solid #eee">${rawP.D}</td><td style="padding:8px;border-bottom:1px solid #eee">${rawK.D}</td><td style="padding:8px;border-bottom:1px solid #eee">${s1.D}</td><td style="padding:8px;border-bottom:1px solid #eee">${s2.D}</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:700">${s3.D>0?'+':''}${s3.D.toFixed(1)}</td></tr>
       <tr><td style="padding:8px;border-bottom:1px solid #eee;font-weight:700">I</td><td style="padding:8px;border-bottom:1px solid #eee">${rawP.I}</td><td style="padding:8px;border-bottom:1px solid #eee">${rawK.I}</td><td style="padding:8px;border-bottom:1px solid #eee">${s1.I}</td><td style="padding:8px;border-bottom:1px solid #eee">${s2.I}</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:700">${s3.I>0?'+':''}${s3.I.toFixed(1)}</td></tr>
@@ -352,6 +408,7 @@ function renderResult(r){
       <tr><td style="padding:8px;font-weight:700">C</td><td style="padding:8px">${rawP.C}</td><td style="padding:8px">${rawK.C}</td><td style="padding:8px">${s1.C}</td><td style="padding:8px">${s2.C}</td><td style="padding:8px;font-weight:700">${s3.C>0?'+':''}${s3.C.toFixed(1)}</td></tr>
       </tbody></table></div>
     </div>
+
     <div style="background:#fff;border-radius:10px;padding:20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06);text-align:center">
       <button onclick="window.print()" style="padding:10px 20px;border:none;background:var(--primary);color:#fff;border-radius:6px;font-size:.85rem;font-weight:600;cursor:pointer;margin:4px">🖨️ Cetak</button>
       <button onclick="renderModeSelection()" style="padding:10px 20px;border:none;background:var(--info);color:#fff;border-radius:6px;font-size:.85rem;font-weight:600;cursor:pointer;margin:4px">🔄 Tes Baru</button>
