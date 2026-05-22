@@ -132,7 +132,7 @@ function renderCalonForm(){
       <div><label style="display:block;font-size:.82rem;font-weight:600;margin-bottom:4px">Nama Lengkap *</label><input id="fNama" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:.85rem" placeholder="Nama lengkap"></div>
       <div><label style="display:block;font-size:.82rem;font-weight:600;margin-bottom:4px">Usia</label><input id="fUsia" type="number" min="17" max="65" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:.85rem" placeholder="Usia"></div>
       <div><label style="display:block;font-size:.82rem;font-weight:600;margin-bottom:4px">Jenis Kelamin</label><select id="fGender" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:.85rem"><option value="">-- Pilih --</option><option>Laki-laki</option><option>Perempuan</option></select></div>
-      <div><label style="display:block;font-size:.82rem;font-weight:600;margin-bottom:4px">Posisi Dilamar</label><input id="fPosisi" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:.85rem" placeholder="Posisi"></div>
+      <div><label style="display:block;font-size:.82rem;font-weight:600;margin-bottom:4px">Posisi yang Dilamar *</label><select id="fPosisi" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:.85rem"><option value="">Memuat lowongan...</option></select></div>
     </div>
     <div style="margin-top:14px"><label style="display:block;font-size:.82rem;font-weight:600;margin-bottom:4px">Email / No. HP</label><input id="fKontak" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:.85rem" placeholder="Email atau HP"></div>
     <div style="display:flex;gap:8px;margin-top:16px">
@@ -140,6 +140,18 @@ function renderCalonForm(){
       <button onclick="validateStart('calon')" style="padding:10px 20px;border:none;background:var(--primary);color:#fff;border-radius:6px;font-size:.85rem;font-weight:600;cursor:pointer">Mulai Tes →</button>
     </div>
   </div>`;
+  loadLowonganOptions();
+}
+async function loadLowonganOptions(){
+  try{
+    const snap=await db.collection('hrd_lowongan').where('status','==','aktif').get();
+    const sel=document.getElementById('fPosisi');if(!sel)return;
+    let opts='<option value="">-- Pilih Posisi Lowongan --</option>';
+    if(snap.empty){opts+='<option value="General">General (Belum ada lowongan aktif)</option>';}
+    else{snap.forEach(d=>{const p=d.data();opts+=`<option value="${p.posisi||p.judul||''}">${p.posisi||p.judul||'-'} — ${p.departemen||''}</option>`;});}
+    opts+='<option value="Lainnya">Lainnya (Posisi tidak terdaftar)</option>';
+    sel.innerHTML=opts;
+  }catch(e){const sel=document.getElementById('fPosisi');if(sel)sel.innerHTML='<option value="">-- Ketik posisi --</option>';}
 }
 
 function renderEvaluasiForm(){
@@ -294,7 +306,13 @@ async function saveResult(r){
     const posCount=r.profile.pos?r.profile.pos.length:0;
     const negCount=r.profile.neg?r.profile.neg.length:0;
     const kpiScore=Math.min(100,Math.max(0,70+Math.min(posCount*3,20)-Math.min(negCount*2,15)));
-    await db.collection('hrd_disc_results').add({mode:testState.mode,nama:testState.nama,usia:testState.usia,jenisKelamin:testState.jenisKelamin,posisi:testState.posisi,tanggalTes:testState.tanggalTes,nip:testState.nip||'',departemen:testState.departemen||'',evaluasiPeriode:testState.evaluasiPeriode||'',kontak:testState.kontak||'',rawP:r.rawP,rawK:r.rawK,seg1:r.s1,seg2:r.s2,seg3:r.s3,pattern:r.pattern,profileName:r.profile.name,positiveTraits:r.profile.pos||[],negativeTraits:r.profile.neg||[],career:r.profile.career||'',kpiScore,createdAt:new Date().toISOString()});toast('Hasil tes berhasil disimpan','success');}
+    await db.collection('hrd_disc_results').add({mode:testState.mode,nama:testState.nama,usia:testState.usia,jenisKelamin:testState.jenisKelamin,posisi:testState.posisi,tanggalTes:testState.tanggalTes,nip:testState.nip||'',departemen:testState.departemen||'',evaluasiPeriode:testState.evaluasiPeriode||'',kontak:testState.kontak||'',rawP:r.rawP,rawK:r.rawK,seg1:r.s1,seg2:r.s2,seg3:r.s3,pattern:r.pattern,profileName:r.profile.name,positiveTraits:r.profile.pos||[],negativeTraits:r.profile.neg||[],career:r.profile.career||'',kpiScore,createdAt:new Date().toISOString()});
+    // Sync calon karyawan to recruitment pipeline
+    if(testState.mode==='calon'){
+      await db.collection('hrd_kandidat').add({nama:testState.nama,email:testState.kontak||'',posisi:testState.posisi,stage:'DISC Test Done',sumber:'DISC Test Online',discPattern:r.pattern,discProfile:r.profile.name,discScore:kpiScore,usia:testState.usia,jenisKelamin:testState.jenisKelamin,kontak:testState.kontak||'',createdAt:new Date().toISOString()});
+      toast('Hasil tes disimpan & data masuk ke pipeline rekrutmen','success');
+    } else { toast('Hasil tes berhasil disimpan','success'); }
+  }
   catch(e){console.error(e);toast('Gagal menyimpan','error');}
 }
 
