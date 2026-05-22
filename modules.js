@@ -1942,3 +1942,34 @@ async function kirimLamaran() {
   </div>`;
   toast('Lamaran terkirim!', 'success');
 }
+
+
+// ── DISC TEST PAGE (in main app) ──────────────────────────────
+function renderDiscTestPage(){
+  const main=document.getElementById('mainContent');
+  main.innerHTML=`
+  <div class="page-title"><span>🧠 DISC Personality Test</span></div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">Tes Kepribadian DISC</div>
+      <div class="flex gap-8"><a href="disc-test.html" target="_blank" class="btn btn-primary btn-sm">🔗 Link Tes (Calon)</a><a href="disc-test.html#evaluasi" target="_blank" class="btn btn-warning btn-sm">📊 Evaluasi Karyawan</a></div>
+    </div>
+    <div style="background:#e3f2fd;border-radius:8px;padding:14px;margin-bottom:16px;border-left:4px solid var(--info)">
+      <p class="text-sm" style="line-height:1.6"><strong>DISC</strong> = Dominance, Influence, Steadiness, Compliance.<br>
+      • <strong>Calon Karyawan:</strong> Bagikan link tes kepada kandidat saat rekrutmen<br>
+      • <strong>Evaluasi Periodik:</strong> HR evaluasi kepribadian karyawan aktif secara berkala</p>
+    </div>
+  </div>
+  <div class="card"><div class="card-header"><div class="card-title">📋 Riwayat Hasil Tes</div></div>
+    <div class="flex gap-8 mb-16"><input class="form-control" placeholder="Cari nama..." id="dSrc" oninput="fltDisc()" style="max-width:250px"><select class="form-control" id="dFlt" onchange="fltDisc()" style="max-width:180px"><option value="">Semua</option><option value="calon">Calon</option><option value="evaluasi">Evaluasi</option></select></div>
+    <div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Nama</th><th>Mode</th><th>Posisi</th><th>Tipe</th><th>Profil</th></tr></thead><tbody id="dTbl"><tr><td colspan="6" class="text-center">Memuat...</td></tr></tbody></table></div>
+  </div>`;
+  loadDiscHist();
+}
+async function loadDiscHist(){const snap=await db.collection('hrd_disc_results').orderBy('createdAt','desc').limit(50).get();window._dData=[];snap.forEach(d=>window._dData.push({id:d.id,...d.data()}));fltDisc();}
+function fltDisc(){
+  const q=(document.getElementById('dSrc')?.value||'').toLowerCase(),m=document.getElementById('dFlt')?.value||'';
+  const data=(window._dData||[]).filter(r=>{if(q&&!r.nama?.toLowerCase().includes(q))return false;if(m&&r.mode!==m)return false;return true;});
+  let h='';if(!data.length)h='<tr><td colspan="6" class="text-center" style="color:var(--text-light)">Belum ada data</td></tr>';
+  else data.forEach(r=>{const dt=r.createdAt?new Date(r.createdAt).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}):'-';const badge=r.mode==='evaluasi'?'<span class="badge badge-warning">Evaluasi</span>':'<span class="badge badge-info">Calon</span>';h+=`<tr><td>${dt}</td><td class="fw-700">${escHtml(r.nama)}</td><td>${badge}</td><td>${escHtml(r.posisi||'-')}</td><td class="fw-700" style="color:var(--primary)">${escHtml(r.pattern||'-')}</td><td>${escHtml(r.profileName||'-')}</td></tr>`;});
+  document.getElementById('dTbl').innerHTML=h;
+}
