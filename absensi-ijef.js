@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 // ============================================================
 // ABSENSI-IJEF.JS — Selfie+GPS + Dinas Luar + Setting + Rekap
 // ============================================================
@@ -154,7 +154,7 @@ async function showSettingSection(section) {
       </div>`;
   } else if (section === 'log') {
     el.innerHTML = '<div class="card"><div class="card-title mb-16">📋 Log Lokasi Absensi</div><div id="logLokasiContent">Loading...</div></div>';
-    const snap = await db.collection('hrd_absensi').orderBy('createdAt','desc').limit(50).get();
+    const snap = await db.collection('hrd_absensi').get();
     let logHtml = '';
     if (snap.empty) {
       logHtml = '<p class="text-sm" style="color:#999">Belum ada data absensi.</p>';
@@ -566,7 +566,7 @@ async function doClockOut() {
 
 async function checkTodayStatus(){const snap=await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).get();let masuk=false,pulang=false;snap.forEach(d=>{if(d.data().tipe==='masuk')masuk=true;if(d.data().tipe==='pulang')pulang=true;});const el=document.getElementById('clockStatus');if(el){if(masuk&&pulang)el.innerHTML='<div class="badge badge-success" style="font-size:.9rem;padding:8px 16px">✅ Sudah In & Out</div>';else if(masuk)el.innerHTML='<div class="badge badge-info" style="font-size:.9rem;padding:8px 16px">⏰ Sudah In, belum Out</div>';else el.innerHTML='<div class="badge badge-warning" style="font-size:.9rem;padding:8px 16px">⚠️ Belum absen</div>';}}
 
-async function loadTodayHistory(){const snap=await db.collection('hrd_absensi').where('tanggal','==',todayStr()).orderBy('createdAt','desc').limit(20).get();let h='';if(snap.empty)h='<p class="text-sm" style="color:#999">Belum ada absensi hari ini</p>';else snap.forEach(d=>{const p=d.data();const tipeLabel=p.tipe==='masuk'?'Clock In':p.tipe==='pulang'?'Clock Out':p.tipe==='dinas_luar'?'Dinas Luar':p.tipe==='istirahat_mulai'?'Mulai Istirahat':p.tipe==='istirahat_selesai'?'Selesai Istirahat':p.tipe;const badgeColor=p.tipe==='masuk'?'success':p.tipe==='pulang'?'info':p.tipe==='istirahat_mulai'?'warning':p.tipe==='istirahat_selesai'?'info':'warning';let lemburBadge='';if(p.lembur&&p.lemburJam)lemburBadge=` <span class="badge" style="background:#f3e5f5;color:#7b1fa2">Lembur ${p.lemburJam} jam</span>`;let coreViolBadge='';if(p.coreHoursViolation)coreViolBadge=' <span class="badge badge-warning">⚠️ Core Hours</span>';h+=`<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">${p.foto?`<img src="${p.foto}" style="width:36px;height:36px;border-radius:50%;object-fit:cover">`:'<div style="width:36px;height:36px;border-radius:50%;background:#eee;display:flex;align-items:center;justify-content:center">👤</div>'}<div style="flex:1"><div class="fw-700 text-sm">${escHtml(p.nama)} ${p.tipe==='dinas_luar'?'<span class="badge badge-info">Dinas Luar</span>':''}${lemburBadge}${coreViolBadge}</div><div class="text-xs" style="color:#999">${tipeLabel} — ${p.waktu}</div></div><span class="badge badge-${badgeColor}">${p.status||p.tipe}</span></div>`;});const el=document.getElementById('todayHistory');if(el)el.innerHTML=h;}
+async function loadTodayHistory(){const snap=await db.collection('hrd_absensi').where('tanggal','==',todayStr()).get();let h='';if(snap.empty)h='<p class="text-sm" style="color:#999">Belum ada absensi hari ini</p>';else snap.forEach(d=>{const p=d.data();const tipeLabel=p.tipe==='masuk'?'Clock In':p.tipe==='pulang'?'Clock Out':p.tipe==='dinas_luar'?'Dinas Luar':p.tipe==='istirahat_mulai'?'Mulai Istirahat':p.tipe==='istirahat_selesai'?'Selesai Istirahat':p.tipe;const badgeColor=p.tipe==='masuk'?'success':p.tipe==='pulang'?'info':p.tipe==='istirahat_mulai'?'warning':p.tipe==='istirahat_selesai'?'info':'warning';let lemburBadge='';if(p.lembur&&p.lemburJam)lemburBadge=` <span class="badge" style="background:#f3e5f5;color:#7b1fa2">Lembur ${p.lemburJam} jam</span>`;let coreViolBadge='';if(p.coreHoursViolation)coreViolBadge=' <span class="badge badge-warning">⚠️ Core Hours</span>';h+=`<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">${p.foto?`<img src="${p.foto}" style="width:36px;height:36px;border-radius:50%;object-fit:cover">`:'<div style="width:36px;height:36px;border-radius:50%;background:#eee;display:flex;align-items:center;justify-content:center">👤</div>'}<div style="flex:1"><div class="fw-700 text-sm">${escHtml(p.nama)} ${p.tipe==='dinas_luar'?'<span class="badge badge-info">Dinas Luar</span>':''}${lemburBadge}${coreViolBadge}</div><div class="text-xs" style="color:#999">${tipeLabel} — ${p.waktu}</div></div><span class="badge badge-${badgeColor}">${p.status||p.tipe}</span></div>`;});const el=document.getElementById('todayHistory');if(el)el.innerHTML=h;}
 
 // ── BREAK TRACKING ────────────────────────────────────────────
 
@@ -738,7 +738,7 @@ async function loadDinasTab(tab) {
   const el = document.getElementById('dinasContent');
 
   if (tab === 'pengajuan') {
-    const snap = await db.collection('hrd_dinas_luar').orderBy('createdAt','desc').get();
+    const snap = await db.collection('hrd_dinas_luar').get();
     let h = '<div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Tanggal</th><th>Tujuan</th><th>Status</th><th>Aksi</th></tr></thead><tbody>';
     if(snap.empty) h += '<tr><td colspan="5" class="text-center">Belum ada pengajuan</td></tr>';
     else snap.forEach(d=>{const p=d.data();const badge=p.status==='approved'?'badge-success':p.status==='rejected'?'badge-danger':'badge-warning';h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggal)}</td><td>${escHtml(p.tujuan)}</td><td><span class="badge ${badge}">${p.status}</span></td><td>${p.status==='pending'&&hasAccess(3)?`<button class="btn btn-xs btn-success" onclick="approveDinas('${d.id}','approved')">✅</button> <button class="btn btn-xs btn-danger" onclick="approveDinas('${d.id}','rejected')">❌</button>`:'-'}</td></tr>`;});
@@ -746,7 +746,7 @@ async function loadDinasTab(tab) {
     el.innerHTML = h;
   } else {
     // Riwayat absen dinas luar (selfie+GPS)
-    const snap = await db.collection('hrd_absensi').where('tipe','==','dinas_luar').orderBy('createdAt','desc').limit(30).get();
+    const snap = await db.collection('hrd_absensi').where('tipe','==','dinas_luar').get();
     let h = '<div class="table-wrap"><table><thead><tr><th>Foto</th><th>Karyawan</th><th>Tanggal</th><th>Waktu</th><th>Lokasi</th><th>Tujuan</th></tr></thead><tbody>';
     if(snap.empty) h += '<tr><td colspan="6" class="text-center">Belum ada absen dinas luar</td></tr>';
     else snap.forEach(d=>{const p=d.data();h+=`<tr><td>${p.foto?`<img src="${p.foto}" style="width:36px;height:36px;border-radius:50%;object-fit:cover">`:'👤'}</td><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggal)}</td><td>${p.waktu}</td><td class="text-xs">${p.lat?.toFixed(4)||'-'}, ${p.lng?.toFixed(4)||'-'}</td><td>${escHtml(p.tujuanDinas||'-')}</td></tr>`;});
