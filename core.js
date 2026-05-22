@@ -175,8 +175,18 @@ function navigateTo(page) {
   if(fn)fn(); else main.innerHTML=`<div class="empty-state"><div class="icon">🚧</div><p>Halaman "${page}" dalam pengembangan</p></div>`;
 }
 
-function toggleSidebar(){document.getElementById('sidebar')?.classList.toggle('open');document.getElementById('overlaySidebar')?.classList.toggle('active');}
-function closeSidebar(){document.getElementById('sidebar')?.classList.remove('open');document.getElementById('overlaySidebar')?.classList.remove('active');}
+function toggleSidebar(){
+  const sb=document.getElementById('sidebar');
+  const ov=document.getElementById('overlaySidebar');
+  if(sb){sb.classList.toggle('open');}
+  if(ov){ov.classList.toggle('active');}
+}
+function closeSidebar(){
+  const sb=document.getElementById('sidebar');
+  const ov=document.getElementById('overlaySidebar');
+  if(sb){sb.classList.remove('open');}
+  if(ov){ov.classList.remove('active');}
+}
 
 function openModal(html,large){const o=document.getElementById('modalOverlay'),c=document.getElementById('modalContent');c.className='modal'+(large?' modal-lg':'');c.innerHTML=html;o.classList.add('active');}
 function closeModal(e){if(e&&e.target!==document.getElementById('modalOverlay'))return;document.getElementById('modalOverlay').classList.remove('active');}
