@@ -2017,26 +2017,42 @@ function fltDisc(){
 
 async function viewDiscResult(id){
   const doc=await db.collection('hrd_disc_results').doc(id).get();if(!doc.exists)return toast('Data tidak ditemukan','error');
-  const r=doc.data();const s3=r.seg3||{D:0,I:0,S:0,C:0};
-  let graphH='';['D','I','S','C'].forEach(t=>{const v=s3[t]||0;const pct=(Math.abs(v)/8*45).toFixed(0);const col=v>=0?'#4caf50':'#ef5350';const style=v>=0?`position:absolute;bottom:50%;width:100%;height:${pct}%;background:${col};border-radius:4px 4px 0 0`:`position:absolute;top:50%;width:100%;height:${pct}%;background:${col};border-radius:0 0 4px 4px`;graphH+=`<div style="display:flex;flex-direction:column;align-items:center;gap:2px"><div style="font-size:.7rem;font-weight:600">${v>0?'+':''}${typeof v==='number'?v.toFixed(1):v}</div><div style="width:40px;height:100px;background:#f5f5f5;border-radius:6px;position:relative;border:1px solid #e0e0e0"><div style="position:absolute;top:50%;left:0;right:0;height:1px;background:#999"></div><div style="${style}"></div></div><div style="font-size:.8rem;font-weight:700;color:var(--primary)">${t}</div></div>`;});
+  const r=doc.data();const s1=r.seg1||{D:0,I:0,S:0,C:0};const s2=r.seg2||{D:0,I:0,S:0,C:0};const s3=r.seg3||{D:0,I:0,S:0,C:0};
+  // Build 3 graphs
+  function bGraph(data,title,sub){let bars='';['D','I','S','C'].forEach(t=>{const v=data[t]||0;const pct=(Math.abs(v)/8*42).toFixed(0);const col=v>=0?'#4caf50':'#ef5350';const st=v>=0?`position:absolute;bottom:50%;width:100%;height:${pct}%;background:${col};border-radius:3px 3px 0 0`:`position:absolute;top:50%;width:100%;height:${pct}%;background:${col};border-radius:0 0 3px 3px`;bars+=`<div style="display:flex;flex-direction:column;align-items:center;gap:1px"><div style="font-size:.6rem;font-weight:600;color:${v>=0?'#2e7d32':'#c62828'}">${v>0?'+':''}${typeof v==='number'?v.toFixed(1):v}</div><div style="width:28px;height:70px;background:#f5f5f5;border-radius:4px;position:relative;border:1px solid #e0e0e0"><div style="position:absolute;top:50%;left:0;right:0;height:1px;background:#bbb"></div><div style="${st}"></div></div><div style="font-size:.65rem;font-weight:700;color:var(--primary)">${t}</div></div>`;});return`<div style="text-align:center;flex:1"><div style="font-size:.65rem;font-weight:700;color:var(--primary);margin-bottom:2px">${title}</div><div style="font-size:.58rem;color:#999;margin-bottom:4px">${sub}</div><div style="display:flex;justify-content:center;gap:6px">${bars}</div></div>`;}
+  const graphs=bGraph(s1,'GRAPH 1 MOST','Mask Public Self')+bGraph(s2,'GRAPH 2 LEAST','Core Private Self')+bGraph(s3,'GRAPH 3 CHANGE','Mirror Perceived Self');
   const dt=r.createdAt?new Date(r.createdAt).toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'}):'-';
-  openModal(`<div class="modal-title">👁️ Detail Hasil DISC</div>
-    <div class="grid-2" style="font-size:.82rem;margin-bottom:16px;background:#f8f9ff;padding:12px;border-radius:8px">
+  // Positive/Negative traits
+  let posH='',negH='';
+  (r.positiveTraits||[]).forEach(t=>{posH+=`<div style="padding:3px 0;font-size:.78rem;color:#2e7d32">✅ ${escHtml(t)}</div>`;});
+  (r.negativeTraits||[]).forEach(t=>{negH+=`<div style="padding:3px 0;font-size:.78rem;color:#c62828">⚠️ ${escHtml(t)}</div>`;});
+  // KPI Score
+  const kpiScore=r.kpiScore||70;const kpiGrade=kpiScore>=90?'A':kpiScore>=80?'B':kpiScore>=70?'C':kpiScore>=60?'D':'E';
+  openModal(`<div class="modal-title">📊 Detail Lengkap Hasil DISC</div>
+    <div class="grid-2" style="font-size:.8rem;margin-bottom:12px;background:#f8f9ff;padding:12px;border-radius:8px">
       <div><strong>Nama:</strong> ${escHtml(r.nama)}</div><div><strong>Tanggal:</strong> ${dt}</div>
-      <div><strong>Mode:</strong> ${r.mode==='evaluasi'?'Evaluasi':'Calon Karyawan'}</div><div><strong>Posisi:</strong> ${escHtml(r.posisi||'-')}</div>
+      <div><strong>Mode:</strong> ${r.mode==='evaluasi'?'Evaluasi Karyawan':'Calon Karyawan'}</div><div><strong>Posisi:</strong> ${escHtml(r.posisi||'-')}</div>
       ${r.departemen?`<div><strong>Dept:</strong> ${escHtml(r.departemen)}</div>`:''}${r.evaluasiPeriode?`<div><strong>Periode:</strong> ${escHtml(r.evaluasiPeriode)}</div>`:''}
-      ${r.nip?`<div><strong>NIP:</strong> ${escHtml(r.nip)}</div>`:''}
+      ${r.nip?`<div><strong>NIP:</strong> ${escHtml(r.nip)}</div>`:''}<div><strong>KPI Score:</strong> <span class="badge badge-${kpiScore>=80?'success':kpiScore>=60?'warning':'danger'}">${kpiScore} (${kpiGrade})</span></div>
     </div>
-    <div style="text-align:center;margin-bottom:16px"><span style="display:inline-block;padding:6px 16px;background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;border-radius:16px;font-weight:700">${escHtml(r.profileName||'-')} (${escHtml(r.pattern||'-')})</span></div>
-    <div style="display:flex;justify-content:center;gap:16px;margin-bottom:16px">${graphH}</div>
-    <div class="table-wrap" style="margin-bottom:16px"><table><thead><tr><th>Dimensi</th><th>Raw P</th><th>Raw K</th><th>Seg1</th><th>Seg2</th><th>Final</th></tr></thead><tbody>
-      <tr><td class="fw-700">D</td><td>${r.rawP?.D||0}</td><td>${r.rawK?.D||0}</td><td>${r.seg1?.D||0}</td><td>${r.seg2?.D||0}</td><td class="fw-700">${s3.D>0?'+':''}${typeof s3.D==='number'?s3.D.toFixed(1):s3.D}</td></tr>
-      <tr><td class="fw-700">I</td><td>${r.rawP?.I||0}</td><td>${r.rawK?.I||0}</td><td>${r.seg1?.I||0}</td><td>${r.seg2?.I||0}</td><td class="fw-700">${s3.I>0?'+':''}${typeof s3.I==='number'?s3.I.toFixed(1):s3.I}</td></tr>
-      <tr><td class="fw-700">S</td><td>${r.rawP?.S||0}</td><td>${r.rawK?.S||0}</td><td>${r.seg1?.S||0}</td><td>${r.seg2?.S||0}</td><td class="fw-700">${s3.S>0?'+':''}${typeof s3.S==='number'?s3.S.toFixed(1):s3.S}</td></tr>
-      <tr><td class="fw-700">C</td><td>${r.rawP?.C||0}</td><td>${r.rawK?.C||0}</td><td>${r.seg1?.C||0}</td><td>${r.seg2?.C||0}</td><td class="fw-700">${s3.C>0?'+':''}${typeof s3.C==='number'?s3.C.toFixed(1):s3.C}</td></tr>
+    <div style="text-align:center;margin-bottom:12px"><span style="display:inline-block;padding:6px 16px;background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;border-radius:16px;font-weight:700;font-size:.9rem">${escHtml(r.profileName||'-')} (${escHtml(r.pattern||'-')})</span></div>
+    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">${graphs}</div>
+    <div style="background:#f8f9ff;border-radius:8px;padding:12px;margin-bottom:12px;font-size:.82rem;line-height:1.6"><strong>📝 Deskripsi:</strong><br>${escHtml(r.description||getDiscDesc(r.pattern)||'')}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div style="background:#e8f5e9;border-radius:8px;padding:10px"><div style="font-size:.78rem;font-weight:700;color:#2e7d32;margin-bottom:6px">✅ Sifat Positif</div>${posH||'<span style="font-size:.75rem;color:#999">-</span>'}</div>
+      <div style="background:#ffebee;border-radius:8px;padding:10px"><div style="font-size:.78rem;font-weight:700;color:#c62828;margin-bottom:6px">⚠️ Sifat Negatif</div>${negH||'<span style="font-size:.75rem;color:#999">-</span>'}</div>
+    </div>
+    ${r.career?`<div style="background:#e8f5e9;border-radius:8px;padding:10px;margin-bottom:12px"><div style="font-size:.78rem;font-weight:700;color:#1b5e20;margin-bottom:4px">💼 Rekomendasi Karir</div><div style="font-size:.78rem;color:#2e7d32;line-height:1.5">${escHtml(r.career)}</div></div>`:''}
+    <div class="table-wrap" style="margin-bottom:12px"><table><thead><tr><th>Dimensi</th><th>Raw P</th><th>Raw K</th><th>Seg1</th><th>Seg2</th><th>Final</th></tr></thead><tbody>
+      <tr><td class="fw-700">D</td><td>${r.rawP?.D||0}</td><td>${r.rawK?.D||0}</td><td>${s1.D||0}</td><td>${s2.D||0}</td><td class="fw-700">${s3.D>0?'+':''}${typeof s3.D==='number'?s3.D.toFixed(1):s3.D}</td></tr>
+      <tr><td class="fw-700">I</td><td>${r.rawP?.I||0}</td><td>${r.rawK?.I||0}</td><td>${s1.I||0}</td><td>${s2.I||0}</td><td class="fw-700">${s3.I>0?'+':''}${typeof s3.I==='number'?s3.I.toFixed(1):s3.I}</td></tr>
+      <tr><td class="fw-700">S</td><td>${r.rawP?.S||0}</td><td>${r.rawK?.S||0}</td><td>${s1.S||0}</td><td>${s2.S||0}</td><td class="fw-700">${s3.S>0?'+':''}${typeof s3.S==='number'?s3.S.toFixed(1):s3.S}</td></tr>
+      <tr><td class="fw-700">C</td><td>${r.rawP?.C||0}</td><td>${r.rawK?.C||0}</td><td>${s1.C||0}</td><td>${s2.C||0}</td><td class="fw-700">${s3.C>0?'+':''}${typeof s3.C==='number'?s3.C.toFixed(1):s3.C}</td></tr>
     </tbody></table></div>
     <div class="flex gap-8"><button class="btn btn-success btn-sm" onclick="syncDiscToKPI('${id}');closeModalDirect()">📈 Sinkron ke KPI</button><button class="btn btn-warning btn-sm" onclick="closeModalDirect();editDiscResult('${id}')">✏️ Edit</button></div>`,true);
 }
+function getDiscDesc(pattern){const D={'D':'Memiliki rasa ego yang tinggi dan cenderung individualis. Mampu memimpin situasi dan orang lain dalam rangka mencapai sasarannya.','I':'Antusias dan optimistik, lebih suka mencapai sasarannya melalui orang lain. Sangat menonjol dalam keterampilan berkomunikasi.','S':'Individu konsisten yang berusaha menjaga lingkungan yang tidak berubah. Sabar, loyal dan suka menolong.','C':'Praktis, cakap dan unik. Menyukai hal yang detil dan logis; secara alamiah sangat analitis.','D-I':'Tidak basa-basi dan tegas, berpandangan jauh ke depan, progresif dan mau berkompetisi.','D-S':'Obyektif dan analitis. Ingin terlibat dalam situasi dan memberikan bantuan. Termotivasi oleh target pribadi.','D-C':'Sensitif terhadap permasalahan, memiliki kreativitas baik dalam memecahkan masalah.','I-S':'Mengesankan orang akan kehangatan, simpati dan pengertiannya. Pendengar yang baik dan penjaga damai.','I-C':'Ramah dan suka berteman; merasa nyaman walaupun dengan orang asing. Perfeksionis secara alamiah.','S-C':'Orang yang baik secara alamiah dan sangat berorientasi detil. Peduli dan teliti.','C-D':'Sangat berorientasi pada tugas dan sensitif pada permasalahan. Membuat keputusan berdasar fakta.','C-S':'Berpikir sistematis dan mengikuti prosedur. Teratur, teliti dan fokus pada detil.','S-I':'Mengesankan orang akan kehangatan dan simpati. Penjaga damai yang sebenarnya.'};if(D[pattern])return D[pattern];const p=pattern?pattern.split('-'):[];if(p.length>=2&&D[p[0]+'-'+p[1]])return D[p[0]+'-'+p[1]];return D[p[0]]||'';}
+
 
 async function editDiscResult(id){
   const doc=await db.collection('hrd_disc_results').doc(id).get();if(!doc.exists)return toast('Data tidak ditemukan','error');
@@ -2105,7 +2121,7 @@ function renderPortalDisc(){
     </div>
   </div>
   <div class="card"><div class="card-title">📋 Riwayat Tes DISC Saya</div>
-    <div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Tipe</th><th>Profil</th><th>Periode</th></tr></thead><tbody id="myDiscTbl"><tr><td colspan="4" class="text-center">Memuat...</td></tr></tbody></table></div>
+    <div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Tipe</th><th>Profil</th><th>Periode</th><th>Aksi</th></tr></thead><tbody id="myDiscTbl"><tr><td colspan="5" class="text-center">Memuat...</td></tr></tbody></table></div>
   </div>`;
   loadMyDiscHistory();
 }
@@ -2119,8 +2135,30 @@ function startPortalDiscTest(){
 async function loadMyDiscHistory(){
   const snap=await db.collection('hrd_disc_results').where('nama','==',currentUser.nama).orderBy('createdAt','desc').limit(20).get();
   let h='';
-  if(snap.empty)h='<tr><td colspan="4" class="text-center" style="color:var(--text-light)">Belum pernah tes</td></tr>';
-  else snap.forEach(d=>{const r=d.data();const dt=r.createdAt?new Date(r.createdAt).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}):'-';h+=`<tr><td>${dt}</td><td class="fw-700" style="color:var(--primary)">${escHtml(r.pattern||'-')}</td><td>${escHtml(r.profileName||'-')}</td><td>${escHtml(r.evaluasiPeriode||'-')}</td></tr>`;});
+  if(snap.empty)h='<tr><td colspan="5" class="text-center" style="color:var(--text-light)">Belum pernah tes</td></tr>';
+  else snap.forEach(d=>{const r=d.data();const dt=r.createdAt?new Date(r.createdAt).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}):'-';h+=`<tr><td>${dt}</td><td class="fw-700" style="color:var(--primary)">${escHtml(r.pattern||'-')}</td><td>${escHtml(r.profileName||'-')}</td><td>${escHtml(r.evaluasiPeriode||'-')}</td><td><button class="btn btn-xs btn-info" onclick="viewMyDiscDetail('${d.id}')">👁️ Detail</button></td></tr>`;});
   document.getElementById('myDiscTbl').innerHTML=h;
+}
+
+async function viewMyDiscDetail(id){
+  const doc=await db.collection('hrd_disc_results').doc(id).get();if(!doc.exists)return toast('Data tidak ditemukan','error');
+  const r=doc.data();const s1=r.seg1||{D:0,I:0,S:0,C:0};const s2=r.seg2||{D:0,I:0,S:0,C:0};const s3=r.seg3||{D:0,I:0,S:0,C:0};
+  function bG(data,title){let bars='';['D','I','S','C'].forEach(t=>{const v=data[t]||0;const pct=(Math.abs(v)/8*40).toFixed(0);const col=v>=0?'#4caf50':'#ef5350';const st=v>=0?`position:absolute;bottom:50%;width:100%;height:${pct}%;background:${col};border-radius:3px 3px 0 0`:`position:absolute;top:50%;width:100%;height:${pct}%;background:${col};border-radius:0 0 3px 3px`;bars+=`<div style="display:flex;flex-direction:column;align-items:center;gap:1px"><div style="font-size:.6rem;font-weight:600;color:${v>=0?'#2e7d32':'#c62828'}">${v>0?'+':''}${typeof v==='number'?v.toFixed(1):v}</div><div style="width:28px;height:65px;background:#f5f5f5;border-radius:4px;position:relative;border:1px solid #e0e0e0"><div style="position:absolute;top:50%;left:0;right:0;height:1px;background:#bbb"></div><div style="${st}"></div></div><div style="font-size:.65rem;font-weight:700;color:var(--primary)">${t}</div></div>`;});return`<div style="text-align:center;flex:1"><div style="font-size:.63rem;font-weight:700;color:var(--primary);margin-bottom:4px">${title}</div><div style="display:flex;justify-content:center;gap:5px">${bars}</div></div>`;}
+  const graphs=bG(s1,'MOST (Public)')+bG(s2,'LEAST (Private)')+bG(s3,'CHANGE (Perceived)');
+  const dt=r.createdAt?new Date(r.createdAt).toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'}):'-';
+  let posH='',negH='';
+  (r.positiveTraits||[]).forEach(t=>{posH+=`<div style="padding:2px 0;font-size:.76rem;color:#2e7d32">✅ ${escHtml(t)}</div>`;});
+  (r.negativeTraits||[]).forEach(t=>{negH+=`<div style="padding:2px 0;font-size:.76rem;color:#c62828">⚠️ ${escHtml(t)}</div>`;});
+  const kpiScore=r.kpiScore||70;const kpiGrade=kpiScore>=90?'A':kpiScore>=80?'B':kpiScore>=70?'C':kpiScore>=60?'D':'E';
+  openModal(`<div class="modal-title">📊 Hasil DISC Saya</div>
+    <div style="text-align:center;margin-bottom:12px"><span style="font-size:.8rem;color:var(--text-light)">${dt} | Periode: ${escHtml(r.evaluasiPeriode||'-')}</span><br><span style="display:inline-block;padding:6px 16px;background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;border-radius:16px;font-weight:700;margin-top:8px">${escHtml(r.profileName||'-')} (${escHtml(r.pattern||'-')})</span></div>
+    <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">${graphs}</div>
+    <div style="background:#f8f9ff;border-radius:8px;padding:10px;margin-bottom:12px;font-size:.8rem;line-height:1.6">${escHtml(getDiscDesc(r.pattern)||'')}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <div style="background:#e8f5e9;border-radius:8px;padding:8px"><div style="font-size:.72rem;font-weight:700;color:#2e7d32;margin-bottom:4px">✅ Kekuatan</div>${posH||'<span style="font-size:.72rem;color:#999">-</span>'}</div>
+      <div style="background:#ffebee;border-radius:8px;padding:8px"><div style="font-size:.72rem;font-weight:700;color:#c62828;margin-bottom:4px">⚠️ Area Pengembangan</div>${negH||'<span style="font-size:.72rem;color:#999">-</span>'}</div>
+    </div>
+    ${r.career?`<div style="background:#e8f5e9;border-radius:8px;padding:8px;margin-bottom:12px"><div style="font-size:.72rem;font-weight:700;color:#1b5e20;margin-bottom:4px">💼 Bidang Pekerjaan Cocok</div><div style="font-size:.75rem;color:#2e7d32;line-height:1.4">${escHtml(r.career)}</div></div>`:''}
+    <div style="text-align:center;padding:8px;background:#f5f5f5;border-radius:8px"><span style="font-size:.8rem">Skor Kepribadian: <strong style="color:${kpiScore>=80?'var(--success)':'var(--warning)'}">${kpiScore}/100 (Grade ${kpiGrade})</strong></span></div>`,true);
 }
 
