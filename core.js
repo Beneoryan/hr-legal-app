@@ -126,7 +126,7 @@ function renderApp() {
 
 function buildNavItems(isKaryawan) {
   if (isKaryawan) {
-    return navGroup('Portal Saya',[['portal','🏠','Beranda'],['portal-absensi','📍','Absensi'],['portal-cuti','🏖️','Cuti & Izin'],['portal-gaji','💰','Slip Gaji'],['portal-jobdesk','📋','Jobdesk'],['portal-peraturan','📜','Peraturan'],['inbox','📥','Inbox Meeting'],['chat','💬','Obrolan']]);
+    return navGroup('Portal Saya',[['portal','🏠','Beranda'],['portal-absensi','📍','Absensi'],['portal-cuti','🏖️','Cuti & Izin'],['portal-gaji','💰','Slip Gaji'],['portal-jobdesk','📋','Jobdesk'],['portal-disc','🧠','DISC Test'],['portal-peraturan','📜','Peraturan'],['inbox','📥','Inbox Meeting'],['chat','💬','Obrolan']]);
   }
   let nav='';
   nav+=navGroup('Utama',[['dashboard','📊','Dashboard'],['approval-center','✅','Approval Center'],['notifikasi','🔔','Notifikasi'],['pengumuman','📢','Pengumuman']]);
@@ -169,7 +169,7 @@ function navigateTo(page) {
     'akun':renderAkun,'approval-center':renderApprovalCenter,'approval-mgmt':renderApprovalMgmt,'qr-share':renderQRShare,
     'portal':renderPortal,'portal-absensi':renderPortalAbsensi,'portal-cuti':renderPortalCuti,
     'portal-gaji':renderPortalGaji,'portal-jobdesk':renderPortalJobdesk,'portal-peraturan':renderPortalPeraturan,
-    'portal-share':renderPortalShare,
+    'portal-disc':renderPortalDisc,'portal-share':renderPortalShare,
   };
   const fn=routes[page];
   if(fn)fn(); else main.innerHTML=`<div class="empty-state"><div class="icon">🚧</div><p>Halaman "${page}" dalam pengembangan</p></div>`;

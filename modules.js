@@ -1944,32 +1944,182 @@ async function kirimLamaran() {
 }
 
 
-// ── DISC TEST PAGE (in main app) ──────────────────────────────
+// ── DISC TEST PAGE (Admin/HR view with View, Edit, Delete, Sync KPI) ──────────
 function renderDiscTestPage(){
   const main=document.getElementById('mainContent');
   main.innerHTML=`
   <div class="page-title"><span>🧠 DISC Personality Test</span></div>
   <div class="card">
     <div class="card-header"><div class="card-title">Tes Kepribadian DISC</div>
-      <div class="flex gap-8"><a href="disc-test.html" target="_blank" class="btn btn-primary btn-sm">🔗 Link Tes (Calon)</a><a href="disc-test.html#evaluasi" target="_blank" class="btn btn-warning btn-sm">📊 Evaluasi Karyawan</a></div>
+      <div class="flex gap-8">
+        <a href="disc-test.html" target="_blank" class="btn btn-primary btn-sm">🔗 Link Tes (Calon Karyawan)</a>
+        <button class="btn btn-warning btn-sm" onclick="modalDiscEvalKaryawan()">📊 Evaluasi Karyawan (Pilih)</button>
+      </div>
     </div>
     <div style="background:#e3f2fd;border-radius:8px;padding:14px;margin-bottom:16px;border-left:4px solid var(--info)">
       <p class="text-sm" style="line-height:1.6"><strong>DISC</strong> = Dominance, Influence, Steadiness, Compliance.<br>
       • <strong>Calon Karyawan:</strong> Bagikan link tes kepada kandidat saat rekrutmen<br>
-      • <strong>Evaluasi Periodik:</strong> HR evaluasi kepribadian karyawan aktif secara berkala</p>
+      • <strong>Evaluasi Periodik:</strong> Pilih karyawan dari database, data otomatis terisi<br>
+      • <strong>Sinkron KPI:</strong> Hasil DISC bisa disinkronkan ke data KPI karyawan</p>
     </div>
   </div>
-  <div class="card"><div class="card-header"><div class="card-title">📋 Riwayat Hasil Tes</div></div>
+  <div class="card"><div class="card-header"><div class="card-title">📋 Riwayat Hasil Tes</div><button class="btn btn-success btn-sm" onclick="syncAllDiscToKPI()">🔄 Sinkron Semua ke KPI</button></div>
     <div class="flex gap-8 mb-16"><input class="form-control" placeholder="Cari nama..." id="dSrc" oninput="fltDisc()" style="max-width:250px"><select class="form-control" id="dFlt" onchange="fltDisc()" style="max-width:180px"><option value="">Semua</option><option value="calon">Calon</option><option value="evaluasi">Evaluasi</option></select></div>
-    <div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Nama</th><th>Mode</th><th>Posisi</th><th>Tipe</th><th>Profil</th></tr></thead><tbody id="dTbl"><tr><td colspan="6" class="text-center">Memuat...</td></tr></tbody></table></div>
+    <div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Nama</th><th>Mode</th><th>Posisi</th><th>Tipe</th><th>Profil</th><th>Aksi</th></tr></thead><tbody id="dTbl"><tr><td colspan="7" class="text-center">Memuat...</td></tr></tbody></table></div>
   </div>`;
   loadDiscHist();
 }
+
+async function modalDiscEvalKaryawan(){
+  const snap=await db.collection('hrd_karyawan').where('status','==','aktif').orderBy('nama').get();
+  let opts='<option value="">-- Pilih Karyawan --</option>';
+  snap.forEach(d=>{const p=d.data();opts+=`<option value="${d.id}" data-nama="${escHtml(p.nama)}" data-nip="${escHtml(p.nip||'')}" data-dept="${escHtml(p.departemen||'')}" data-pos="${escHtml(p.posisi||'')}">${escHtml(p.nama)} — ${escHtml(p.departemen||'')} (${escHtml(p.nip||'')})</option>`;});
+  openModal(`<div class="modal-title">📊 Evaluasi DISC — Pilih Karyawan</div>
+    <div class="form-group"><label>Karyawan</label><select class="form-control" id="discEvalSelect" onchange="onDiscEvalSelect()">${opts}</select></div>
+    <div id="discEvalInfo" style="display:none;background:#f8f9ff;border-radius:8px;padding:12px;margin-bottom:16px">
+      <div class="grid-2" style="font-size:.82rem"><div><strong>Nama:</strong> <span id="deNama">-</span></div><div><strong>NIP:</strong> <span id="deNip">-</span></div><div><strong>Departemen:</strong> <span id="deDept">-</span></div><div><strong>Posisi:</strong> <span id="dePos">-</span></div></div>
+    </div>
+    <div class="form-group"><label>Periode Evaluasi</label><input class="form-control" id="discEvalPeriode" placeholder="Contoh: Q1 2026, Semester 1 2026"></div>
+    <button class="btn btn-primary" onclick="startDiscEvalForKaryawan()">Mulai Tes DISC →</button>`,true);
+}
+
+function onDiscEvalSelect(){
+  const sel=document.getElementById('discEvalSelect');
+  const opt=sel.options[sel.selectedIndex];
+  if(!sel.value){document.getElementById('discEvalInfo').style.display='none';return;}
+  document.getElementById('discEvalInfo').style.display='block';
+  document.getElementById('deNama').textContent=opt.dataset.nama;
+  document.getElementById('deNip').textContent=opt.dataset.nip;
+  document.getElementById('deDept').textContent=opt.dataset.dept;
+  document.getElementById('dePos').textContent=opt.dataset.pos;
+}
+
+function startDiscEvalForKaryawan(){
+  const sel=document.getElementById('discEvalSelect');
+  const opt=sel.options[sel.selectedIndex];
+  if(!sel.value)return toast('Pilih karyawan dulu','warning');
+  const periode=document.getElementById('discEvalPeriode').value||'';
+  const params=new URLSearchParams({nama:opt.dataset.nama,nip:opt.dataset.nip,dept:opt.dataset.dept,pos:opt.dataset.pos,periode,mode:'evaluasi'});
+  closeModalDirect();
+  window.open('disc-test.html#evaluasi?'+params.toString(),'_blank');
+}
+
 async function loadDiscHist(){const snap=await db.collection('hrd_disc_results').orderBy('createdAt','desc').limit(50).get();window._dData=[];snap.forEach(d=>window._dData.push({id:d.id,...d.data()}));fltDisc();}
 function fltDisc(){
   const q=(document.getElementById('dSrc')?.value||'').toLowerCase(),m=document.getElementById('dFlt')?.value||'';
   const data=(window._dData||[]).filter(r=>{if(q&&!r.nama?.toLowerCase().includes(q))return false;if(m&&r.mode!==m)return false;return true;});
-  let h='';if(!data.length)h='<tr><td colspan="6" class="text-center" style="color:var(--text-light)">Belum ada data</td></tr>';
-  else data.forEach(r=>{const dt=r.createdAt?new Date(r.createdAt).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}):'-';const badge=r.mode==='evaluasi'?'<span class="badge badge-warning">Evaluasi</span>':'<span class="badge badge-info">Calon</span>';h+=`<tr><td>${dt}</td><td class="fw-700">${escHtml(r.nama)}</td><td>${badge}</td><td>${escHtml(r.posisi||'-')}</td><td class="fw-700" style="color:var(--primary)">${escHtml(r.pattern||'-')}</td><td>${escHtml(r.profileName||'-')}</td></tr>`;});
+  let h='';if(!data.length)h='<tr><td colspan="7" class="text-center" style="color:var(--text-light)">Belum ada data</td></tr>';
+  else data.forEach(r=>{const dt=r.createdAt?new Date(r.createdAt).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}):'-';const badge=r.mode==='evaluasi'?'<span class="badge badge-warning">Evaluasi</span>':'<span class="badge badge-info">Calon</span>';
+    h+=`<tr><td>${dt}</td><td class="fw-700">${escHtml(r.nama)}</td><td>${badge}</td><td>${escHtml(r.posisi||'-')}</td><td class="fw-700" style="color:var(--primary)">${escHtml(r.pattern||'-')}</td><td>${escHtml(r.profileName||'-')}</td><td><button class="btn btn-xs btn-info" onclick="viewDiscResult('${r.id}')">👁️</button> <button class="btn btn-xs btn-warning" onclick="editDiscResult('${r.id}')">✏️</button> <button class="btn btn-xs btn-success" onclick="syncDiscToKPI('${r.id}')">📈</button> <button class="btn btn-xs btn-danger" onclick="deleteDiscResult('${r.id}')">🗑️</button></td></tr>`;
+  });
   document.getElementById('dTbl').innerHTML=h;
 }
+
+async function viewDiscResult(id){
+  const doc=await db.collection('hrd_disc_results').doc(id).get();if(!doc.exists)return toast('Data tidak ditemukan','error');
+  const r=doc.data();const s3=r.seg3||{D:0,I:0,S:0,C:0};
+  let graphH='';['D','I','S','C'].forEach(t=>{const v=s3[t]||0;const pct=(Math.abs(v)/8*45).toFixed(0);const col=v>=0?'#4caf50':'#ef5350';const style=v>=0?`position:absolute;bottom:50%;width:100%;height:${pct}%;background:${col};border-radius:4px 4px 0 0`:`position:absolute;top:50%;width:100%;height:${pct}%;background:${col};border-radius:0 0 4px 4px`;graphH+=`<div style="display:flex;flex-direction:column;align-items:center;gap:2px"><div style="font-size:.7rem;font-weight:600">${v>0?'+':''}${typeof v==='number'?v.toFixed(1):v}</div><div style="width:40px;height:100px;background:#f5f5f5;border-radius:6px;position:relative;border:1px solid #e0e0e0"><div style="position:absolute;top:50%;left:0;right:0;height:1px;background:#999"></div><div style="${style}"></div></div><div style="font-size:.8rem;font-weight:700;color:var(--primary)">${t}</div></div>`;});
+  const dt=r.createdAt?new Date(r.createdAt).toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'}):'-';
+  openModal(`<div class="modal-title">👁️ Detail Hasil DISC</div>
+    <div class="grid-2" style="font-size:.82rem;margin-bottom:16px;background:#f8f9ff;padding:12px;border-radius:8px">
+      <div><strong>Nama:</strong> ${escHtml(r.nama)}</div><div><strong>Tanggal:</strong> ${dt}</div>
+      <div><strong>Mode:</strong> ${r.mode==='evaluasi'?'Evaluasi':'Calon Karyawan'}</div><div><strong>Posisi:</strong> ${escHtml(r.posisi||'-')}</div>
+      ${r.departemen?`<div><strong>Dept:</strong> ${escHtml(r.departemen)}</div>`:''}${r.evaluasiPeriode?`<div><strong>Periode:</strong> ${escHtml(r.evaluasiPeriode)}</div>`:''}
+      ${r.nip?`<div><strong>NIP:</strong> ${escHtml(r.nip)}</div>`:''}
+    </div>
+    <div style="text-align:center;margin-bottom:16px"><span style="display:inline-block;padding:6px 16px;background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;border-radius:16px;font-weight:700">${escHtml(r.profileName||'-')} (${escHtml(r.pattern||'-')})</span></div>
+    <div style="display:flex;justify-content:center;gap:16px;margin-bottom:16px">${graphH}</div>
+    <div class="table-wrap" style="margin-bottom:16px"><table><thead><tr><th>Dimensi</th><th>Raw P</th><th>Raw K</th><th>Seg1</th><th>Seg2</th><th>Final</th></tr></thead><tbody>
+      <tr><td class="fw-700">D</td><td>${r.rawP?.D||0}</td><td>${r.rawK?.D||0}</td><td>${r.seg1?.D||0}</td><td>${r.seg2?.D||0}</td><td class="fw-700">${s3.D>0?'+':''}${typeof s3.D==='number'?s3.D.toFixed(1):s3.D}</td></tr>
+      <tr><td class="fw-700">I</td><td>${r.rawP?.I||0}</td><td>${r.rawK?.I||0}</td><td>${r.seg1?.I||0}</td><td>${r.seg2?.I||0}</td><td class="fw-700">${s3.I>0?'+':''}${typeof s3.I==='number'?s3.I.toFixed(1):s3.I}</td></tr>
+      <tr><td class="fw-700">S</td><td>${r.rawP?.S||0}</td><td>${r.rawK?.S||0}</td><td>${r.seg1?.S||0}</td><td>${r.seg2?.S||0}</td><td class="fw-700">${s3.S>0?'+':''}${typeof s3.S==='number'?s3.S.toFixed(1):s3.S}</td></tr>
+      <tr><td class="fw-700">C</td><td>${r.rawP?.C||0}</td><td>${r.rawK?.C||0}</td><td>${r.seg1?.C||0}</td><td>${r.seg2?.C||0}</td><td class="fw-700">${s3.C>0?'+':''}${typeof s3.C==='number'?s3.C.toFixed(1):s3.C}</td></tr>
+    </tbody></table></div>
+    <div class="flex gap-8"><button class="btn btn-success btn-sm" onclick="syncDiscToKPI('${id}');closeModalDirect()">📈 Sinkron ke KPI</button><button class="btn btn-warning btn-sm" onclick="closeModalDirect();editDiscResult('${id}')">✏️ Edit</button></div>`,true);
+}
+
+async function editDiscResult(id){
+  const doc=await db.collection('hrd_disc_results').doc(id).get();if(!doc.exists)return toast('Data tidak ditemukan','error');
+  const r=doc.data();
+  openModal(`<div class="modal-title">✏️ Edit Hasil DISC</div>
+    <div class="grid-2"><div class="form-group"><label>Nama</label><input class="form-control" id="edNama" value="${escHtml(r.nama||'')}"></div><div class="form-group"><label>NIP</label><input class="form-control" id="edNip" value="${escHtml(r.nip||'')}"></div><div class="form-group"><label>Departemen</label><input class="form-control" id="edDept" value="${escHtml(r.departemen||'')}"></div><div class="form-group"><label>Posisi</label><input class="form-control" id="edPos" value="${escHtml(r.posisi||'')}"></div><div class="form-group"><label>Periode</label><input class="form-control" id="edPeriode" value="${escHtml(r.evaluasiPeriode||'')}"></div><div class="form-group"><label>Mode</label><select class="form-control" id="edMode"><option value="calon" ${r.mode==='calon'?'selected':''}>Calon</option><option value="evaluasi" ${r.mode==='evaluasi'?'selected':''}>Evaluasi</option></select></div></div>
+    <div class="form-group"><label>Catatan HR</label><textarea class="form-control" id="edNote" placeholder="Catatan tambahan dari HR...">${escHtml(r.catatanHR||'')}</textarea></div>
+    <button class="btn btn-primary" onclick="saveEditDisc('${id}')">Simpan Perubahan</button>`,true);
+}
+
+async function saveEditDisc(id){
+  const data={nama:document.getElementById('edNama').value,nip:document.getElementById('edNip').value,departemen:document.getElementById('edDept').value,posisi:document.getElementById('edPos').value,evaluasiPeriode:document.getElementById('edPeriode').value,mode:document.getElementById('edMode').value,catatanHR:document.getElementById('edNote').value,updatedAt:new Date().toISOString()};
+  await db.collection('hrd_disc_results').doc(id).update(data);
+  closeModalDirect();toast('Data DISC diperbarui','success');loadDiscHist();
+}
+
+async function deleteDiscResult(id){
+  if(!confirm('Yakin hapus hasil tes DISC ini?'))return;
+  await db.collection('hrd_disc_results').doc(id).delete();
+  toast('Hasil tes dihapus','success');loadDiscHist();
+}
+
+async function syncDiscToKPI(id){
+  const doc=await db.collection('hrd_disc_results').doc(id).get();if(!doc.exists)return toast('Data tidak ditemukan','error');
+  const r=doc.data();
+  // Add/update KPI entry with DISC personality data
+  await db.collection('hrd_kpi').add({
+    nama:r.nama,periode:r.evaluasiPeriode||r.tanggalTes||todayStr(),
+    produktivitas:0,kualitas:0,kedisiplinan:0,kerjasama:0,skor:0,
+    catatan:`[DISC] Tipe: ${r.pattern||'-'} | Profil: ${r.profileName||'-'} | D:${r.seg3?.D||0} I:${r.seg3?.I||0} S:${r.seg3?.S||0} C:${r.seg3?.C||0}`,
+    penilai:'DISC Auto-Sync',discResultId:id,discPattern:r.pattern||'',discProfile:r.profileName||'',
+    createdAt:new Date().toISOString()
+  });
+  toast(`DISC ${r.nama} disinkronkan ke KPI`,'success');
+}
+
+async function syncAllDiscToKPI(){
+  if(!confirm('Sinkronkan semua hasil DISC terbaru ke KPI?'))return;
+  const snap=await db.collection('hrd_disc_results').orderBy('createdAt','desc').limit(50).get();
+  let count=0;
+  for(const doc of snap.docs){
+    const r=doc.data();
+    // Check if already synced
+    const existing=await db.collection('hrd_kpi').where('discResultId','==',doc.id).limit(1).get();
+    if(existing.empty){
+      await db.collection('hrd_kpi').add({nama:r.nama,periode:r.evaluasiPeriode||r.tanggalTes||todayStr(),produktivitas:0,kualitas:0,kedisiplinan:0,kerjasama:0,skor:0,catatan:`[DISC] Tipe: ${r.pattern||'-'} | Profil: ${r.profileName||'-'}`,penilai:'DISC Auto-Sync',discResultId:doc.id,discPattern:r.pattern||'',discProfile:r.profileName||'',createdAt:new Date().toISOString()});
+      count++;
+    }
+  }
+  toast(`${count} hasil DISC disinkronkan ke KPI`,'success');
+}
+
+// ── PORTAL DISC (Karyawan self-test, data auto-filled) ────────
+function renderPortalDisc(){
+  const main=document.getElementById('mainContent');
+  const u=currentUser;
+  main.innerHTML=`
+  <div class="page-title"><span>🧠 DISC Test Saya</span></div>
+  <div class="card">
+    <div style="background:#e3f2fd;border-radius:8px;padding:14px;margin-bottom:16px;border-left:4px solid var(--info)">
+      <p class="text-sm" style="line-height:1.6">Tes DISC membantu Anda memahami gaya komunikasi dan kepribadian Anda. Hasil tes akan tersimpan dan dapat dilihat oleh HR untuk evaluasi.</p>
+    </div>
+    <div style="text-align:center;margin-bottom:16px">
+      <button class="btn btn-primary btn-lg" onclick="startPortalDiscTest()">🧠 Mulai Tes DISC</button>
+    </div>
+  </div>
+  <div class="card"><div class="card-title">📋 Riwayat Tes DISC Saya</div>
+    <div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Tipe</th><th>Profil</th><th>Periode</th></tr></thead><tbody id="myDiscTbl"><tr><td colspan="4" class="text-center">Memuat...</td></tr></tbody></table></div>
+  </div>`;
+  loadMyDiscHistory();
+}
+
+function startPortalDiscTest(){
+  const u=currentUser;
+  const params=new URLSearchParams({nama:u.nama,nip:u.nip||'',dept:u.departemen||'',pos:u.posisi||u.role||'',mode:'evaluasi',periode:'Self-Assessment '+new Date().toLocaleDateString('id-ID',{month:'long',year:'numeric'})});
+  window.open('disc-test.html#evaluasi?'+params.toString(),'_blank');
+}
+
+async function loadMyDiscHistory(){
+  const snap=await db.collection('hrd_disc_results').where('nama','==',currentUser.nama).orderBy('createdAt','desc').limit(20).get();
+  let h='';
+  if(snap.empty)h='<tr><td colspan="4" class="text-center" style="color:var(--text-light)">Belum pernah tes</td></tr>';
+  else snap.forEach(d=>{const r=d.data();const dt=r.createdAt?new Date(r.createdAt).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}):'-';h+=`<tr><td>${dt}</td><td class="fw-700" style="color:var(--primary)">${escHtml(r.pattern||'-')}</td><td>${escHtml(r.profileName||'-')}</td><td>${escHtml(r.evaluasiPeriode||'-')}</td></tr>`;});
+  document.getElementById('myDiscTbl').innerHTML=h;
+}
+

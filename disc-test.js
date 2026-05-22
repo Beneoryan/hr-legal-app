@@ -103,7 +103,18 @@ function todayStr(){return new Date().toISOString().split('T')[0];}
 // ── INIT ──────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded',()=>{
   const h=window.location.hash;
-  if(h==='#evaluasi')startMode('evaluasi');
+  if(h.startsWith('#evaluasi')){
+    // Check for URL params (auto-fill from main app)
+    const paramStr=h.includes('?')?h.split('?')[1]:'';
+    if(paramStr){
+      const p=new URLSearchParams(paramStr);
+      testState.mode='evaluasi';testState.nama=p.get('nama')||'';testState.nip=p.get('nip')||'';
+      testState.departemen=p.get('dept')||'';testState.posisi=p.get('pos')||'';
+      testState.evaluasiPeriode=p.get('periode')||'';testState.tanggalTes=todayStr();
+      testState.answers={};testState.currentQuestion=0;
+      renderInstructions();
+    } else { startMode('evaluasi'); }
+  }
   else if(h==='#history')renderHistory();
   else renderModeSelection();
 });
