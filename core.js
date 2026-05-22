@@ -108,7 +108,7 @@ function renderApp() {
     <div style="padding:16px 20px;border-top:1px solid rgba(255,255,255,.1)"><div style="font-size:.75rem;color:rgba(255,255,255,.5)">v5.0 — ${currentUser.nama}</div></div>
   </div>
   <div class="header">
-    <button class="menu-btn" onclick="toggleSidebar()">=</button>
+    <button class="menu-btn" onclick="toggleSidebar()">☰</button>
     <div class="title">HRD & Legal IJEF Corp</div>
     <div class="notif-badge" onclick="navigateTo('notifikasi')" title="Notifikasi">🔔<span class="count" id="notifCount" style="display:none">0</span></div>
     <div class="user-info">
