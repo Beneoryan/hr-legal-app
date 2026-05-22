@@ -120,6 +120,8 @@ function renderApp() {
   <div class="main" id="mainContent"></div>`;
   navigateTo(currentPage);
   listenNotifications();
+  // Auto-load national holidays if not yet populated
+  autoLoadHariLiburNasional().catch(()=>{});
 }
 
 function buildNavItems(isKaryawan) {

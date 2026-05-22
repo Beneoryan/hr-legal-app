@@ -401,6 +401,15 @@ async function getActiveShift() {
 async function doClockIn() {
   if(!capturedPhoto)return toast('Ambil foto selfie dulu','warning');
   if(!currentGPS)return toast('Deteksi lokasi GPS dulu','warning');
+
+  // Check if today is a holiday
+  const holidayInfo = await checkHoliday(todayStr());
+  if (holidayInfo) {
+    const tipeLabel = holidayInfo.tipe === 'nasional' ? 'Nasional' : holidayInfo.tipe === 'cuti_bersama' ? 'Cuti Bersama' : 'Perusahaan';
+    const lanjut = confirm(`ℹ️ Hari ini adalah hari libur: ${holidayInfo.nama} (${tipeLabel}). Tetap ingin clock in?`);
+    if (!lanjut) return;
+  }
+
   const locationStatus = await getNearestOfficeLocation(currentGPS.lat, currentGPS.lng);
   if (!locationStatus.allowed) return toast(`Lokasi di luar radius "${locationStatus.nearest.nama}". Absen hanya boleh dari lokasi kantor terdaftar.`,'warning');
   const existing=await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).where('tipe','==','masuk').get();

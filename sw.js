@@ -1,5 +1,5 @@
-const CACHE_NAME = 'hrd-ijef-v5.4';
-const ASSETS = ['/', '/index.html', '/core.js?v=5.4', '/modules.js?v=5.4', '/absensi-ijef.js?v=5.4'];
+const CACHE_NAME = 'hrd-ijef-v5.5';
+const ASSETS = ['/', '/index.html', '/core.js?v=5.5', '/modules.js?v=5.5', '/absensi-ijef.js?v=5.5'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(ASSETS)));

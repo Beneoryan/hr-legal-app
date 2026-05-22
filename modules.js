@@ -378,9 +378,331 @@ async function simpanOvertime(){const s=document.getElementById('otStart').value
 async function approveOT(id,status){await db.collection('hrd_overtime').doc(id).update({status,approvedBy:currentUser.nama});toast('Updated','success');renderOvertime();}
 
 // ── HARI LIBUR ────────────────────────────────────────────────
-async function renderHariLibur(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>📅 Hari Libur</span><button class="btn btn-primary btn-sm" onclick="modalHariLibur()">+ Tambah</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Nama</th><th>Jenis</th><th>Aksi</th></tr></thead><tbody id="tblLibur"></tbody></table></div></div>`;const snap=await db.collection('hrd_hari_libur').orderBy('tanggal').get();let h='';if(snap.empty)h='<tr><td colspan="4" class="text-center">Belum ada</td></tr>';else snap.forEach(d=>{const p=d.data();h+=`<tr><td>${formatDate(p.tanggal)}</td><td class="fw-700">${escHtml(p.nama)}</td><td><span class="badge badge-info">${p.jenis||'nasional'}</span></td><td><button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_hari_libur','${d.id}','hari-libur')">🗑️</button></td></tr>`;});document.getElementById('tblLibur').innerHTML=h;}
-function modalHariLibur(){openModal(`<div class="modal-title">Tambah Hari Libur</div><div class="form-group"><label>Tanggal</label><input class="form-control" type="date" id="hlTgl"></div><div class="form-group"><label>Nama</label><input class="form-control" id="hlNama"></div><div class="form-group"><label>Jenis</label><select class="form-control" id="hlJenis"><option value="nasional">Nasional</option><option value="perusahaan">Perusahaan</option><option value="cuti_bersama">Cuti Bersama</option></select></div><button class="btn btn-primary" onclick="simpanHariLibur()">Simpan</button>`);}
-async function simpanHariLibur(){const data={tanggal:document.getElementById('hlTgl').value,nama:document.getElementById('hlNama').value,jenis:document.getElementById('hlJenis').value,createdAt:new Date().toISOString()};if(!data.nama||!data.tanggal)return toast('Lengkapi data','warning');await db.collection('hrd_hari_libur').add(data);closeModalDirect();toast('Ditambahkan','success');renderHariLibur();}
+
+// Indonesian National Holidays 2025
+const HARI_LIBUR_NASIONAL_2025 = [
+  { tanggal: '2025-01-01', nama: 'Tahun Baru Masehi', tipe: 'nasional' },
+  { tanggal: '2025-01-27', nama: 'Isra Mi\'raj Nabi Muhammad SAW', tipe: 'nasional' },
+  { tanggal: '2025-01-29', nama: 'Tahun Baru Imlek 2576 Kongzili', tipe: 'nasional' },
+  { tanggal: '2025-03-29', nama: 'Hari Raya Nyepi Tahun Baru Saka 1947', tipe: 'nasional' },
+  { tanggal: '2025-03-30', nama: 'Hari Raya Idul Fitri 1446 H (Hari 1)', tipe: 'nasional' },
+  { tanggal: '2025-03-31', nama: 'Hari Raya Idul Fitri 1446 H (Hari 2)', tipe: 'nasional' },
+  { tanggal: '2025-03-28', nama: 'Cuti Bersama Idul Fitri', tipe: 'cuti_bersama' },
+  { tanggal: '2025-04-01', nama: 'Cuti Bersama Idul Fitri', tipe: 'cuti_bersama' },
+  { tanggal: '2025-04-02', nama: 'Cuti Bersama Idul Fitri', tipe: 'cuti_bersama' },
+  { tanggal: '2025-04-03', nama: 'Cuti Bersama Idul Fitri', tipe: 'cuti_bersama' },
+  { tanggal: '2025-04-04', nama: 'Cuti Bersama Idul Fitri', tipe: 'cuti_bersama' },
+  { tanggal: '2025-04-18', nama: 'Wafat Isa Al Masih', tipe: 'nasional' },
+  { tanggal: '2025-05-01', nama: 'Hari Buruh Internasional', tipe: 'nasional' },
+  { tanggal: '2025-05-12', nama: 'Hari Raya Waisak 2569 BE', tipe: 'nasional' },
+  { tanggal: '2025-05-29', nama: 'Kenaikan Isa Al Masih', tipe: 'nasional' },
+  { tanggal: '2025-06-01', nama: 'Hari Lahir Pancasila', tipe: 'nasional' },
+  { tanggal: '2025-06-06', nama: 'Hari Raya Idul Adha 1446 H', tipe: 'nasional' },
+  { tanggal: '2025-06-27', nama: 'Tahun Baru Islam 1447 H', tipe: 'nasional' },
+  { tanggal: '2025-08-17', nama: 'Hari Kemerdekaan RI', tipe: 'nasional' },
+  { tanggal: '2025-09-05', nama: 'Maulid Nabi Muhammad SAW', tipe: 'nasional' },
+  { tanggal: '2025-12-25', nama: 'Hari Natal', tipe: 'nasional' },
+  { tanggal: '2025-12-26', nama: 'Cuti Bersama Natal', tipe: 'cuti_bersama' }
+];
+
+const HARI_LIBUR_NASIONAL_2026 = [
+  { tanggal: '2026-01-01', nama: 'Tahun Baru Masehi', tipe: 'nasional' },
+  { tanggal: '2026-01-16', nama: 'Isra Mi\'raj Nabi Muhammad SAW', tipe: 'nasional' },
+  { tanggal: '2026-02-17', nama: 'Tahun Baru Imlek 2577 Kongzili', tipe: 'nasional' },
+  { tanggal: '2026-03-19', nama: 'Hari Raya Nyepi Tahun Baru Saka 1948', tipe: 'nasional' },
+  { tanggal: '2026-03-20', nama: 'Hari Raya Idul Fitri 1447 H (Hari 1)', tipe: 'nasional' },
+  { tanggal: '2026-03-21', nama: 'Hari Raya Idul Fitri 1447 H (Hari 2)', tipe: 'nasional' },
+  { tanggal: '2026-03-18', nama: 'Cuti Bersama Idul Fitri', tipe: 'cuti_bersama' },
+  { tanggal: '2026-03-22', nama: 'Cuti Bersama Idul Fitri', tipe: 'cuti_bersama' },
+  { tanggal: '2026-03-23', nama: 'Cuti Bersama Idul Fitri', tipe: 'cuti_bersama' },
+  { tanggal: '2026-04-03', nama: 'Wafat Isa Al Masih', tipe: 'nasional' },
+  { tanggal: '2026-05-01', nama: 'Hari Buruh Internasional', tipe: 'nasional' },
+  { tanggal: '2026-05-14', nama: 'Kenaikan Isa Al Masih', tipe: 'nasional' },
+  { tanggal: '2026-05-26', nama: 'Hari Raya Idul Adha 1447 H', tipe: 'nasional' },
+  { tanggal: '2026-05-31', nama: 'Hari Raya Waisak 2570 BE', tipe: 'nasional' },
+  { tanggal: '2026-06-01', nama: 'Hari Lahir Pancasila', tipe: 'nasional' },
+  { tanggal: '2026-06-17', nama: 'Tahun Baru Islam 1448 H', tipe: 'nasional' },
+  { tanggal: '2026-08-17', nama: 'Hari Kemerdekaan RI', tipe: 'nasional' },
+  { tanggal: '2026-08-26', nama: 'Maulid Nabi Muhammad SAW', tipe: 'nasional' },
+  { tanggal: '2026-12-25', nama: 'Hari Natal', tipe: 'nasional' },
+  { tanggal: '2026-12-26', nama: 'Cuti Bersama Natal', tipe: 'cuti_bersama' }
+];
+
+let hariLiburCalendarMonth = null;
+let hariLiburViewMode = 'kalender'; // 'kalender' or 'daftar'
+
+async function renderHariLibur() {
+  const main = document.getElementById('mainContent');
+  if (!hariLiburCalendarMonth) {
+    const now = new Date();
+    hariLiburCalendarMonth = { year: now.getFullYear(), month: now.getMonth() };
+  }
+  main.innerHTML = `
+    <div class="page-title"><span>📅 Hari Libur</span></div>
+    <div class="card">
+      <div class="tabs mb-16" id="hariLiburTabs">
+        <div class="tab ${hariLiburViewMode==='kalender'?'active':''}" onclick="switchHariLiburView('kalender')">📅 Kalender</div>
+        <div class="tab ${hariLiburViewMode==='daftar'?'active':''}" onclick="switchHariLiburView('daftar')">📋 Daftar</div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <button class="btn btn-sm btn-outline" onclick="hariLiburPrevMonth()">&lt;</button>
+          <span class="fw-700 color-primary" id="hariLiburMonthLabel" style="min-width:140px;text-align:center"></span>
+          <button class="btn btn-sm btn-outline" onclick="hariLiburNextMonth()">&gt;</button>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-info btn-sm" onclick="syncHariLiburNasional()">🔄 Sinkron Nasional</button>
+          <button class="btn btn-primary btn-sm" onclick="modalHariLibur()">+ Tambah Custom</button>
+        </div>
+      </div>
+      <div id="hariLiburContent"></div>
+    </div>`;
+  await loadHariLiburView();
+}
+
+function switchHariLiburView(mode) {
+  hariLiburViewMode = mode;
+  renderHariLibur();
+}
+
+function hariLiburPrevMonth() {
+  hariLiburCalendarMonth.month--;
+  if (hariLiburCalendarMonth.month < 0) { hariLiburCalendarMonth.month = 11; hariLiburCalendarMonth.year--; }
+  loadHariLiburView();
+}
+
+function hariLiburNextMonth() {
+  hariLiburCalendarMonth.month++;
+  if (hariLiburCalendarMonth.month > 11) { hariLiburCalendarMonth.month = 0; hariLiburCalendarMonth.year++; }
+  loadHariLiburView();
+}
+
+async function loadHariLiburView() {
+  const y = hariLiburCalendarMonth.year;
+  const m = hariLiburCalendarMonth.month;
+  const monthNames = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const label = document.getElementById('hariLiburMonthLabel');
+  if (label) label.textContent = `${monthNames[m]} ${y}`;
+
+  // Load holidays from Firestore
+  const startDate = `${y}-${String(m+1).padStart(2,'0')}-01`;
+  const endDate = `${y}-${String(m+1).padStart(2,'0')}-${String(new Date(y, m+1, 0).getDate()).padStart(2,'0')}`;
+  const snap = await db.collection('hrd_hari_libur').where('tanggal','>=',startDate).where('tanggal','<=',endDate).orderBy('tanggal').get();
+  const holidays = [];
+  snap.forEach(d => holidays.push({ id: d.id, ...d.data() }));
+
+  const container = document.getElementById('hariLiburContent');
+  if (!container) return;
+
+  if (hariLiburViewMode === 'kalender') {
+    renderHariLiburCalendar(container, y, m, holidays);
+  } else {
+    renderHariLiburList(container, y, m, holidays);
+  }
+}
+
+function renderHariLiburCalendar(container, year, month, holidays) {
+  const today = new Date();
+  const todayStr2 = today.toISOString().split('T')[0];
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const daysInMonth = lastDay.getDate();
+  // Monday = 0, Sunday = 6
+  let startDayOfWeek = firstDay.getDay() - 1;
+  if (startDayOfWeek < 0) startDayOfWeek = 6;
+
+  const holidayMap = {};
+  holidays.forEach(h => {
+    const day = parseInt(h.tanggal.split('-')[2]);
+    if (!holidayMap[day]) holidayMap[day] = [];
+    holidayMap[day].push(h);
+  });
+
+  let html = `<style>
+    .hl-calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-top:8px}
+    .hl-cal-header{padding:8px 4px;text-align:center;font-size:.75rem;font-weight:700;color:var(--primary);background:#f0f4ff;border-radius:4px}
+    .hl-cal-cell{min-height:70px;padding:4px 6px;border-radius:6px;border:1.5px solid transparent;position:relative;cursor:default;transition:all .15s}
+    .hl-cal-cell:hover{box-shadow:0 2px 8px rgba(0,0,0,.1)}
+    .hl-cal-cell.hl-empty{background:transparent;border:none;min-height:auto}
+    .hl-cal-cell.hl-weekend{background:#f5f5f5;color:#999}
+    .hl-cal-cell.hl-holiday{background:#ffebee;border-color:#ef5350}
+    .hl-cal-cell.hl-cuti-bersama{background:#fff3e0;border-color:#ff9800}
+    .hl-cal-cell.hl-today{border-color:#1565c0;box-shadow:0 0 0 2px rgba(21,101,192,.3)}
+    .hl-cal-day{font-size:.85rem;font-weight:700}
+    .hl-cal-cell.hl-holiday .hl-cal-day{color:#c62828}
+    .hl-cal-cell.hl-cuti-bersama .hl-cal-day{color:#e65100}
+    .hl-cal-cell.hl-today .hl-cal-day{color:#1565c0}
+    .hl-cal-name{font-size:.6rem;color:#c62828;margin-top:2px;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+    .hl-cal-cell.hl-cuti-bersama .hl-cal-name{color:#e65100}
+  </style>
+  <div class="hl-calendar">
+    <div class="hl-cal-header">Sen</div>
+    <div class="hl-cal-header">Sel</div>
+    <div class="hl-cal-header">Rab</div>
+    <div class="hl-cal-header">Kam</div>
+    <div class="hl-cal-header">Jum</div>
+    <div class="hl-cal-header" style="color:var(--text-light)">Sab</div>
+    <div class="hl-cal-header" style="color:var(--danger)">Min</div>`;
+
+  // Empty cells for days before month start
+  for (let i = 0; i < startDayOfWeek; i++) {
+    html += '<div class="hl-cal-cell hl-empty"></div>';
+  }
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const dayOfWeek = (startDayOfWeek + day - 1) % 7; // 0=Mon, 5=Sat, 6=Sun
+    const isWeekend = dayOfWeek >= 5;
+    const isToday = dateStr === todayStr2;
+    const dayHolidays = holidayMap[day] || [];
+    const hasHoliday = dayHolidays.some(h => h.tipe === 'nasional' || h.tipe === 'perusahaan');
+    const hasCutiBersama = dayHolidays.some(h => h.tipe === 'cuti_bersama');
+
+    let classes = 'hl-cal-cell';
+    if (hasHoliday) classes += ' hl-holiday';
+    else if (hasCutiBersama) classes += ' hl-cuti-bersama';
+    else if (isWeekend) classes += ' hl-weekend';
+    if (isToday) classes += ' hl-today';
+
+    const title = dayHolidays.map(h => h.nama).join(', ');
+    html += `<div class="${classes}" title="${escHtml(title)}">`;
+    html += `<div class="hl-cal-day">${day}</div>`;
+    if (dayHolidays.length > 0) {
+      html += `<div class="hl-cal-name">${escHtml(dayHolidays[0].nama)}</div>`;
+    }
+    html += '</div>';
+  }
+
+  html += '</div>';
+
+  // Legend
+  html += `<div style="margin-top:16px;display:flex;gap:16px;flex-wrap:wrap;align-items:center">
+    <span class="text-xs"><span style="display:inline-block;width:14px;height:14px;background:#ffebee;border:1.5px solid #ef5350;border-radius:3px;vertical-align:middle"></span> Hari Libur</span>
+    <span class="text-xs"><span style="display:inline-block;width:14px;height:14px;background:#fff3e0;border:1.5px solid #ff9800;border-radius:3px;vertical-align:middle"></span> Cuti Bersama</span>
+    <span class="text-xs"><span style="display:inline-block;width:14px;height:14px;background:#f5f5f5;border:1.5px solid #ddd;border-radius:3px;vertical-align:middle"></span> Weekend</span>
+    <span class="text-xs"><span style="display:inline-block;width:14px;height:14px;background:#fff;border:2px solid #1565c0;border-radius:3px;vertical-align:middle"></span> Hari Ini</span>
+  </div>`;
+
+  container.innerHTML = html;
+}
+
+function renderHariLiburList(container, year, month, holidays) {
+  let html = '<div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Nama</th><th>Tipe</th><th>Aksi</th></tr></thead><tbody>';
+  if (!holidays.length) {
+    html += '<tr><td colspan="4" class="text-center">Tidak ada hari libur bulan ini</td></tr>';
+  } else {
+    holidays.forEach(h => {
+      const tipeBadge = h.tipe === 'nasional' ? 'badge-danger' : h.tipe === 'cuti_bersama' ? 'badge-warning' : 'badge-info';
+      const tipeLabel = h.tipe === 'nasional' ? 'Nasional' : h.tipe === 'cuti_bersama' ? 'Cuti Bersama' : 'Perusahaan';
+      html += `<tr>
+        <td>${formatDate(h.tanggal)}</td>
+        <td class="fw-700">${escHtml(h.nama)}</td>
+        <td><span class="badge ${tipeBadge}">${tipeLabel}</span></td>
+        <td><button class="btn btn-xs btn-danger" onclick="hapusHariLibur('${h.id}')">🗑️</button></td>
+      </tr>`;
+    });
+  }
+  html += '</tbody></table></div>';
+  container.innerHTML = html;
+}
+
+async function hapusHariLibur(id) {
+  if (!confirm('Hapus hari libur ini?')) return;
+  await db.collection('hrd_hari_libur').doc(id).delete();
+  toast('Dihapus', 'success');
+  loadHariLiburView();
+}
+
+function modalHariLibur() {
+  openModal(`<div class="modal-title">+ Tambah Hari Libur Custom</div>
+    <div class="form-group"><label>Tanggal</label><input class="form-control" type="date" id="hlTgl"></div>
+    <div class="form-group"><label>Nama Hari Libur</label><input class="form-control" id="hlNama" placeholder="Contoh: HUT Perusahaan"></div>
+    <div class="form-group"><label>Tipe</label><select class="form-control" id="hlTipe">
+      <option value="perusahaan">Perusahaan</option>
+      <option value="nasional">Nasional</option>
+      <option value="cuti_bersama">Cuti Bersama</option>
+    </select></div>
+    <button class="btn btn-primary" onclick="simpanHariLibur()">Simpan</button>`);
+}
+
+async function simpanHariLibur() {
+  const tanggal = document.getElementById('hlTgl').value;
+  const nama = document.getElementById('hlNama').value;
+  const tipe = document.getElementById('hlTipe').value;
+  if (!tanggal || !nama) return toast('Lengkapi data', 'warning');
+  const tahun = parseInt(tanggal.split('-')[0]);
+  await db.collection('hrd_hari_libur').add({
+    tanggal, nama, tipe, tahun, createdAt: new Date().toISOString()
+  });
+  closeModalDirect();
+  toast('Hari libur ditambahkan', 'success');
+  loadHariLiburView();
+}
+
+async function syncHariLiburNasional() {
+  const year = hariLiburCalendarMonth.year;
+  let dataToSync = [];
+  if (year === 2025) dataToSync = HARI_LIBUR_NASIONAL_2025;
+  else if (year === 2026) dataToSync = HARI_LIBUR_NASIONAL_2026;
+  else { toast(`Data hari libur nasional tahun ${year} belum tersedia. Tersedia: 2025, 2026`, 'warning'); return; }
+
+  if (!confirm(`Sinkronisasi ${dataToSync.length} hari libur nasional tahun ${year}? Data yang sudah ada (nasional/cuti_bersama) akan diperbarui.`)) return;
+
+  toast('Memproses sinkronisasi...', 'info');
+
+  // Delete existing national holidays for this year
+  const existingSnap = await db.collection('hrd_hari_libur').where('tahun','==',year).where('tipe','in',['nasional','cuti_bersama']).get();
+  const batch1 = [];
+  existingSnap.forEach(d => batch1.push(d.ref.delete()));
+  await Promise.all(batch1);
+
+  // Add all national holidays
+  const batch2 = [];
+  dataToSync.forEach(h => {
+    batch2.push(db.collection('hrd_hari_libur').add({
+      tanggal: h.tanggal,
+      nama: h.nama,
+      tipe: h.tipe,
+      tahun: year,
+      createdAt: new Date().toISOString()
+    }));
+  });
+  await Promise.all(batch2);
+
+  toast(`${dataToSync.length} hari libur nasional ${year} berhasil disinkronkan`, 'success');
+  loadHariLiburView();
+}
+
+// Auto-load national holidays on first render if collection is empty for current year
+async function autoLoadHariLiburNasional() {
+  const year = new Date().getFullYear();
+  let dataToSync = [];
+  if (year === 2025) dataToSync = HARI_LIBUR_NASIONAL_2025;
+  else if (year === 2026) dataToSync = HARI_LIBUR_NASIONAL_2026;
+  else return;
+
+  const existingSnap = await db.collection('hrd_hari_libur').where('tahun','==',year).where('tipe','in',['nasional','cuti_bersama']).limit(1).get();
+  if (!existingSnap.empty) return; // Already populated
+
+  const batch = [];
+  dataToSync.forEach(h => {
+    batch.push(db.collection('hrd_hari_libur').add({
+      tanggal: h.tanggal,
+      nama: h.nama,
+      tipe: h.tipe,
+      tahun: year,
+      createdAt: new Date().toISOString()
+    }));
+  });
+  await Promise.all(batch);
+}
+
+// Check if a given date is a holiday - returns holiday info or null
+async function checkHoliday(dateStr) {
+  const snap = await db.collection('hrd_hari_libur').where('tanggal','==',dateStr).limit(1).get();
+  if (snap.empty) return null;
+  return snap.docs[0].data();
+}
 
 // ── PENALTY ───────────────────────────────────────────────────
 async function renderPenalty(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>⚠️ Penalty Point</span><button class="btn btn-primary btn-sm" onclick="modalPenalty()">+ Tambah</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Tanggal</th><th>Jenis</th><th>Poin</th><th>Aksi</th></tr></thead><tbody id="tblPenalty"></tbody></table></div></div>`;const snap=await db.collection('hrd_penalty').orderBy('createdAt','desc').get();let h='';if(snap.empty)h='<tr><td colspan="5" class="text-center">Belum ada</td></tr>';else snap.forEach(d=>{const p=d.data();h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggal)}</td><td>${escHtml(p.jenis)}</td><td><span class="badge badge-danger">${p.poin}</span></td><td><button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_penalty','${d.id}','penalty')">🗑️</button></td></tr>`;});document.getElementById('tblPenalty').innerHTML=h;}
