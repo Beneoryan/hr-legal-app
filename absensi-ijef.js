@@ -1,21 +1,21 @@
-﻿'use strict';
+'use strict';
 // ============================================================
-// ABSENSI-IJEF.JS â€” Selfie+GPS + Dinas Luar + Setting + Rekap
+// ABSENSI-IJEF.JS — Selfie+GPS + Dinas Luar + Setting + Rekap
 // ============================================================
 
 let absensiStream = null, capturedPhoto = null, currentGPS = null;
 let dinasStream = null, dinasPhoto = null, dinasGPS = null;
 
-// â”€â”€ MAIN RENDER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── MAIN RENDER ───────────────────────────────────────────────
 function renderAbsensiIJEF() {
   const main = document.getElementById('mainContent');
-  main.innerHTML = `<div class="page-title"><span>ðŸ“ Absensi IJEF</span></div>
+  main.innerHTML = `<div class="page-title"><span>📍 Absensi IJEF</span></div>
     <div class="tabs" id="absenTabs">
-      <div class="tab active" onclick="showAbsenTab('clock')">â° Clock In/Out</div>
-      <div class="tab" onclick="showAbsenTab('dinas')">ðŸš— Dinas Luar</div>
-      <div class="tab" onclick="showAbsenTab('rekap')">ðŸ“Š Rekap</div>
-      <div class="tab" onclick="showAbsenTab('import')">ðŸ“¥ Import</div>
-      ${hasAccess(3)?'<div class="tab" onclick="showAbsenTab(\'setting\')">âš™ï¸ Setting</div>':''}
+      <div class="tab active" onclick="showAbsenTab('clock')">⏰ Clock In/Out</div>
+      <div class="tab" onclick="showAbsenTab('dinas')">🚗 Dinas Luar</div>
+      <div class="tab" onclick="showAbsenTab('rekap')">📊 Rekap</div>
+      <div class="tab" onclick="showAbsenTab('import')">📥 Import</div>
+      ${hasAccess(3)?'<div class="tab" onclick="showAbsenTab(\'setting\')">⚙️ Setting</div>':''}
     </div><div id="absenContent"></div>`;
   showAbsenTab('clock');
 }
@@ -31,19 +31,19 @@ function showAbsenTab(tab) {
   else if(tab==='setting')renderAbsenSetting(c);
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// â”€â”€ SETTING ABSENSI â€” Lokasi, Radius, Shift, Jam Operasional â”€â”€
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════════════
+// ── SETTING ABSENSI — Lokasi, Radius, Shift, Jam Operasional ──
+// ══════════════════════════════════════════════════════════════
 
 async function renderAbsenSetting(container) {
-  container.innerHTML = `<div class="card"><div class="card-title mb-16">âš™ï¸ Setting Absensi</div><div id="settingContent">Loading...</div></div>`;
+  container.innerHTML = `<div class="card"><div class="card-title mb-16">⚙️ Setting Absensi</div><div id="settingContent">Loading...</div></div>`;
   const doc = await db.collection('hrd_settings').doc('absensi').get();
   const s = doc.exists ? doc.data() : {};
   
   document.getElementById('settingContent').innerHTML = `
     <div class="tabs mb-16">
-      <div class="tab active" onclick="showSettingSection('lokasi')">ðŸ“ Lokasi & Radius</div>
-      <div class="tab" onclick="showSettingSection('shift')">ðŸ• Shift & Jam</div>
+      <div class="tab active" onclick="showSettingSection('lokasi')">📍 Lokasi & Radius</div>
+      <div class="tab" onclick="showSettingSection('shift')">🕐 Shift & Jam</div>
     </div>
     <div id="settingSection"></div>`;
   showSettingSection('lokasi');
@@ -60,18 +60,18 @@ async function showSettingSection(section) {
     const lokasi = s.lokasi || [];
     let lokasiHtml = '';
     lokasi.forEach((l,i) => {
-      lokasiHtml += `<tr><td class="fw-700">${escHtml(l.nama)}</td><td>${l.lat}, ${l.lng}</td><td>${l.radius}m</td><td><button class="btn btn-xs btn-danger" onclick="hapusLokasiAbsen(${i})">ðŸ—‘ï¸</button></td></tr>`;
+      lokasiHtml += `<tr><td class="fw-700">${escHtml(l.nama)}</td><td>${l.lat}, ${l.lng}</td><td>${l.radius}m</td><td><button class="btn btn-xs btn-danger" onclick="hapusLokasiAbsen(${i})">🗑️</button></td></tr>`;
     });
 
     el.innerHTML = `
       <div class="card">
-        <div class="card-header"><div class="card-title">ðŸ“ Lokasi Kantor & Radius Absensi</div><button class="btn btn-primary btn-sm" onclick="modalTambahLokasi()">+ Tambah Lokasi</button></div>
+        <div class="card-header"><div class="card-title">📍 Lokasi Kantor & Radius Absensi</div><button class="btn btn-primary btn-sm" onclick="modalTambahLokasi()">+ Tambah Lokasi</button></div>
         <p class="text-sm mb-16" style="color:#666">Karyawan hanya bisa clock in/out jika berada dalam radius lokasi yang terdaftar. Bisa tambah beberapa lokasi (kantor pusat, cabang, dll).</p>
         <div class="table-wrap"><table><thead><tr><th>Nama Lokasi</th><th>Koordinat</th><th>Radius</th><th>Aksi</th></tr></thead><tbody id="tblLokasiAbsen">${lokasiHtml||'<tr><td colspan="4" class="text-center">Belum ada lokasi. Tambahkan lokasi kantor.</td></tr>'}</tbody></table></div>
         <div class="mt-16" style="padding:12px;background:#f8f9ff;border-radius:8px">
-          <div class="text-sm fw-700 mb-8">ðŸ’¡ Tips:</div>
+          <div class="text-sm fw-700 mb-8">💡 Tips:</div>
           <ul class="text-xs" style="padding-left:16px;line-height:1.8;color:#666">
-            <li>Gunakan Google Maps untuk mendapatkan koordinat (klik kanan â†’ "What's here?")</li>
+            <li>Gunakan Google Maps untuk mendapatkan koordinat (klik kanan → "What's here?")</li>
             <li>Radius 10-50m cocok untuk kantor kecil, 100-200m untuk area pabrik/kampus</li>
             <li>Jika ada beberapa cabang, tambahkan semua lokasi</li>
           </ul>
@@ -83,19 +83,19 @@ async function showSettingSection(section) {
     ];
     let shiftHtml = '';
     shifts.forEach((sh,i) => {
-      shiftHtml += `<tr><td class="fw-700">${escHtml(sh.nama)}</td><td>${sh.jamMasuk}</td><td>${sh.jamPulang}</td><td>${sh.toleransi} menit</td><td><button class="btn btn-xs btn-info" onclick="modalEditShift(${i})">âœï¸</button> <button class="btn btn-xs btn-danger" onclick="hapusShift(${i})">ðŸ—‘ï¸</button></td></tr>`;
+      shiftHtml += `<tr><td class="fw-700">${escHtml(sh.nama)}</td><td>${sh.jamMasuk}</td><td>${sh.jamPulang}</td><td>${sh.toleransi} menit</td><td><button class="btn btn-xs btn-info" onclick="modalEditShift(${i})">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusShift(${i})">🗑️</button></td></tr>`;
     });
 
     el.innerHTML = `
       <div class="card">
-        <div class="card-header"><div class="card-title">ðŸ• Shift & Jam Operasional</div><button class="btn btn-primary btn-sm" onclick="modalTambahShift()">+ Tambah Shift</button></div>
+        <div class="card-header"><div class="card-title">🕐 Shift & Jam Operasional</div><button class="btn btn-primary btn-sm" onclick="modalTambahShift()">+ Tambah Shift</button></div>
         <p class="text-sm mb-16" style="color:#666">Atur shift kerja dan jam operasional. Toleransi keterlambatan dihitung dari jam masuk + toleransi.</p>
         <div class="table-wrap"><table><thead><tr><th>Nama Shift</th><th>Jam Masuk</th><th>Jam Pulang</th><th>Toleransi</th><th>Aksi</th></tr></thead><tbody id="tblShift">${shiftHtml}</tbody></table></div>
         <div class="mt-16 card" style="background:#fff8e1;border-left:4px solid var(--warning)">
-          <div class="text-sm fw-700 mb-8">ðŸ“‹ Keterangan:</div>
+          <div class="text-sm fw-700 mb-8">📋 Keterangan:</div>
           <ul class="text-xs" style="padding-left:16px;line-height:1.8">
             <li><b>Toleransi:</b> Waktu tambahan setelah jam masuk sebelum dianggap terlambat</li>
-            <li><b>Contoh:</b> Jam masuk 08:00, toleransi 10 menit â†’ terlambat jika clock in setelah 08:10</li>
+            <li><b>Contoh:</b> Jam masuk 08:00, toleransi 10 menit → terlambat jika clock in setelah 08:10</li>
             <li>Shift berlaku untuk semua karyawan. Untuk shift khusus per departemen, buat shift terpisah.</li>
           </ul>
         </div>
@@ -104,14 +104,14 @@ async function showSettingSection(section) {
 }
 
 function modalTambahLokasi() {
-  openModal(`<div class="modal-title">ðŸ“ Tambah Lokasi Absensi</div>
+  openModal(`<div class="modal-title">📍 Tambah Lokasi Absensi</div>
     <div class="form-group"><label>Nama Lokasi</label><input class="form-control" id="setLokNama" placeholder="Kantor Pusat / Cabang A"></div>
     <div class="grid-3">
       <div class="form-group"><label>Latitude</label><input class="form-control" id="setLokLat" placeholder="-7.2575"></div>
       <div class="form-group"><label>Longitude</label><input class="form-control" id="setLokLng" placeholder="112.7521"></div>
       <div class="form-group"><label>Radius (meter)</label><input class="form-control" type="number" id="setLokRadius" value="50"></div>
     </div>
-    <button class="btn btn-info btn-sm mb-16" onclick="detectCurrentForSetting()">ðŸ“ Gunakan Lokasi Saya Sekarang</button>
+    <button class="btn btn-info btn-sm mb-16" onclick="detectCurrentForSetting()">📍 Gunakan Lokasi Saya Sekarang</button>
     <div id="setLokPreview" class="mb-16"></div>
     <button class="btn btn-primary" onclick="simpanLokasiAbsen()">Simpan</button>`);
 }
@@ -120,7 +120,7 @@ function detectCurrentForSetting() {
   navigator.geolocation.getCurrentPosition(pos => {
     document.getElementById('setLokLat').value = pos.coords.latitude.toFixed(6);
     document.getElementById('setLokLng').value = pos.coords.longitude.toFixed(6);
-    document.getElementById('setLokPreview').innerHTML = `<span class="badge badge-success">âœ… Lokasi terdeteksi: ${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}</span>`;
+    document.getElementById('setLokPreview').innerHTML = `<span class="badge badge-success">✅ Lokasi terdeteksi: ${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}</span>`;
   }, err => toast('Gagal deteksi: ' + err.message, 'error'), {enableHighAccuracy:true});
 }
 
@@ -188,25 +188,25 @@ async function hapusShift(idx) {
   toast('Dihapus', 'success'); showSettingSection('shift');
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// â”€â”€ CLOCK IN/OUT â€” Menggunakan setting lokasi & shift â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════════════
+// ── CLOCK IN/OUT — Menggunakan setting lokasi & shift ─────────
+// ══════════════════════════════════════════════════════════════
 
 function renderClockInOut(container) {
-  container.innerHTML = `<div class="card"><div class="card-title mb-16">ðŸ“¸ Absensi Selfie + GPS</div>
+  container.innerHTML = `<div class="card"><div class="card-title mb-16">📸 Absensi Selfie + GPS</div>
     <div class="grid-2"><div>
       <div style="position:relative;border-radius:12px;overflow:hidden;background:#000;aspect-ratio:4/3;max-width:400px"><video id="selfieVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover"></video><canvas id="selfieCanvas" style="display:none"></canvas></div>
-      <div class="mt-8 flex gap-8"><button class="btn btn-primary btn-sm" onclick="startCamera()">ðŸ“· Kamera</button><button class="btn btn-info btn-sm" onclick="captureMainPhoto()">ðŸ“¸ Ambil</button></div>
+      <div class="mt-8 flex gap-8"><button class="btn btn-primary btn-sm" onclick="startCamera()">📷 Kamera</button><button class="btn btn-info btn-sm" onclick="captureMainPhoto()">📸 Ambil</button></div>
       <div id="selfiePreview" class="mt-8"></div>
     </div><div>
-      <div class="form-group"><label>ðŸ“ GPS</label><div id="gpsStatus" class="text-sm" style="color:#999">Belum terdeteksi</div></div>
+      <div class="form-group"><label>📍 GPS</label><div id="gpsStatus" class="text-sm" style="color:#999">Belum terdeteksi</div></div>
       <div class="form-group"><label>Jarak ke Lokasi Terdekat</label><div id="gpsDistance" class="text-sm">-</div></div>
-      <button class="btn btn-success btn-sm mb-8" onclick="getGPSLocation()">ðŸ“ Deteksi Lokasi</button>
+      <button class="btn btn-success btn-sm mb-8" onclick="getGPSLocation()">📍 Deteksi Lokasi</button>
       <div id="shiftInfo" class="mt-8 mb-8"></div>
-      <div class="mt-16" id="clockActions"><button class="btn btn-success" onclick="doClockIn()">â° Clock In</button> <button class="btn btn-warning" onclick="doClockOut()">ðŸ  Clock Out</button></div>
+      <div class="mt-16" id="clockActions"><button class="btn btn-success" onclick="doClockIn()">⏰ Clock In</button> <button class="btn btn-warning" onclick="doClockOut()">🏠 Clock Out</button></div>
       <div id="clockStatus" class="mt-16"></div>
     </div></div></div>
-    <div class="card mt-16"><div class="card-title mb-8">ðŸ“‹ Riwayat Hari Ini</div><div id="todayHistory"></div></div>`;
+    <div class="card mt-16"><div class="card-title mb-8">📋 Riwayat Hari Ini</div><div id="todayHistory"></div></div>`;
   loadTodayHistory(); checkTodayStatus(); loadShiftInfo();
 }
 
@@ -217,7 +217,7 @@ async function loadShiftInfo() {
   const el = document.getElementById('shiftInfo');
   if (el) {
     let html = '<div class="text-xs" style="background:#f0f4ff;padding:8px 12px;border-radius:6px"><b>Shift Aktif:</b><br>';
-    shifts.forEach(sh => { html += `â€¢ ${sh.nama}: ${sh.jamMasuk} - ${sh.jamPulang} (toleransi ${sh.toleransi} mnt)<br>`; });
+    shifts.forEach(sh => { html += `• ${sh.nama}: ${sh.jamMasuk} - ${sh.jamPulang} (toleransi ${sh.toleransi} mnt)<br>`; });
     html += '</div>';
     el.innerHTML = html;
   }
@@ -237,19 +237,19 @@ function captureMainPhoto() {
   c.width=v.videoWidth||320;c.height=v.videoHeight||240;
   c.getContext('2d').drawImage(v,0,0);
   capturedPhoto=c.toDataURL('image/jpeg',0.6);
-  document.getElementById('selfiePreview').innerHTML=`<img src="${capturedPhoto}" style="width:100px;border-radius:8px;border:2px solid var(--success)"><div class="text-xs color-success">âœ… Foto diambil</div>`;
+  document.getElementById('selfiePreview').innerHTML=`<img src="${capturedPhoto}" style="width:100px;border-radius:8px;border:2px solid var(--success)"><div class="text-xs color-success">✅ Foto diambil</div>`;
   if(absensiStream){absensiStream.getTracks().forEach(t=>t.stop());absensiStream=null;}
 }
 
 function getGPSLocation() {
-  document.getElementById('gpsStatus').innerHTML='<span style="color:var(--warning)">â³ Mendeteksi...</span>';
+  document.getElementById('gpsStatus').innerHTML='<span style="color:var(--warning)">⏳ Mendeteksi...</span>';
   if(!navigator.geolocation)return toast('GPS tidak didukung','error');
   navigator.geolocation.getCurrentPosition(pos=>{
     currentGPS={lat:pos.coords.latitude,lng:pos.coords.longitude,accuracy:pos.coords.accuracy};
-    document.getElementById('gpsStatus').innerHTML=`<span style="color:var(--success)">âœ… ${currentGPS.lat.toFixed(6)}, ${currentGPS.lng.toFixed(6)}</span><div class="text-xs">Akurasi: ${currentGPS.accuracy.toFixed(0)}m</div>`;
+    document.getElementById('gpsStatus').innerHTML=`<span style="color:var(--success)">✅ ${currentGPS.lat.toFixed(6)}, ${currentGPS.lng.toFixed(6)}</span><div class="text-xs">Akurasi: ${currentGPS.accuracy.toFixed(0)}m</div>`;
     calculateDistanceToOffice();
   },err=>{
-    document.getElementById('gpsStatus').innerHTML=`<span style="color:var(--danger)">âŒ ${err.message}</span>`;
+    document.getElementById('gpsStatus').innerHTML=`<span style="color:var(--danger)">❌ ${err.message}</span>`;
   },{enableHighAccuracy:true,timeout:10000});
 }
 
@@ -259,9 +259,9 @@ async function calculateDistanceToOffice() {
   const el = document.getElementById('gpsDistance');
   if (!el) return;
   if (status.allowed) {
-    el.innerHTML = `<span class="badge badge-success">${status.dist.toFixed(1)}m âœ… Dalam radius "${status.nearest.nama}" (${status.radius}m)</span>`;
+    el.innerHTML = `<span class="badge badge-success">${status.dist.toFixed(1)}m ✅ Dalam radius "${status.nearest.nama}" (${status.radius}m)</span>`;
   } else {
-    el.innerHTML = `<span class="badge badge-danger">${status.dist.toFixed(1)}m âŒ Luar radius "${status.nearest.nama}" (max ${status.radius}m)</span>`;
+    el.innerHTML = `<span class="badge badge-danger">${status.dist.toFixed(1)}m ❌ Luar radius "${status.nearest.nama}" (max ${status.radius}m)</span>`;
   }
 }
 
@@ -312,7 +312,7 @@ async function doClockIn() {
   const status = waktuSekarang > batasWaktu ? 'terlambat' : 'tepat_waktu';
 
   await db.collection('hrd_absensi').add({userId:currentUser.id,nama:currentUser.nama,departemen:currentUser.departemen||'',tanggal:todayStr(),waktu:now.toTimeString().slice(0,5),tipe:'masuk',foto:capturedPhoto,lat:currentGPS.lat,lng:currentGPS.lng,accuracy:currentGPS.accuracy,shift:shift.nama,status,officeLocation:locationStatus.nearest.nama,officeDistance:locationStatus.dist,officeRadius:locationStatus.radius,createdAt:now.toISOString()});
-  toast(`âœ… Clock In: ${now.toTimeString().slice(0,5)} (${status==='terlambat'?'âš ï¸ Terlambat':'Tepat Waktu'})`,'success');
+  toast(`✅ Clock In: ${now.toTimeString().slice(0,5)} (${status==='terlambat'?'⚠️ Terlambat':'Tepat Waktu'})`,'success');
   capturedPhoto=null;currentGPS=null;loadTodayHistory();checkTodayStatus();
 }
 
@@ -325,31 +325,31 @@ async function doClockOut() {
   if(!existing.empty)return toast('Sudah clock out hari ini','warning');
   const now=new Date();
   await db.collection('hrd_absensi').add({userId:currentUser.id,nama:currentUser.nama,departemen:currentUser.departemen||'',tanggal:todayStr(),waktu:now.toTimeString().slice(0,5),tipe:'pulang',foto:capturedPhoto,lat:currentGPS.lat,lng:currentGPS.lng,accuracy:currentGPS.accuracy,status:'pulang',officeLocation:locationStatus.nearest.nama,officeDistance:locationStatus.dist,officeRadius:locationStatus.radius,createdAt:now.toISOString()});
-  toast('âœ… Clock Out: '+now.toTimeString().slice(0,5),'success');
+  toast('✅ Clock Out: '+now.toTimeString().slice(0,5),'success');
   capturedPhoto=null;currentGPS=null;loadTodayHistory();checkTodayStatus();
 }
 
-async function checkTodayStatus(){const snap=await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).get();let masuk=false,pulang=false;snap.forEach(d=>{if(d.data().tipe==='masuk')masuk=true;if(d.data().tipe==='pulang')pulang=true;});const el=document.getElementById('clockStatus');if(el){if(masuk&&pulang)el.innerHTML='<div class="badge badge-success" style="font-size:.9rem;padding:8px 16px">âœ… Sudah In & Out</div>';else if(masuk)el.innerHTML='<div class="badge badge-info" style="font-size:.9rem;padding:8px 16px">â° Sudah In, belum Out</div>';else el.innerHTML='<div class="badge badge-warning" style="font-size:.9rem;padding:8px 16px">âš ï¸ Belum absen</div>';}}
+async function checkTodayStatus(){const snap=await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).get();let masuk=false,pulang=false;snap.forEach(d=>{if(d.data().tipe==='masuk')masuk=true;if(d.data().tipe==='pulang')pulang=true;});const el=document.getElementById('clockStatus');if(el){if(masuk&&pulang)el.innerHTML='<div class="badge badge-success" style="font-size:.9rem;padding:8px 16px">✅ Sudah In & Out</div>';else if(masuk)el.innerHTML='<div class="badge badge-info" style="font-size:.9rem;padding:8px 16px">⏰ Sudah In, belum Out</div>';else el.innerHTML='<div class="badge badge-warning" style="font-size:.9rem;padding:8px 16px">⚠️ Belum absen</div>';}}
 
-async function loadTodayHistory(){const snap=await db.collection('hrd_absensi').where('tanggal','==',todayStr()).orderBy('createdAt','desc').limit(20).get();let h='';if(snap.empty)h='<p class="text-sm" style="color:#999">Belum ada absensi hari ini</p>';else snap.forEach(d=>{const p=d.data();h+=`<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">${p.foto?`<img src="${p.foto}" style="width:36px;height:36px;border-radius:50%;object-fit:cover">`:'<div style="width:36px;height:36px;border-radius:50%;background:#eee;display:flex;align-items:center;justify-content:center">ðŸ‘¤</div>'}<div style="flex:1"><div class="fw-700 text-sm">${escHtml(p.nama)} ${p.tipe==='dinas_luar'?'<span class="badge badge-info">Dinas Luar</span>':''}</div><div class="text-xs" style="color:#999">${p.tipe==='masuk'?'Clock In':p.tipe==='pulang'?'Clock Out':'Dinas'} â€” ${p.waktu}</div></div><span class="badge badge-${p.status==='terlambat'?'warning':'success'}">${p.status||p.tipe}</span></div>`;});const el=document.getElementById('todayHistory');if(el)el.innerHTML=h;}
+async function loadTodayHistory(){const snap=await db.collection('hrd_absensi').where('tanggal','==',todayStr()).orderBy('createdAt','desc').limit(20).get();let h='';if(snap.empty)h='<p class="text-sm" style="color:#999">Belum ada absensi hari ini</p>';else snap.forEach(d=>{const p=d.data();h+=`<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">${p.foto?`<img src="${p.foto}" style="width:36px;height:36px;border-radius:50%;object-fit:cover">`:'<div style="width:36px;height:36px;border-radius:50%;background:#eee;display:flex;align-items:center;justify-content:center">👤</div>'}<div style="flex:1"><div class="fw-700 text-sm">${escHtml(p.nama)} ${p.tipe==='dinas_luar'?'<span class="badge badge-info">Dinas Luar</span>':''}</div><div class="text-xs" style="color:#999">${p.tipe==='masuk'?'Clock In':p.tipe==='pulang'?'Clock Out':'Dinas'} — ${p.waktu}</div></div><span class="badge badge-${p.status==='terlambat'?'warning':'success'}">${p.status||p.tipe}</span></div>`;});const el=document.getElementById('todayHistory');if(el)el.innerHTML=h;}
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// â”€â”€ DINAS LUAR â€” Form Pengajuan + Absen Selfie+GPS di Lokasi â”€â”€
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════════════
+// ── DINAS LUAR — Form Pengajuan + Absen Selfie+GPS di Lokasi ──
+// ══════════════════════════════════════════════════════════════
 
 function renderDinasLuar(container) {
   container.innerHTML = `
     <div class="card">
       <div class="card-header">
-        <div class="card-title">ðŸš— Dinas Luar</div>
+        <div class="card-title">🚗 Dinas Luar</div>
         <div class="flex gap-8">
-          <button class="btn btn-primary btn-sm" onclick="modalDinasLuar()">ðŸ“ Ajukan Dinas</button>
-          <button class="btn btn-success btn-sm" onclick="modalAbsenDinasLuar()">ðŸ“¸ Absen Dinas Luar</button>
+          <button class="btn btn-primary btn-sm" onclick="modalDinasLuar()">📝 Ajukan Dinas</button>
+          <button class="btn btn-success btn-sm" onclick="modalAbsenDinasLuar()">📸 Absen Dinas Luar</button>
         </div>
       </div>
       <div class="tabs mb-16">
-        <div class="tab active" onclick="loadDinasTab('pengajuan')">ðŸ“ Pengajuan</div>
-        <div class="tab" onclick="loadDinasTab('absen')">ðŸ“¸ Riwayat Absen Dinas</div>
+        <div class="tab active" onclick="loadDinasTab('pengajuan')">📝 Pengajuan</div>
+        <div class="tab" onclick="loadDinasTab('absen')">📸 Riwayat Absen Dinas</div>
       </div>
       <div id="dinasContent"></div>
     </div>`;
@@ -365,7 +365,7 @@ async function loadDinasTab(tab) {
     const snap = await db.collection('hrd_dinas_luar').orderBy('createdAt','desc').get();
     let h = '<div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Tanggal</th><th>Tujuan</th><th>Status</th><th>Aksi</th></tr></thead><tbody>';
     if(snap.empty) h += '<tr><td colspan="5" class="text-center">Belum ada pengajuan</td></tr>';
-    else snap.forEach(d=>{const p=d.data();const badge=p.status==='approved'?'badge-success':p.status==='rejected'?'badge-danger':'badge-warning';h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggal)}</td><td>${escHtml(p.tujuan)}</td><td><span class="badge ${badge}">${p.status}</span></td><td>${p.status==='pending'&&hasAccess(3)?`<button class="btn btn-xs btn-success" onclick="approveDinas('${d.id}','approved')">âœ…</button> <button class="btn btn-xs btn-danger" onclick="approveDinas('${d.id}','rejected')">âŒ</button>`:'-'}</td></tr>`;});
+    else snap.forEach(d=>{const p=d.data();const badge=p.status==='approved'?'badge-success':p.status==='rejected'?'badge-danger':'badge-warning';h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggal)}</td><td>${escHtml(p.tujuan)}</td><td><span class="badge ${badge}">${p.status}</span></td><td>${p.status==='pending'&&hasAccess(3)?`<button class="btn btn-xs btn-success" onclick="approveDinas('${d.id}','approved')">✅</button> <button class="btn btn-xs btn-danger" onclick="approveDinas('${d.id}','rejected')">❌</button>`:'-'}</td></tr>`;});
     h += '</tbody></table></div>';
     el.innerHTML = h;
   } else {
@@ -373,35 +373,35 @@ async function loadDinasTab(tab) {
     const snap = await db.collection('hrd_absensi').where('tipe','==','dinas_luar').orderBy('createdAt','desc').limit(30).get();
     let h = '<div class="table-wrap"><table><thead><tr><th>Foto</th><th>Karyawan</th><th>Tanggal</th><th>Waktu</th><th>Lokasi</th><th>Tujuan</th></tr></thead><tbody>';
     if(snap.empty) h += '<tr><td colspan="6" class="text-center">Belum ada absen dinas luar</td></tr>';
-    else snap.forEach(d=>{const p=d.data();h+=`<tr><td>${p.foto?`<img src="${p.foto}" style="width:36px;height:36px;border-radius:50%;object-fit:cover">`:'ðŸ‘¤'}</td><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggal)}</td><td>${p.waktu}</td><td class="text-xs">${p.lat?.toFixed(4)||'-'}, ${p.lng?.toFixed(4)||'-'}</td><td>${escHtml(p.tujuanDinas||'-')}</td></tr>`;});
+    else snap.forEach(d=>{const p=d.data();h+=`<tr><td>${p.foto?`<img src="${p.foto}" style="width:36px;height:36px;border-radius:50%;object-fit:cover">`:'👤'}</td><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggal)}</td><td>${p.waktu}</td><td class="text-xs">${p.lat?.toFixed(4)||'-'}, ${p.lng?.toFixed(4)||'-'}</td><td>${escHtml(p.tujuanDinas||'-')}</td></tr>`;});
     h += '</tbody></table></div>';
     el.innerHTML = h;
   }
 }
 
 function modalDinasLuar() {
-  openModal(`<div class="modal-title">ðŸ“ Ajukan Dinas Luar</div>
+  openModal(`<div class="modal-title">📝 Ajukan Dinas Luar</div>
     <div class="grid-2"><div class="form-group"><label>Nama</label><input class="form-control" id="dlNama" value="${currentUser.nama}"></div><div class="form-group"><label>Tanggal</label><input class="form-control" type="date" id="dlTgl" value="${todayStr()}"></div></div>
     <div class="form-group"><label>Tujuan / Lokasi</label><input class="form-control" id="dlTujuan" placeholder="Nama klien / alamat tujuan"></div>
     <div class="form-group"><label>Keperluan</label><textarea class="form-control" id="dlKeperluan" placeholder="Jelaskan keperluan dinas luar"></textarea></div>
     <div class="grid-2"><div class="form-group"><label>Jam Berangkat</label><input class="form-control" type="time" id="dlJamGo"></div><div class="form-group"><label>Estimasi Kembali</label><input class="form-control" type="time" id="dlJamBack"></div></div>
-    <button class="btn btn-primary" onclick="simpanDinasLuar()">ðŸ“ Ajukan</button>`);
+    <button class="btn btn-primary" onclick="simpanDinasLuar()">📝 Ajukan</button>`);
 }
 
 async function simpanDinasLuar() {
   const data = {nama:document.getElementById('dlNama').value,tanggal:document.getElementById('dlTgl').value,tujuan:document.getElementById('dlTujuan').value,keperluan:document.getElementById('dlKeperluan').value,jamBerangkat:document.getElementById('dlJamGo').value,jamKembali:document.getElementById('dlJamBack').value,status:'pending',userId:currentUser.id,createdAt:new Date().toISOString()};
   if(!data.tujuan)return toast('Tujuan wajib','warning');
   await db.collection('hrd_dinas_luar').add(data);
-  await sendNotification('hr','Dinas Luar',`${data.nama} â†’ ${data.tujuan}`);
+  await sendNotification('hr','Dinas Luar',`${data.nama} → ${data.tujuan}`);
   closeModalDirect();toast('Pengajuan dinas luar terkirim','success');loadDinasTab('pengajuan');
 }
 
 async function approveDinas(id,status){await db.collection('hrd_dinas_luar').doc(id).update({status,approvedBy:currentUser.nama,approvedAt:new Date().toISOString()});toast('Updated','success');loadDinasTab('pengajuan');}
 
-// â”€â”€ ABSEN DINAS LUAR â€” Selfie + GPS (tanpa batasan radius) â”€â”€â”€â”€
+// ── ABSEN DINAS LUAR — Selfie + GPS (tanpa batasan radius) ────
 function modalAbsenDinasLuar() {
   dinasPhoto = null; dinasGPS = null;
-  openModal(`<div class="modal-title">ðŸ“¸ Absen Dinas Luar (Selfie + GPS)</div>
+  openModal(`<div class="modal-title">📸 Absen Dinas Luar (Selfie + GPS)</div>
     <p class="text-sm mb-16" style="color:#666">Absen dari lokasi dinas luar. Foto selfie dan GPS akan direkam sebagai bukti kehadiran di lokasi tujuan.</p>
     <div class="grid-2">
       <div>
@@ -410,19 +410,19 @@ function modalAbsenDinasLuar() {
           <canvas id="dinasCanvas" style="display:none"></canvas>
         </div>
         <div class="mt-8 flex gap-8">
-          <button class="btn btn-primary btn-sm" onclick="startDinasCamera()">ðŸ“· Kamera</button>
-          <button class="btn btn-info btn-sm" onclick="captureDinasPhoto()">ðŸ“¸ Ambil</button>
+          <button class="btn btn-primary btn-sm" onclick="startDinasCamera()">📷 Kamera</button>
+          <button class="btn btn-info btn-sm" onclick="captureDinasPhoto()">📸 Ambil</button>
         </div>
         <div id="dinasPhotoPreview" class="mt-8"></div>
       </div>
       <div>
-        <div class="form-group"><label>ðŸ“ Lokasi GPS</label><div id="dinasGpsStatus" class="text-sm" style="color:#999">Belum terdeteksi</div></div>
-        <button class="btn btn-success btn-sm mb-16" onclick="getDinasGPS()">ðŸ“ Deteksi Lokasi</button>
+        <div class="form-group"><label>📍 Lokasi GPS</label><div id="dinasGpsStatus" class="text-sm" style="color:#999">Belum terdeteksi</div></div>
+        <button class="btn btn-success btn-sm mb-16" onclick="getDinasGPS()">📍 Deteksi Lokasi</button>
         <div class="form-group"><label>Tujuan Dinas</label><input class="form-control" id="dinasAbsenTujuan" placeholder="Nama klien / lokasi"></div>
         <div class="form-group"><label>Keterangan</label><textarea class="form-control" id="dinasAbsenKet" placeholder="Aktivitas yang dilakukan"></textarea></div>
       </div>
     </div>
-    <button class="btn btn-success mt-16" style="width:100%;padding:12px" onclick="submitAbsenDinas()">ðŸ“¸ Simpan Absen Dinas Luar</button>`, true);
+    <button class="btn btn-success mt-16" style="width:100%;padding:12px" onclick="submitAbsenDinas()">📸 Simpan Absen Dinas Luar</button>`, true);
   setTimeout(()=>startDinasCamera(), 300);
 }
 
@@ -440,17 +440,17 @@ function captureDinasPhoto() {
   c.width=v.videoWidth||320;c.height=v.videoHeight||240;
   c.getContext('2d').drawImage(v,0,0);
   dinasPhoto=c.toDataURL('image/jpeg',0.6);
-  document.getElementById('dinasPhotoPreview').innerHTML=`<img src="${dinasPhoto}" style="width:80px;border-radius:8px;border:2px solid var(--success)"><span class="text-xs color-success ml-8">âœ…</span>`;
+  document.getElementById('dinasPhotoPreview').innerHTML=`<img src="${dinasPhoto}" style="width:80px;border-radius:8px;border:2px solid var(--success)"><span class="text-xs color-success ml-8">✅</span>`;
   if(dinasStream){dinasStream.getTracks().forEach(t=>t.stop());dinasStream=null;}
 }
 
 function getDinasGPS() {
-  document.getElementById('dinasGpsStatus').innerHTML='<span style="color:var(--warning)">â³ Mendeteksi...</span>';
+  document.getElementById('dinasGpsStatus').innerHTML='<span style="color:var(--warning)">⏳ Mendeteksi...</span>';
   navigator.geolocation.getCurrentPosition(pos=>{
     dinasGPS={lat:pos.coords.latitude,lng:pos.coords.longitude,accuracy:pos.coords.accuracy};
-    document.getElementById('dinasGpsStatus').innerHTML=`<span style="color:var(--success)">âœ… ${dinasGPS.lat.toFixed(6)}, ${dinasGPS.lng.toFixed(6)}</span><div class="text-xs">Akurasi: ${dinasGPS.accuracy.toFixed(0)}m</div>`;
+    document.getElementById('dinasGpsStatus').innerHTML=`<span style="color:var(--success)">✅ ${dinasGPS.lat.toFixed(6)}, ${dinasGPS.lng.toFixed(6)}</span><div class="text-xs">Akurasi: ${dinasGPS.accuracy.toFixed(0)}m</div>`;
   },err=>{
-    document.getElementById('dinasGpsStatus').innerHTML=`<span style="color:var(--danger)">âŒ ${err.message}</span>`;
+    document.getElementById('dinasGpsStatus').innerHTML=`<span style="color:var(--danger)">❌ ${err.message}</span>`;
   },{enableHighAccuracy:true,timeout:10000});
 }
 
@@ -480,15 +480,15 @@ async function submitAbsenDinas() {
 
   dinasPhoto = null; dinasGPS = null;
   closeModalDirect();
-  toast('âœ… Absen Dinas Luar berhasil! ' + now.toTimeString().slice(0,5), 'success');
+  toast('✅ Absen Dinas Luar berhasil! ' + now.toTimeString().slice(0,5), 'success');
   loadTodayHistory();
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// â”€â”€ REKAP GRID â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════════════
+// ── REKAP GRID ────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
 
-function renderRekapAbsensi(container){container.innerHTML=`<div class="card"><div class="card-header"><div class="card-title">ðŸ“Š Rekap Absensi</div><div class="flex gap-8"><input class="form-control" type="month" id="rekapBulan" value="${monthStr()}" onchange="loadRekapGrid()"><button class="btn btn-sm btn-info" onclick="loadRekapGrid()">ðŸ”</button></div></div><div id="rekapGrid">Loading...</div><div class="mt-16" id="rekapSummary"></div></div>`;loadRekapGrid();}
+function renderRekapAbsensi(container){container.innerHTML=`<div class="card"><div class="card-header"><div class="card-title">📊 Rekap Absensi</div><div class="flex gap-8"><input class="form-control" type="month" id="rekapBulan" value="${monthStr()}" onchange="loadRekapGrid()"><button class="btn btn-sm btn-info" onclick="loadRekapGrid()">🔍</button></div></div><div id="rekapGrid">Loading...</div><div class="mt-16" id="rekapSummary"></div></div>`;loadRekapGrid();}
 
 async function loadRekapGrid(){
   const bulan=document.getElementById('rekapBulan')?.value||monthStr();
@@ -510,7 +510,7 @@ async function loadRekapGrid(){
     for(let i=1;i<=days;i++){
       const st=absenMap[u.id]?.[i];
       let color='#eee',text='-';
-      if(st==='tepat_waktu'||st==='hadir'){color='#4caf50';text='âœ“';ut++;totalH++;}
+      if(st==='tepat_waktu'||st==='hadir'){color='#4caf50';text='✓';ut++;totalH++;}
       else if(st==='terlambat'){color='#ff9800';text='T';ut++;totalT++;}
       else if(st==='dinas'){color='#2196f3';text='D';ut++;totalD++;}
       h+=`<td style="text-align:center;background:${color};color:#fff;font-size:.6rem;font-weight:700;padding:3px">${text}</td>`;
@@ -533,9 +533,9 @@ async function loadRekapGrid(){
     </div>`;
 }
 
-// â”€â”€ IMPORT CSV â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-function renderImportCSV(container){container.innerHTML=`<div class="card"><div class="card-title mb-16">ðŸ“¥ Import CSV</div>
-    <div class="tabs mb-16"><div class="tab active" onclick="switchImportTabAbsensi('file')">ðŸ“„ Upload CSV</div><div class="tab" onclick="switchImportTabAbsensi('api')">ðŸ”— Google Sheets</div></div>
+// ── IMPORT CSV ────────────────────────────────────────────────
+function renderImportCSV(container){container.innerHTML=`<div class="card"><div class="card-title mb-16">📥 Import CSV</div>
+    <div class="tabs mb-16"><div class="tab active" onclick="switchImportTabAbsensi('file')">📄 Upload CSV</div><div class="tab" onclick="switchImportTabAbsensi('api')">🔗 Google Sheets</div></div>
     <div id="importAbsensiTab"></div>
     <div id="csvResult" class="mt-16"></div>
   </div>`;
@@ -545,10 +545,10 @@ function switchImportTabAbsensi(mode){const tabs=document.querySelectorAll('#abs
   if(mode==='api'){el.innerHTML=`<p class="text-sm mb-8" style="color:#666">Import data absensi langsung dari Google Sheets. Header minimal: <code>nama,tanggal,waktu,tipe,status</code>.</p>
       <div class="form-group"><label>URL Google Sheets</label><input class="form-control" id="importAbsenApiUrl" placeholder="https://docs.google.com/spreadsheets/d/xxx/edit?usp=sharing"></div>
       <div id="importAbsenApiStatus" class="mb-8"></div>
-      <div class="flex gap-8 mb-16"><button class="btn btn-info" onclick="previewAbsenApiImport()">ðŸ‘ï¸ Preview</button><button class="btn btn-primary" onclick="processAbsenApiImport()">ðŸ“¥ Import</button></div>
+      <div class="flex gap-8 mb-16"><button class="btn btn-info" onclick="previewAbsenApiImport()">👁️ Preview</button><button class="btn btn-primary" onclick="processAbsenApiImport()">📥 Import</button></div>
       <div id="importAbsenApiPreview"></div>`;} else {el.innerHTML=`<p class="text-sm mb-8" style="color:#666">Upload file CSV absensi. Header minimal: <code>nama,tanggal,waktu,tipe,status</code>.</p>
       <div class="form-group"><label>File CSV</label><input type="file" class="form-control" id="csvFile" accept=".csv"></div>
-      <div class="flex gap-8 mb-16"><button class="btn btn-primary" onclick="processCSVImport()">ðŸ“¥ Import</button><button class="btn btn-outline btn-sm" onclick="downloadCSVTemplate()">ðŸ“„ Download Template</button></div>
+      <div class="flex gap-8 mb-16"><button class="btn btn-primary" onclick="processCSVImport()">📥 Import</button><button class="btn btn-outline btn-sm" onclick="downloadCSVTemplate()">📄 Download Template</button></div>
       <div class="text-xs" style="color:#666">Contoh: nama,tanggal(YYYY-MM-DD),waktu(HH:MM),tipe(masuk/pulang),status</div>`;}}
 
 function downloadCSVTemplate(){const csv='nama,tanggal,waktu,tipe,status\nRyan Benoe,2026-05-19,08:00,masuk,tepat_waktu\nRyan Benoe,2026-05-19,17:00,pulang,pulang';const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='template_absensi.csv';a.click();toast('Template absensi didownload','success');}
@@ -559,10 +559,10 @@ function absensiConvertToGSheetCSV(inputUrl){const match=inputUrl.match(/\/sprea
 
 function parseCsvRows(text){const lines=text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n').filter(l=>l.trim());return lines.map(line=>{const cols=[];let cur='';let inQuotes=false;for(let i=0;i<line.length;i++){const ch=line[i];if(inQuotes){if(ch==='"'){if(line[i+1]==='"'){cur+='"';i++;} else {inQuotes=false;}} else {cur+=ch;}} else {if(ch==='"'){inQuotes=true;} else if(ch===','){cols.push(cur);cur='';} else {cur+=ch;}}}cols.push(cur);return cols.map(c=>c.trim());});}
 
-async function previewAbsenApiImport(){const rawUrl=document.getElementById('importAbsenApiUrl').value.trim();if(!rawUrl) return toast('Paste URL Google Sheets dulu','warning');const statusEl=document.getElementById('importAbsenApiStatus');statusEl.innerHTML='<span class="badge badge-info">Mengambil data...</span>';try{const url=(typeof convertToGSheetCSV==='function'?convertToGSheetCSV(rawUrl):absensiConvertToGSheetCSV(rawUrl));const resp=await fetch(url);if(!resp.ok)throw new Error('Gagal ambil sheet: '+resp.status);const text=await resp.text();if(!text.trim())throw new Error('Data kosong');const rows=parseCsvRows(text);if(rows.length<2)throw new Error('Data kosong atau format salah');const headers=rows[0].map(h=>h.toLowerCase());const colsToShow=Math.min(rows.length-1,5);let previewHtml='<div class="table-wrap" style="max-height:260px;overflow:auto"><table><thead><tr>'+headers.slice(0,5).map(h=>`<th>${escHtml(h)}</th>`).join('')+'</tr></thead><tbody>';for(let i=1;i<=colsToShow;i++){const row=rows[i];previewHtml+='<tr>'+row.slice(0,5).map(c=>`<td>${escHtml(c||'')}</td>`).join('')+'</tr>';}previewHtml+='</tbody></table></div>';document.getElementById('importAbsenApiPreview').innerHTML=previewHtml;statusEl.innerHTML=`<span class="badge badge-success">âœ… ${rows.length-1} baris ditemukan</span>`;window._absenApiImportText=text;}catch(err){statusEl.innerHTML=`<span class="badge badge-danger">âŒ ${escHtml(err.message)}</span>`;document.getElementById('importAbsenApiPreview').innerHTML='';}}
+async function previewAbsenApiImport(){const rawUrl=document.getElementById('importAbsenApiUrl').value.trim();if(!rawUrl) return toast('Paste URL Google Sheets dulu','warning');const statusEl=document.getElementById('importAbsenApiStatus');statusEl.innerHTML='<span class="badge badge-info">Mengambil data...</span>';try{const url=(typeof convertToGSheetCSV==='function'?convertToGSheetCSV(rawUrl):absensiConvertToGSheetCSV(rawUrl));const resp=await fetch(url);if(!resp.ok)throw new Error('Gagal ambil sheet: '+resp.status);const text=await resp.text();if(!text.trim())throw new Error('Data kosong');const rows=parseCsvRows(text);if(rows.length<2)throw new Error('Data kosong atau format salah');const headers=rows[0].map(h=>h.toLowerCase());const colsToShow=Math.min(rows.length-1,5);let previewHtml='<div class="table-wrap" style="max-height:260px;overflow:auto"><table><thead><tr>'+headers.slice(0,5).map(h=>`<th>${escHtml(h)}</th>`).join('')+'</tr></thead><tbody>';for(let i=1;i<=colsToShow;i++){const row=rows[i];previewHtml+='<tr>'+row.slice(0,5).map(c=>`<td>${escHtml(c||'')}</td>`).join('')+'</tr>';}previewHtml+='</tbody></table></div>';document.getElementById('importAbsenApiPreview').innerHTML=previewHtml;statusEl.innerHTML=`<span class="badge badge-success">✅ ${rows.length-1} baris ditemukan</span>`;window._absenApiImportText=text;}catch(err){statusEl.innerHTML=`<span class="badge badge-danger">❌ ${escHtml(err.message)}</span>`;document.getElementById('importAbsenApiPreview').innerHTML='';}}
 
-async function processAbsenApiImport(){const rawUrl=document.getElementById('importAbsenApiUrl').value.trim();if(!rawUrl) return toast('Paste URL Google Sheets dulu','warning');let text=window._absenApiImportText;const statusEl=document.getElementById('importAbsenApiStatus');statusEl.innerHTML='<span class="badge badge-info">Memproses import...</span>';try{if(!text){const url=(typeof convertToGSheetCSV==='function'?convertToGSheetCSV(rawUrl):absensiConvertToGSheetCSV(rawUrl));const resp=await fetch(url);if(!resp.ok)throw new Error('Gagal ambil sheet: '+resp.status);text=await resp.text();if(!text.trim())throw new Error('Data kosong');}await processAbsenImportText(text);window._absenApiImportText=null;statusEl.innerHTML='<span class="badge badge-success">âœ… Import selesai</span>';}catch(err){statusEl.innerHTML=`<span class="badge badge-danger">âŒ ${escHtml(err.message)}</span>`;}} 
+async function processAbsenApiImport(){const rawUrl=document.getElementById('importAbsenApiUrl').value.trim();if(!rawUrl) return toast('Paste URL Google Sheets dulu','warning');let text=window._absenApiImportText;const statusEl=document.getElementById('importAbsenApiStatus');statusEl.innerHTML='<span class="badge badge-info">Memproses import...</span>';try{if(!text){const url=(typeof convertToGSheetCSV==='function'?convertToGSheetCSV(rawUrl):absensiConvertToGSheetCSV(rawUrl));const resp=await fetch(url);if(!resp.ok)throw new Error('Gagal ambil sheet: '+resp.status);text=await resp.text();if(!text.trim())throw new Error('Data kosong');}await processAbsenImportText(text);window._absenApiImportText=null;statusEl.innerHTML='<span class="badge badge-success">✅ Import selesai</span>';}catch(err){statusEl.innerHTML=`<span class="badge badge-danger">❌ ${escHtml(err.message)}</span>`;}} 
 
-async function processAbsenImportText(text){const rows=parseCsvRows(text);if(rows.length<2)return toast('Data kosong atau format salah','warning');const headers=rows[0].map(h=>h.toLowerCase());const ni=headers.indexOf('nama'),ti=headers.indexOf('tanggal');if(ni===-1||ti===-1)return toast('Header CSV harus berisi kolom nama dan tanggal','error');const wi=headers.indexOf('waktu'),tpi=headers.indexOf('tipe'),si=headers.indexOf('status');let imported=0;let batch=db.batch();for(let i=1;i<rows.length;i++){const cols=rows[i];if(!cols[ni]||!cols[ti])continue;const nama=cols[ni];const tanggal=cols[ti];const waktu=wi>=0?cols[wi]||'08:00':'08:00';const tipe=tpi>=0?cols[tpi]||'masuk':'masuk';const status=si>=0?cols[si]||'tepat_waktu':'tepat_waktu';batch.set(db.collection('hrd_absensi').doc(),{nama,userId:nama.toLowerCase().replace(/\s+/g,''),departemen:'',tanggal,waktu,tipe,status,createdAt:new Date().toISOString()});imported++;if(imported>400){await batch.commit();batch=db.batch();imported=0;}}await batch.commit();document.getElementById('csvResult').innerHTML='<div class="badge badge-success" style="font-size:.9rem;padding:8px 16px">âœ… Import selesai</div>';toast('Import absensi selesai','success');}
+async function processAbsenImportText(text){const rows=parseCsvRows(text);if(rows.length<2)return toast('Data kosong atau format salah','warning');const headers=rows[0].map(h=>h.toLowerCase());const ni=headers.indexOf('nama'),ti=headers.indexOf('tanggal');if(ni===-1||ti===-1)return toast('Header CSV harus berisi kolom nama dan tanggal','error');const wi=headers.indexOf('waktu'),tpi=headers.indexOf('tipe'),si=headers.indexOf('status');let imported=0;let batch=db.batch();for(let i=1;i<rows.length;i++){const cols=rows[i];if(!cols[ni]||!cols[ti])continue;const nama=cols[ni];const tanggal=cols[ti];const waktu=wi>=0?cols[wi]||'08:00':'08:00';const tipe=tpi>=0?cols[tpi]||'masuk':'masuk';const status=si>=0?cols[si]||'tepat_waktu':'tepat_waktu';batch.set(db.collection('hrd_absensi').doc(),{nama,userId:nama.toLowerCase().replace(/\s+/g,''),departemen:'',tanggal,waktu,tipe,status,createdAt:new Date().toISOString()});imported++;if(imported>400){await batch.commit();batch=db.batch();imported=0;}}await batch.commit();document.getElementById('csvResult').innerHTML='<div class="badge badge-success" style="font-size:.9rem;padding:8px 16px">✅ Import selesai</div>';toast('Import absensi selesai','success');}
 
 
