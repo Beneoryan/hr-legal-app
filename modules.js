@@ -1326,20 +1326,20 @@ async function kirimBroadcast(){
 async function renderNotifikasi(){
   const main=document.getElementById('mainContent');
   main.innerHTML=`<div class="page-title"><span>🔔 Notifikasi</span><button class="btn btn-sm btn-outline" onclick="markAllRead()">Tandai Semua Dibaca</button></div><div class="card" id="notifList">Loading...</div>`;
-  // Get notifications for user ID and user role
-  const[snap1,snap2]=await Promise.all([
-    db.collection('hrd_notifikasi').where('targetUser','==',currentUser.id).orderBy('createdAt','desc').limit(30).get(),
-    db.collection('hrd_notifikasi').where('targetUser','==',currentUser.role).orderBy('createdAt','desc').limit(30).get()
-  ]);
-  const allNotifs=[];
-  const seen=new Set();
-  snap1.forEach(d=>{if(!seen.has(d.id)){seen.add(d.id);allNotifs.push({id:d.id,...d.data()});}});
-  snap2.forEach(d=>{if(!seen.has(d.id)){seen.add(d.id);allNotifs.push({id:d.id,...d.data()});}});
-  allNotifs.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
-  let h='';
-  if(!allNotifs.length)h='<div class="empty-state"><div class="icon">🔔</div><p>Tidak ada notifikasi</p></div>';
-  else allNotifs.forEach(p=>{h+=`<div style="padding:12px;border-bottom:1px solid var(--border);${p.read?'opacity:.6':'background:#f0f4ff;border-left:3px solid var(--primary)'}"><div class="flex" style="justify-content:space-between"><div class="fw-700 text-sm">${escHtml(p.title)}</div><div class="text-xs" style="color:#999">${formatDateTime(p.createdAt)}</div></div><div class="text-sm mt-8">${escHtml(p.message)}</div>${!p.read?`<button class="btn btn-xs btn-outline mt-8" onclick="markRead('${p.id}')">Tandai Dibaca</button>`:''}</div>`;});
-  document.getElementById('notifList').innerHTML=h;
+  try{
+    const[snap1,snap2]=await Promise.all([
+      db.collection('hrd_notifikasi').where('targetUser','==',currentUser.id).get(),
+      db.collection('hrd_notifikasi').where('targetUser','==',currentUser.role).get()
+    ]);
+    const allNotifs=[];const seen=new Set();
+    snap1.forEach(d=>{if(!seen.has(d.id)){seen.add(d.id);allNotifs.push({id:d.id,...d.data()});}});
+    snap2.forEach(d=>{if(!seen.has(d.id)){seen.add(d.id);allNotifs.push({id:d.id,...d.data()});}});
+    allNotifs.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+    let h='';
+    if(!allNotifs.length)h='<div class="empty-state"><div class="icon">🔔</div><p>Tidak ada notifikasi</p></div>';
+    else allNotifs.slice(0,30).forEach(p=>{h+=`<div style="padding:12px;border-bottom:1px solid var(--border);${p.read?'opacity:.6':'background:#f0f4ff;border-left:3px solid var(--primary)'}"><div class="flex" style="justify-content:space-between"><div class="fw-700 text-sm">${escHtml(p.title)}</div><div class="text-xs" style="color:#999">${formatDateTime(p.createdAt)}</div></div><div class="text-sm mt-8">${escHtml(p.message)}</div>${!p.read?`<button class="btn btn-xs btn-outline mt-8" onclick="markRead('${p.id}')">Tandai Dibaca</button>`:''}</div>`;});
+    document.getElementById('notifList').innerHTML=h;
+  }catch(e){document.getElementById('notifList').innerHTML='<div class="empty-state"><div class="icon">🔔</div><p>Tidak ada notifikasi</p></div>';}
 }
 async function markRead(id){await db.collection('hrd_notifikasi').doc(id).update({read:true});renderNotifikasi();}
 async function markAllRead(){
@@ -2192,11 +2192,18 @@ function startPortalDiscTest(){
 }
 
 async function loadMyDiscHistory(){
-  const snap=await db.collection('hrd_disc_results').where('nama','==',currentUser.nama).orderBy('createdAt','desc').limit(20).get();
-  let h='';
-  if(snap.empty)h='<tr><td colspan="5" class="text-center" style="color:var(--text-light)">Belum pernah tes</td></tr>';
-  else snap.forEach(d=>{const r=d.data();const dt=r.createdAt?new Date(r.createdAt).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}):'-';h+=`<tr><td>${dt}</td><td class="fw-700" style="color:var(--primary)">${escHtml(r.pattern||'-')}</td><td>${escHtml(r.profileName||'-')}</td><td>${escHtml(r.evaluasiPeriode||'-')}</td><td><button class="btn btn-xs btn-info" onclick="viewMyDiscDetail('${d.id}')">👁️ Detail</button></td></tr>`;});
-  document.getElementById('myDiscTbl').innerHTML=h;
+  try{
+    // Try by nama first, also try by nip for linked accounts
+    let allResults=[];
+    const snap1=await db.collection('hrd_disc_results').where('nama','==',currentUser.nama).get();
+    snap1.forEach(d=>allResults.push({id:d.id,...d.data()}));
+    if(currentUser.nip){const snap2=await db.collection('hrd_disc_results').where('nip','==',currentUser.nip).get();snap2.forEach(d=>{if(!allResults.find(r=>r.id===d.id))allResults.push({id:d.id,...d.data()});});}
+    allResults.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+    let h='';
+    if(!allResults.length)h='<tr><td colspan="5" class="text-center" style="color:var(--text-light)">Belum pernah tes</td></tr>';
+    else allResults.slice(0,20).forEach(r=>{const dt=r.createdAt?new Date(r.createdAt).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}):'-';h+=`<tr><td>${dt}</td><td class="fw-700" style="color:var(--primary)">${escHtml(r.pattern||'-')}</td><td>${escHtml(r.profileName||'-')}</td><td>${escHtml(r.evaluasiPeriode||'-')}</td><td><button class="btn btn-xs btn-info" onclick="viewMyDiscDetail('${r.id}')">👁️ Detail</button></td></tr>`;});
+    document.getElementById('myDiscTbl').innerHTML=h;
+  }catch(e){document.getElementById('myDiscTbl').innerHTML='<tr><td colspan="5" class="text-center" style="color:var(--text-light)">Belum pernah tes</td></tr>';}
 }
 
 async function viewMyDiscDetail(id){
