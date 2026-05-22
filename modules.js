@@ -1337,11 +1337,33 @@ async function renderNotifikasi(){
     allNotifs.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
     let h='';
     if(!allNotifs.length)h='<div class="empty-state"><div class="icon">🔔</div><p>Tidak ada notifikasi</p></div>';
-    else allNotifs.slice(0,30).forEach(p=>{h+=`<div style="padding:12px;border-bottom:1px solid var(--border);${p.read?'opacity:.6':'background:#f0f4ff;border-left:3px solid var(--primary)'}"><div class="flex" style="justify-content:space-between"><div class="fw-700 text-sm">${escHtml(p.title)}</div><div class="text-xs" style="color:#999">${formatDateTime(p.createdAt)}</div></div><div class="text-sm mt-8">${escHtml(p.message)}</div>${!p.read?`<button class="btn btn-xs btn-outline mt-8" onclick="markRead('${p.id}')">Tandai Dibaca</button>`:''}</div>`;});
+    else allNotifs.slice(0,30).forEach(p=>{
+      const linkPage=p.link||detectNotifLink(p.title);
+      h+=`<div style="padding:12px;border-bottom:1px solid var(--border);cursor:pointer;${p.read?'opacity:.6':'background:#f0f4ff;border-left:3px solid var(--primary)'}" onclick="openNotif('${p.id}','${linkPage}')"><div class="flex" style="justify-content:space-between"><div class="fw-700 text-sm">${escHtml(p.title)}</div><div class="text-xs" style="color:#999">${formatDateTime(p.createdAt)}</div></div><div class="text-sm mt-8">${escHtml(p.message)}</div>${!p.read?`<button class="btn btn-xs btn-outline mt-8" onclick="event.stopPropagation();markRead('${p.id}')">Tandai Dibaca</button>`:''}</div>`;
+    });
     document.getElementById('notifList').innerHTML=h;
   }catch(e){document.getElementById('notifList').innerHTML='<div class="empty-state"><div class="icon">🔔</div><p>Tidak ada notifikasi</p></div>';}
 }
 async function markRead(id){await db.collection('hrd_notifikasi').doc(id).update({read:true});renderNotifikasi();}
+
+async function openNotif(id,link){
+  await db.collection('hrd_notifikasi').doc(id).update({read:true});
+  if(link)navigateTo(link);
+  else renderNotifikasi();
+}
+function detectNotifLink(title){
+  const t=(title||'').toLowerCase();
+  if(t.includes('meeting')||t.includes('undangan'))return'meeting';
+  if(t.includes('broadcast'))return'broadcast';
+  if(t.includes('pengumuman'))return'pengumuman';
+  if(t.includes('cuti')||t.includes('izin'))return'cuti';
+  if(t.includes('approval'))return'approval-center';
+  if(t.includes('gaji')||t.includes('slip'))return'penggajian';
+  if(t.includes('reimbursement'))return'reimbursement';
+  if(t.includes('kandidat')||t.includes('rekrutmen'))return'kandidat';
+  if(t.includes('disc'))return'disc-test';
+  return'';
+}
 async function markAllRead(){
   const[s1,s2]=await Promise.all([
     db.collection('hrd_notifikasi').where('targetUser','==',currentUser.id).where('read','==',false).get(),
@@ -2193,11 +2215,12 @@ function startPortalDiscTest(){
 
 async function loadMyDiscHistory(){
   try{
-    // Try by nama first, also try by nip for linked accounts
+    // Flexible name matching - case insensitive
+    const snap=await db.collection('hrd_disc_results').get();
+    const myName=currentUser.nama.toLowerCase().trim();
+    const myNip=(currentUser.nip||'').toLowerCase().trim();
     let allResults=[];
-    const snap1=await db.collection('hrd_disc_results').where('nama','==',currentUser.nama).get();
-    snap1.forEach(d=>allResults.push({id:d.id,...d.data()}));
-    if(currentUser.nip){const snap2=await db.collection('hrd_disc_results').where('nip','==',currentUser.nip).get();snap2.forEach(d=>{if(!allResults.find(r=>r.id===d.id))allResults.push({id:d.id,...d.data()});});}
+    snap.forEach(d=>{const r=d.data();const rName=(r.nama||'').toLowerCase().trim();const rNip=(r.nip||'').toLowerCase().trim();if(rName===myName||(myNip&&rNip===myNip))allResults.push({id:d.id,...r});});
     allResults.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
     let h='';
     if(!allResults.length)h='<tr><td colspan="5" class="text-center" style="color:var(--text-light)">Belum pernah tes</td></tr>';
