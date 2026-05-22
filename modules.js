@@ -1348,7 +1348,7 @@ async function markRead(id){await db.collection('hrd_notifikasi').doc(id).update
 
 async function openNotif(id,link){
   await db.collection('hrd_notifikasi').doc(id).update({read:true});
-  if(link)navigateTo(link);
+  if(link&&link!=='')navigateTo(link);
   else renderNotifikasi();
 }
 function detectNotifLink(title){
@@ -1377,7 +1377,7 @@ async function markAllRead(){
 }
 
 // ── PENGUMUMAN ────────────────────────────────────────────────
-async function renderPengumuman(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>📢 Pengumuman</span>${hasAccess(3)?'<button class="btn btn-primary btn-sm" onclick="modalPengumuman()">+ Tambah</button>':''}</div><div id="pengumumanList">Loading...</div>`;const snap=await db.collection('hrd_pengumuman').orderBy('createdAt','desc').get();let h='';if(snap.empty)h='<div class="empty-state"><div class="icon">📢</div><p>Belum ada</p></div>';else snap.forEach(d=>{const p=d.data();h+=`<div class="card"><div class="card-header"><div class="card-title">${escHtml(p.judul)}</div><div class="text-xs" style="color:#999">${formatDateTime(p.createdAt)}</div></div><div class="text-sm" style="white-space:pre-wrap">${escHtml(p.isi)}</div></div>`;});document.getElementById('pengumumanList').innerHTML=h;}
+async function renderPengumuman(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>📢 Pengumuman</span>${hasAccess(3)?'<button class="btn btn-primary btn-sm" onclick="modalPengumuman()">+ Tambah</button>':''}</div><div id="pengumumanList">Loading...</div>`;try{const snap=await db.collection('hrd_pengumuman').get();const items=[];snap.forEach(d=>items.push({id:d.id,...d.data()}));items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));let h='';if(!items.length)h='<div class="empty-state"><div class="icon">📢</div><p>Belum ada</p></div>';else items.forEach(p=>{h+=`<div class="card"><div class="card-header"><div class="card-title">${escHtml(p.judul)}</div><div class="text-xs" style="color:#999">${formatDateTime(p.createdAt)} — ${escHtml(p.dibuatOleh||'')}</div></div><div class="text-sm" style="white-space:pre-wrap">${escHtml(p.isi)}</div></div>`;});document.getElementById('pengumumanList').innerHTML=h;}catch(e){document.getElementById('pengumumanList').innerHTML='<div class="empty-state"><div class="icon">📢</div><p>Belum ada pengumuman</p></div>';}}
 function modalPengumuman(){openModal(`<div class="modal-title">Tambah Pengumuman</div><div class="form-group"><label>Judul</label><input class="form-control" id="pgJudul"></div><div class="form-group"><label>Isi</label><textarea class="form-control" id="pgIsi" style="min-height:150px"></textarea></div><button class="btn btn-primary" onclick="simpanPengumuman()">Publikasikan</button>`);}
 async function simpanPengumuman(){const data={judul:document.getElementById('pgJudul').value,isi:document.getElementById('pgIsi').value,dibuatOleh:currentUser.nama,createdAt:new Date().toISOString()};if(!data.judul)return toast('Judul wajib','warning');await db.collection('hrd_pengumuman').add(data);const users=await getAllUsers();await sendNotificationBulk(users.map(u=>u.id),'📢 Pengumuman',data.judul);closeModalDirect();toast('Dipublikasikan','success');renderPengumuman();}
 
@@ -2230,24 +2230,6 @@ async function loadMyDiscHistory(){
 }
 
 async function viewMyDiscDetail(id){
-  const doc=await db.collection('hrd_disc_results').doc(id).get();if(!doc.exists)return toast('Data tidak ditemukan','error');
-  const r=doc.data();const s1=r.seg1||{D:0,I:0,S:0,C:0};const s2=r.seg2||{D:0,I:0,S:0,C:0};const s3=r.seg3||{D:0,I:0,S:0,C:0};
-  function bG(data,title){let bars='';['D','I','S','C'].forEach(t=>{const v=data[t]||0;const pct=(Math.abs(v)/8*40).toFixed(0);const col=v>=0?'#4caf50':'#ef5350';const st=v>=0?`position:absolute;bottom:50%;width:100%;height:${pct}%;background:${col};border-radius:3px 3px 0 0`:`position:absolute;top:50%;width:100%;height:${pct}%;background:${col};border-radius:0 0 3px 3px`;bars+=`<div style="display:flex;flex-direction:column;align-items:center;gap:1px"><div style="font-size:.6rem;font-weight:600;color:${v>=0?'#2e7d32':'#c62828'}">${v>0?'+':''}${typeof v==='number'?v.toFixed(1):v}</div><div style="width:28px;height:65px;background:#f5f5f5;border-radius:4px;position:relative;border:1px solid #e0e0e0"><div style="position:absolute;top:50%;left:0;right:0;height:1px;background:#bbb"></div><div style="${st}"></div></div><div style="font-size:.65rem;font-weight:700;color:var(--primary)">${t}</div></div>`;});return`<div style="text-align:center;flex:1"><div style="font-size:.63rem;font-weight:700;color:var(--primary);margin-bottom:4px">${title}</div><div style="display:flex;justify-content:center;gap:5px">${bars}</div></div>`;}
-  const graphs=bG(s1,'MOST (Public)')+bG(s2,'LEAST (Private)')+bG(s3,'CHANGE (Perceived)');
-  const dt=r.createdAt?new Date(r.createdAt).toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'}):'-';
-  let posH='',negH='';
-  (r.positiveTraits||[]).forEach(t=>{posH+=`<div style="padding:2px 0;font-size:.76rem;color:#2e7d32">✅ ${escHtml(t)}</div>`;});
-  (r.negativeTraits||[]).forEach(t=>{negH+=`<div style="padding:2px 0;font-size:.76rem;color:#c62828">⚠️ ${escHtml(t)}</div>`;});
-  const kpiScore=r.kpiScore||70;const kpiGrade=kpiScore>=90?'A':kpiScore>=80?'B':kpiScore>=70?'C':kpiScore>=60?'D':'E';
-  openModal(`<div class="modal-title">📊 Hasil DISC Saya</div>
-    <div style="text-align:center;margin-bottom:12px"><span style="font-size:.8rem;color:var(--text-light)">${dt} | Periode: ${escHtml(r.evaluasiPeriode||'-')}</span><br><span style="display:inline-block;padding:6px 16px;background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;border-radius:16px;font-weight:700;margin-top:8px">${escHtml(r.profileName||'-')} (${escHtml(r.pattern||'-')})</span></div>
-    <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">${graphs}</div>
-    <div style="background:#f8f9ff;border-radius:8px;padding:10px;margin-bottom:12px;font-size:.8rem;line-height:1.6">${escHtml(getDiscDesc(r.pattern)||'')}</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-      <div style="background:#e8f5e9;border-radius:8px;padding:8px"><div style="font-size:.72rem;font-weight:700;color:#2e7d32;margin-bottom:4px">✅ Kekuatan</div>${posH||'<span style="font-size:.72rem;color:#999">-</span>'}</div>
-      <div style="background:#ffebee;border-radius:8px;padding:8px"><div style="font-size:.72rem;font-weight:700;color:#c62828;margin-bottom:4px">⚠️ Area Pengembangan</div>${negH||'<span style="font-size:.72rem;color:#999">-</span>'}</div>
-    </div>
-    ${r.career?`<div style="background:#e8f5e9;border-radius:8px;padding:8px;margin-bottom:12px"><div style="font-size:.72rem;font-weight:700;color:#1b5e20;margin-bottom:4px">💼 Bidang Pekerjaan Cocok</div><div style="font-size:.75rem;color:#2e7d32;line-height:1.4">${escHtml(r.career)}</div></div>`:''}
-    <div style="text-align:center;padding:8px;background:#f5f5f5;border-radius:8px"><span style="font-size:.8rem">Skor Kepribadian: <strong style="color:${kpiScore>=80?'var(--success)':'var(--warning)'}">${kpiScore}/100 (Grade ${kpiGrade})</strong></span></div>`,true);
+  // Reuse the admin detail view for consistency
+  viewDiscResult(id);
 }
-

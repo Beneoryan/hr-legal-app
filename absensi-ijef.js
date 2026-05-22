@@ -870,7 +870,7 @@ async function loadRekapGrid(){
   const bulan=document.getElementById('rekapBulan')?.value||monthStr();
   const days=getMonthDays(bulan);
   const startDate=bulan+'-01',endDate=bulan+'-'+String(days).padStart(2,'0');
-  const[usersSnap,absenSnap,settDoc]=await Promise.all([db.collection('hrd_users').where('status','==','aktif').get(),db.collection('hrd_absensi').where('tanggal','>=',startDate).where('tanggal','<=',endDate).get(),db.collection('hrd_settings').doc('absensi').get()]);
+  const[usersSnap,absenSnap,settDoc]=await Promise.all([db.collection('hrd_karyawan').where('status','==','aktif').get(),db.collection('hrd_absensi').where('tanggal','>=',startDate).where('tanggal','<=',endDate).get(),db.collection('hrd_settings').doc('absensi').get()]);
   const sett = settDoc.exists ? settDoc.data() : {};
   const flex = sett.flexTime || { enabled: true, durasiKerja: 8, durasiIstirahat: 1 };
   const users=[];usersSnap.forEach(d=>users.push({id:d.id,...d.data()}));
