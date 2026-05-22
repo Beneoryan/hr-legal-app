@@ -105,7 +105,6 @@ function todayStr(){return new Date().toISOString().split('T')[0];}
 document.addEventListener('DOMContentLoaded',()=>{
   const h=window.location.hash;
   if(h.startsWith('#evaluasi')){
-    // Check for URL params (auto-fill from main app)
     const paramStr=h.includes('?')?h.split('?')[1]:'';
     if(paramStr){
       const p=new URLSearchParams(paramStr);
@@ -117,31 +116,10 @@ document.addEventListener('DOMContentLoaded',()=>{
     } else { startMode('evaluasi'); }
   }
   else if(h==='#history')renderHistory();
-  else renderModeSelection();
+  else { startMode('calon'); } // Default: langsung ke form calon karyawan
 });
 
-function renderModeSelection(){
-  document.getElementById('app').innerHTML=`
-  <div style="background:#fff;border-radius:10px;padding:24px;max-width:600px;margin:40px auto;box-shadow:0 1px 4px rgba(0,0,0,.06);text-align:center">
-    <h2 style="color:var(--primary);margin-bottom:8px">🧠 DISC Personality Test</h2>
-    <p style="color:var(--text-light);margin-bottom:24px;font-size:.88rem">Pilih mode tes yang sesuai</p>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
-      <div onclick="startMode('calon')" style="cursor:pointer;background:#fff;border:2px solid var(--border);border-radius:10px;padding:20px;transition:all .2s" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
-        <div style="font-size:2.5rem;margin-bottom:8px">🧑‍💼</div>
-        <h3 style="color:var(--primary);font-size:.95rem;margin-bottom:4px">Calon Karyawan</h3>
-        <p style="font-size:.78rem;color:var(--text-light)">Tes untuk proses rekrutmen</p>
-      </div>
-      <div onclick="startMode('evaluasi')" style="cursor:pointer;background:#fff;border:2px solid var(--border);border-radius:10px;padding:20px;transition:all .2s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
-        <div style="font-size:2.5rem;margin-bottom:8px">📊</div>
-        <h3 style="color:var(--accent);font-size:.95rem;margin-bottom:4px">Evaluasi Karyawan</h3>
-        <p style="font-size:.78rem;color:var(--text-light)">Evaluasi periodik oleh HR</p>
-      </div>
-    </div>
-    <div style="border-top:1px solid var(--border);padding-top:16px">
-      <button onclick="renderHistory()" style="padding:8px 16px;border:1.5px solid var(--primary);background:transparent;color:var(--primary);border-radius:6px;font-size:.82rem;font-weight:600;cursor:pointer">📋 Riwayat Hasil Tes</button>
-    </div>
-  </div>`;
-}
+function renderModeSelection(){ startMode('calon'); }
 
 function startMode(mode){testState={...testState,mode,answers:{},currentQuestion:0};mode==='calon'?renderCalonForm():renderEvaluasiForm();}
 
@@ -322,98 +300,44 @@ async function saveResult(r){
 
 function renderResult(r){
   const{s1,s2,s3,pattern,profile,desc,rawP,rawK}=r;
-  // Build 3 graphs
-  function buildGraph(data,title,subtitle){
-    let bars='';['D','I','S','C'].forEach(t=>{const v=data[t]||0;const pct=(Math.abs(v)/8*45).toFixed(0);const col=v>=0?'#4caf50':'#ef5350';const style=v>=0?`position:absolute;bottom:50%;width:100%;height:${pct}%;background:${col};border-radius:4px 4px 0 0`:`position:absolute;top:50%;width:100%;height:${pct}%;background:${col};border-radius:0 0 4px 4px`;bars+=`<div style="display:flex;flex-direction:column;align-items:center;gap:2px"><div style="font-size:.68rem;font-weight:600;color:${v>=0?'#2e7d32':'#c62828'}">${v>0?'+':''}${typeof v==='number'?v.toFixed(1):v}</div><div style="width:40px;height:120px;background:#f5f5f5;border-radius:6px;position:relative;border:1px solid #e0e0e0"><div style="position:absolute;top:50%;left:0;right:0;height:1px;background:#999"></div><div style="${style}"></div></div><div style="font-size:.78rem;font-weight:700;color:var(--primary)">${t}</div></div>`;});
-    return`<div style="flex:1;min-width:180px;text-align:center"><div style="font-size:.75rem;font-weight:700;color:var(--primary);margin-bottom:4px">${title}</div><div style="font-size:.68rem;color:var(--text-light);margin-bottom:8px">${subtitle}</div><div style="display:flex;justify-content:center;gap:12px">${bars}</div></div>`;
-  }
-  const graph1=buildGraph(s1,'GRAPH 1 — MOST','Mask Public Self');
-  const graph2=buildGraph(s2,'GRAPH 2 — LEAST','Core Private Self');
-  const graph3=buildGraph(s3,'GRAPH 3 — CHANGE','Mirror Perceived Self');
-
-  // Positive & Negative traits
-  let posHtml='',negHtml='';
-  (profile.pos||[]).forEach(t=>{posHtml+=`<div style="padding:5px 0;border-bottom:1px solid #e8f5e9;font-size:.83rem;color:#2e7d32">✅ ${esc(t)}</div>`;});
-  (profile.neg||[]).forEach(t=>{negHtml+=`<div style="padding:5px 0;border-bottom:1px solid #ffebee;font-size:.83rem;color:#c62828">⚠️ ${esc(t)}</div>`;});
-
-  // KPI Impact Score calculation
-  const posCount=profile.pos?profile.pos.length:0;
-  const negCount=profile.neg?profile.neg.length:0;
-  const kpiBase=70;
-  const kpiBonus=Math.min(posCount*3,20);
-  const kpiPenalty=Math.min(negCount*2,15);
-  const kpiScore=Math.min(100,Math.max(0,kpiBase+kpiBonus-kpiPenalty));
-  const kpiGrade=kpiScore>=90?'A':kpiScore>=80?'B':kpiScore>=70?'C':kpiScore>=60?'D':'E';
+  function buildLineGraph(data,title,subtitle){
+    const vals=['D','I','S','C'].map(t=>data[t]||0);const h=160;
+    const toY=v=>h/2-((v/8)*(h/2));
+    let dots='';vals.forEach((v,i)=>{dots+=`<circle cx="${20+i*50}" cy="${toY(v)}" r="4" fill="#1a237e"/><text x="${20+i*50}" y="${toY(v)-10}" text-anchor="middle" font-size="9" font-weight="700" fill="${v>=0?'#2e7d32':'#c62828'}">${v>0?'+':''}${v.toFixed(1)}</text>`;});
+    const points=vals.map((v,i)=>`${20+i*50},${toY(v)}`).join(' ');
+    return`<div style="flex:1;min-width:200px;text-align:center"><div style="font-size:.72rem;font-weight:700;color:var(--primary)">${title}</div><div style="font-size:.62rem;color:#999;margin-bottom:4px">${subtitle}</div><svg width="200" height="${h+25}" viewBox="0 0 200 ${h+25}" style="border:1px solid #e0e0e0;border-radius:6px;background:#fafafa"><line x1="10" y1="${h/2}" x2="190" y2="${h/2}" stroke="#999" stroke-width="1" stroke-dasharray="3"/><line x1="10" y1="${h/4}" x2="190" y2="${h/4}" stroke="#eee" stroke-width="0.5"/><line x1="10" y1="${h*3/4}" x2="190" y2="${h*3/4}" stroke="#eee" stroke-width="0.5"/><polyline points="${points}" fill="none" stroke="#1a237e" stroke-width="2"/>${dots}<text x="20" y="${h+15}" text-anchor="middle" font-size="10" font-weight="700" fill="#1a237e">D</text><text x="70" y="${h+15}" text-anchor="middle" font-size="10" font-weight="700" fill="#1a237e">I</text><text x="120" y="${h+15}" text-anchor="middle" font-size="10" font-weight="700" fill="#1a237e">S</text><text x="170" y="${h+15}" text-anchor="middle" font-size="10" font-weight="700" fill="#1a237e">C</text></svg></div>`;}
+  const graph1=buildLineGraph(s1,'GRAPH 1 MOST','Mask Public Self');
+  const graph2=buildLineGraph(s2,'GRAPH 2 LEAST','Core Private Self');
+  const graph3=buildLineGraph(s3,'GRAPH 3 CHANGE','Mirror Perceived Self');
+  let maskT='',coreT='',mirrorT='';
+  (profile.pos||[]).forEach(t=>{maskT+=`<div style="font-size:.8rem;padding:2px 0">${esc(t)}</div>`;});
+  (profile.neg||[]).forEach(t=>{coreT+=`<div style="font-size:.8rem;padding:2px 0">${esc(t)}</div>`;});
+  [...(profile.pos||[]),...(profile.neg||[])].forEach(t=>{mirrorT+=`<div style="font-size:.8rem;padding:2px 0">${esc(t)}</div>`;});
+  const sorted=Object.entries(s3).sort((a,b)=>b[1]-a[1]);const dominant=sorted.filter(([_,v])=>v>0);const weak=sorted.filter(([_,v])=>v<0);
+  const dn={D:'Dominance',I:'Influence',S:'Steadiness',C:'Compliance'};
+  const dd={D:'berorientasi pada hasil, suka tantangan, tegas, dan mandiri',I:'ramah, optimis, persuasif, dan suka bersosialisasi',S:'sabar, loyal, konsisten, dan menghindari konflik',C:'perfeksionis, detail, analitis, dan terorganisir'};
+  const ddLow={D:'pendiam, menghindari konfrontasi, dan kurang agresif',I:'dingin, menjaga jarak, dan kurang percaya pada orang lain',S:'tidak sabar, suka perubahan, dan kurang stabil',C:'kurang detail, spontan, dan tidak terlalu mengikuti aturan'};
+  let kesimp=`Berdasarkan hasil tes, <strong>${esc(testState.nama)}</strong> memiliki profil kepribadian dominan <strong>${pattern} (${esc(profile.name)})</strong>.\n\nBerikut rinciannya:\n`;
+  dominant.forEach(([t,v])=>{kesimp+=`\n<strong>Sisi ${t} (${dn[t]}) yang tinggi:</strong> Ini membuatnya menjadi pribadi yang ${dd[t]}.\n`;});
+  weak.forEach(([t,v])=>{kesimp+=`\n<strong>Sisi ${t} (${dn[t]}) yang rendah:</strong> Ini menjelaskan mengapa ia cenderung ${ddLow[t]}.\n`;});
+  kesimp+=`\n<strong>Kesimpulan Karakter:</strong>\nSecara keseluruhan, ${esc(testState.nama)} adalah seorang "<strong>${esc(profile.name)}</strong>".\n<strong>Kekuatan:</strong> ${(profile.pos||[]).join(', ')}.\n<strong>Potensi Tantangan:</strong> ${(profile.neg||[]).join(', ')}.`;
+  const posCount=profile.pos?profile.pos.length:0;const negCount=profile.neg?profile.neg.length:0;
+  const kpiScore=Math.min(100,Math.max(0,70+Math.min(posCount*3,20)-Math.min(negCount*2,15)));const kpiGrade=kpiScore>=90?'A':kpiScore>=80?'B':kpiScore>=70?'C':kpiScore>=60?'D':'E';
 
   document.getElementById('app').innerHTML=`
-  <div style="max-width:800px;margin:0 auto">
+  <div style="max-width:850px;margin:0 auto">
     <div style="background:#fff;border-radius:10px;padding:24px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06);text-align:center">
-      <h2 style="color:var(--primary);margin-bottom:4px">Hasil Tes DISC</h2>
-      <p style="color:var(--text-light);font-size:.85rem">${esc(testState.nama)} — ${testState.tanggalTes}</p>
-      ${testState.mode==='evaluasi'?`<p style="font-size:.78rem;color:var(--text-light)">Periode: ${esc(testState.evaluasiPeriode)} | Dept: ${esc(testState.departemen)}</p>`:''}
-      <div style="display:inline-block;padding:8px 20px;background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;border-radius:20px;font-size:1rem;font-weight:700;margin:12px 0">${esc(profile.name)} (${pattern})</div>
-    </div>
-
-    <div style="background:#fff;border-radius:10px;padding:20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
-      <h4 style="color:var(--primary);margin-bottom:16px;text-align:center">📊 Personality System Graph</h4>
-      <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">${graph1}${graph2}${graph3}</div>
-      <div style="text-align:center;margin-top:12px;font-size:.72rem;color:var(--text-light)">D=Dominance | I=Influence | S=Steadiness | C=Compliance</div>
-    </div>
-
-    <div style="background:#fff;border-radius:10px;padding:20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
-      <h4 style="color:var(--primary);margin-bottom:12px">📝 Deskripsi Kepribadian</h4>
-      <div style="background:#f8f9ff;border-radius:8px;padding:16px;font-size:.85rem;line-height:1.7">${esc(desc)}</div>
-    </div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-      <div style="background:#fff;border-radius:10px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
-        <h4 style="color:var(--success);margin-bottom:12px">✅ Sifat Positif</h4>
-        ${posHtml||'<p style="font-size:.82rem;color:#999">-</p>'}
-      </div>
-      <div style="background:#fff;border-radius:10px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
-        <h4 style="color:var(--danger);margin-bottom:12px">⚠️ Sifat Negatif</h4>
-        ${negHtml||'<p style="font-size:.82rem;color:#999">-</p>'}
-      </div>
-    </div>
-
-    <div style="background:#fff;border-radius:10px;padding:20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
-      <h4 style="color:var(--primary);margin-bottom:12px">💼 Rekomendasi Bidang Pekerjaan</h4>
-      <div style="background:#e8f5e9;border-radius:8px;padding:16px;font-size:.85rem;line-height:1.7;color:#1b5e20">${esc(profile.career||'Belum tersedia untuk profil ini.')}</div>
-    </div>
-
-    <div style="background:#fff;border-radius:10px;padding:20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
-      <h4 style="color:var(--primary);margin-bottom:12px">📈 Dampak terhadap KPI</h4>
-      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-        <div style="text-align:center;padding:16px 24px;background:linear-gradient(135deg,${kpiScore>=80?'#e8f5e9':'#fff8e1'},#fff);border-radius:10px;border:2px solid ${kpiScore>=80?'var(--success)':kpiScore>=60?'var(--warning)':'var(--danger)'}">
-          <div style="font-size:2rem;font-weight:700;color:${kpiScore>=80?'var(--success)':kpiScore>=60?'var(--warning)':'var(--danger)'}">${kpiScore}</div>
-          <div style="font-size:.75rem;color:var(--text-light)">Skor Kepribadian</div>
-          <div style="font-size:1.2rem;font-weight:700;margin-top:4px">Grade ${kpiGrade}</div>
-        </div>
-        <div style="flex:1;font-size:.82rem;line-height:1.8">
-          <div><strong>Sifat Positif:</strong> ${posCount} poin (+${kpiBonus} skor)</div>
-          <div><strong>Sifat Negatif:</strong> ${negCount} poin (-${kpiPenalty} skor)</div>
-          <div style="margin-top:8px;padding:8px;background:#f5f5f5;border-radius:6px;font-size:.78rem;color:var(--text-light)">
-            <strong>Catatan:</strong> Skor ini merepresentasikan potensi kepribadian terhadap performa kerja. Skor tinggi menunjukkan keseimbangan positif yang baik untuk produktivitas dan kerjasama tim.
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div style="background:#fff;border-radius:10px;padding:20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
-      <h4 style="color:var(--primary);margin-bottom:12px">📊 Detail Skor</h4>
-      <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.82rem"><thead><tr style="background:var(--primary);color:#fff"><th style="padding:10px">Dimensi</th><th style="padding:10px">Raw P</th><th style="padding:10px">Raw K</th><th style="padding:10px">Seg1</th><th style="padding:10px">Seg2</th><th style="padding:10px">Final</th></tr></thead><tbody>
-      <tr><td style="padding:8px;border-bottom:1px solid #eee;font-weight:700">D</td><td style="padding:8px;border-bottom:1px solid #eee">${rawP.D}</td><td style="padding:8px;border-bottom:1px solid #eee">${rawK.D}</td><td style="padding:8px;border-bottom:1px solid #eee">${s1.D}</td><td style="padding:8px;border-bottom:1px solid #eee">${s2.D}</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:700">${s3.D>0?'+':''}${s3.D.toFixed(1)}</td></tr>
-      <tr><td style="padding:8px;border-bottom:1px solid #eee;font-weight:700">I</td><td style="padding:8px;border-bottom:1px solid #eee">${rawP.I}</td><td style="padding:8px;border-bottom:1px solid #eee">${rawK.I}</td><td style="padding:8px;border-bottom:1px solid #eee">${s1.I}</td><td style="padding:8px;border-bottom:1px solid #eee">${s2.I}</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:700">${s3.I>0?'+':''}${s3.I.toFixed(1)}</td></tr>
-      <tr><td style="padding:8px;border-bottom:1px solid #eee;font-weight:700">S</td><td style="padding:8px;border-bottom:1px solid #eee">${rawP.S}</td><td style="padding:8px;border-bottom:1px solid #eee">${rawK.S}</td><td style="padding:8px;border-bottom:1px solid #eee">${s1.S}</td><td style="padding:8px;border-bottom:1px solid #eee">${s2.S}</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:700">${s3.S>0?'+':''}${s3.S.toFixed(1)}</td></tr>
-      <tr><td style="padding:8px;font-weight:700">C</td><td style="padding:8px">${rawP.C}</td><td style="padding:8px">${rawK.C}</td><td style="padding:8px">${s1.C}</td><td style="padding:8px">${s2.C}</td><td style="padding:8px;font-weight:700">${s3.C>0?'+':''}${s3.C.toFixed(1)}</td></tr>
-      </tbody></table></div>
-    </div>
-
-    <div style="background:#fff;border-radius:10px;padding:20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06);text-align:center">
-      <button onclick="window.print()" style="padding:10px 20px;border:none;background:var(--primary);color:#fff;border-radius:6px;font-size:.85rem;font-weight:600;cursor:pointer;margin:4px">🖨️ Cetak</button>
-      <button onclick="renderModeSelection()" style="padding:10px 20px;border:none;background:var(--info);color:#fff;border-radius:6px;font-size:.85rem;font-weight:600;cursor:pointer;margin:4px">🔄 Tes Baru</button>
-      <button onclick="renderHistory()" style="padding:10px 20px;border:1.5px solid var(--primary);background:transparent;color:var(--primary);border-radius:6px;font-size:.85rem;font-weight:600;cursor:pointer;margin:4px">📋 Riwayat</button>
-    </div>
+      <h2 style="color:var(--primary);margin-bottom:2px">D.I.S.C.</h2><h3 style="color:var(--primary);font-style:italic;margin-bottom:16px">Personality System Graph Page</h3>
+      <div style="text-align:left;background:#f8f9ff;padding:12px;border-radius:8px;font-size:.85rem;margin-bottom:16px"><div style="display:grid;grid-template-columns:100px 1fr;gap:4px"><span><b>Name</b></span><span>: ${esc(testState.nama)}</span><span><b>Age</b></span><span>: ${esc(testState.usia||'-')}</span><span><b>Gender</b></span><span>: ${esc(testState.jenisKelamin||'-')}</span><span><b>Tgl. Tes</b></span><span>: ${testState.tanggalTes}</span>${testState.departemen?`<span><b>Dept</b></span><span>: ${esc(testState.departemen)}</span>`:''}${testState.posisi?`<span><b>Posisi</b></span><span>: ${esc(testState.posisi)}</span>`:''}</div></div>
+      <div style="overflow-x:auto;margin-bottom:12px"><table style="width:auto;margin:0 auto;border-collapse:collapse;font-size:.8rem"><thead><tr style="background:var(--primary);color:#fff"><th style="padding:6px 10px">Line</th><th style="padding:6px 10px">D</th><th style="padding:6px 10px">I</th><th style="padding:6px 10px">S</th><th style="padding:6px 10px">C</th><th style="padding:6px 10px">tot</th></tr></thead><tbody><tr><td style="padding:5px 10px;border:1px solid #ddd;font-weight:700">1 (P)</td><td style="padding:5px 10px;border:1px solid #ddd">${rawP.D}</td><td style="padding:5px 10px;border:1px solid #ddd">${rawP.I}</td><td style="padding:5px 10px;border:1px solid #ddd">${rawP.S}</td><td style="padding:5px 10px;border:1px solid #ddd">${rawP.C}</td><td style="padding:5px 10px;border:1px solid #ddd;color:var(--danger);font-weight:700">24</td></tr><tr><td style="padding:5px 10px;border:1px solid #ddd;font-weight:700">2 (K)</td><td style="padding:5px 10px;border:1px solid #ddd">${rawK.D}</td><td style="padding:5px 10px;border:1px solid #ddd">${rawK.I}</td><td style="padding:5px 10px;border:1px solid #ddd">${rawK.S}</td><td style="padding:5px 10px;border:1px solid #ddd">${rawK.C}</td><td style="padding:5px 10px;border:1px solid #ddd;color:var(--danger);font-weight:700">24</td></tr><tr><td style="padding:5px 10px;border:1px solid #ddd;font-weight:700">3 (Δ)</td><td style="padding:5px 10px;border:1px solid #ddd">${s3.D.toFixed(1)}</td><td style="padding:5px 10px;border:1px solid #ddd">${s3.I.toFixed(1)}</td><td style="padding:5px 10px;border:1px solid #ddd">${s3.S.toFixed(1)}</td><td style="padding:5px 10px;border:1px solid #ddd">${s3.C.toFixed(1)}</td><td style="padding:5px 10px;border:1px solid #ddd"></td></tr></tbody></table></div>
+      <div style="display:inline-block;padding:8px 20px;background:linear-gradient(135deg,var(--primary),#283593);color:#fff;border-radius:20px;font-size:1rem;font-weight:700">${esc(profile.name)} (${pattern})</div></div>
+    <div style="background:#fff;border-radius:10px;padding:20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)"><div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">${graph1}${graph2}${graph3}</div></div>
+    <div style="background:#fff;border-radius:10px;padding:20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)"><h4 style="color:var(--primary);margin-bottom:12px;text-align:center">Gambaran Karakter</h4><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px"><div><h5 style="text-decoration:underline;margin-bottom:6px;font-size:.82rem">Mask Public Self</h5><div style="font-weight:700;color:var(--primary);font-size:.8rem;margin-bottom:4px">${esc(profile.name)}</div>${maskT}</div><div><h5 style="text-decoration:underline;margin-bottom:6px;font-size:.82rem">Core Private Self</h5><div style="font-weight:700;color:var(--primary);font-size:.8rem;margin-bottom:4px">${esc(profile.name)}</div>${coreT}</div><div><h5 style="text-decoration:underline;margin-bottom:6px;font-size:.82rem">Mirror Perceived Self</h5><div style="font-weight:700;color:var(--primary);font-size:.8rem;margin-bottom:4px">${esc(profile.name)}</div>${mirrorT}</div></div></div>
+    <div style="background:#fff;border-radius:10px;padding:20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)"><h4 style="color:var(--primary);margin-bottom:12px">📝 Deskripsi Kepribadian</h4><div style="background:#f8f9ff;border:1px solid var(--border);border-radius:8px;padding:16px;font-size:.85rem;line-height:1.7">${esc(desc)}</div></div>
+    <div style="background:#fff;border-radius:10px;padding:20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)"><h4 style="color:var(--primary);margin-bottom:12px">🔍 Analisis & Kesimpulan Karakter</h4><div style="font-size:.85rem;line-height:1.8;white-space:pre-line">${kesimp}</div></div>
+    <div style="background:#fff;border-radius:10px;padding:20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)"><h4 style="color:var(--primary);margin-bottom:12px">💼 Rekomendasi Bidang Pekerjaan</h4><div style="font-size:.85rem;line-height:1.8">Melihat profilnya, ${esc(testState.nama)} akan sangat unggul dalam pekerjaan yang sesuai karakternya.<br><br><b>Bidang pekerjaan yang cocok:</b><br>${esc(profile.career||'-')}</div></div>
+    <div style="background:#fff;border-radius:10px;padding:20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)"><h4 style="color:var(--primary);margin-bottom:12px">📈 Dampak KPI</h4><div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap"><div style="text-align:center;padding:16px 24px;border-radius:10px;border:2px solid ${kpiScore>=80?'var(--success)':'var(--warning)'}"><div style="font-size:2rem;font-weight:700;color:${kpiScore>=80?'var(--success)':'var(--warning)'}">${kpiScore}</div><div style="font-size:.75rem">Grade ${kpiGrade}</div></div><div style="flex:1;font-size:.82rem;line-height:1.8"><div>Kekuatan: ${posCount} poin (+${Math.min(posCount*3,20)})</div><div>Area Pengembangan: ${negCount} poin (-${Math.min(negCount*2,15)})</div></div></div></div>
+    <div style="background:#fff;border-radius:10px;padding:20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06);text-align:center"><button onclick="window.print()" style="padding:10px 20px;border:none;background:var(--primary);color:#fff;border-radius:6px;font-size:.85rem;font-weight:600;cursor:pointer;margin:4px">🖨️ Cetak</button><button onclick="startMode('calon')" style="padding:10px 20px;border:none;background:var(--info);color:#fff;border-radius:6px;font-size:.85rem;font-weight:600;cursor:pointer;margin:4px">🔄 Tes Baru</button></div>
   </div>`;
 }
 
