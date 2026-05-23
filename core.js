@@ -301,6 +301,42 @@ function listenNotifications(){
 let _notifSoundCooldown=false;
 let _notifAudioCtx=null;
 let _audioUnlocked=false;
+let _notifAudioEl=null;
+
+// Create a reusable audio element with generated WAV (works better on mobile than Web Audio API)
+function createNotifAudio(){
+  if(_notifAudioEl)return _notifAudioEl;
+  // Generate a short WAV notification sound programmatically
+  const sampleRate=22050;const duration=1.2;const numSamples=Math.floor(sampleRate*duration);
+  const buffer=new ArrayBuffer(44+numSamples*2);const view=new DataView(buffer);
+  // WAV header
+  const writeStr=(offset,str)=>{for(let i=0;i<str.length;i++)view.setUint8(offset+i,str.charCodeAt(i));};
+  writeStr(0,'RIFF');view.setUint32(4,36+numSamples*2,true);writeStr(8,'WAVE');
+  writeStr(12,'fmt ');view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);
+  view.setUint32(24,sampleRate,true);view.setUint32(28,sampleRate*2,true);view.setUint16(32,2,true);view.setUint16(34,16,true);
+  writeStr(36,'data');view.setUint32(40,numSamples*2,true);
+  // Generate tones: 3 ascending beeps
+  for(let i=0;i<numSamples;i++){
+    const t=i/sampleRate;let val=0;
+    // Beep 1: 0-0.15s (880Hz)
+    if(t<0.15)val=Math.sin(2*Math.PI*880*t)*0.9*(1-t/0.15*0.3);
+    // Beep 2: 0.18-0.33s (1109Hz)
+    else if(t>=0.18&&t<0.33)val=Math.sin(2*Math.PI*1109*t)*0.9*(1-(t-0.18)/0.15*0.3);
+    // Beep 3: 0.36-0.55s (1319Hz)
+    else if(t>=0.36&&t<0.55)val=Math.sin(2*Math.PI*1319*t)*0.95*(1-(t-0.36)/0.19*0.5);
+    // Repeat: Beep 4-6
+    else if(t>=0.6&&t<0.75)val=Math.sin(2*Math.PI*880*t)*0.9;
+    else if(t>=0.78&&t<0.93)val=Math.sin(2*Math.PI*1109*t)*0.9;
+    else if(t>=0.96&&t<1.2)val=Math.sin(2*Math.PI*1568*t)*1.0*(1-(t-0.96)/0.24*0.6);
+    view.setInt16(44+i*2,Math.max(-32768,Math.min(32767,Math.floor(val*32767))),true);
+  }
+  const blob=new Blob([buffer],{type:'audio/wav'});
+  const url=URL.createObjectURL(blob);
+  _notifAudioEl=new Audio(url);
+  _notifAudioEl.volume=1.0;
+  return _notifAudioEl;
+}
+
 function getAudioContext(){
   if(!_notifAudioCtx||_notifAudioCtx.state==='closed'){
     const AudioCtx=window.AudioContext||window.webkitAudioContext;
@@ -309,31 +345,51 @@ function getAudioContext(){
   if(_notifAudioCtx.state==='suspended') _notifAudioCtx.resume();
   return _notifAudioCtx;
 }
+
 function unlockAudio(){
   if(_audioUnlocked)return;
   try{
+    // Method 1: Unlock Web Audio API
     const ctx=getAudioContext();
-    // Play silent buffer to unlock audio on mobile
     const buf=ctx.createBuffer(1,1,22050);
     const src=ctx.createBufferSource();
     src.buffer=buf;src.connect(ctx.destination);src.start(0);
+    // Method 2: Unlock HTML5 Audio element (critical for iOS)
+    const audio=createNotifAudio();
+    audio.muted=true;
+    audio.play().then(()=>{audio.pause();audio.muted=false;audio.currentTime=0;}).catch(()=>{});
     _audioUnlocked=true;
   }catch(e){}
 }
+
 function playNotificationSound(){
   if(_notifSoundCooldown)return;
   _notifSoundCooldown=true;
   setTimeout(()=>{_notifSoundCooldown=false;},3000);
-  // Vibrate on mobile (fallback if audio fails)
+  // Vibrate on mobile
   if(navigator.vibrate) navigator.vibrate([200,100,200,100,300]);
+  // Method 1: HTML5 Audio (most reliable on mobile)
+  try{
+    const audio=createNotifAudio();
+    audio.currentTime=0;
+    audio.volume=1.0;
+    audio.play().catch(()=>{
+      // Fallback: Web Audio API
+      playNotifWebAudio();
+    });
+  }catch(e){
+    playNotifWebAudio();
+  }
+}
+
+function playNotifWebAudio(){
   try{
     const ctx=getAudioContext();
-    if(ctx.state==='suspended'){ctx.resume();}
+    if(ctx.state==='suspended')ctx.resume();
     const playTone=(freq,startTime,duration,vol)=>{
       const osc=ctx.createOscillator();
       const gain=ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
+      osc.connect(gain);gain.connect(ctx.destination);
       osc.type='square';
       osc.frequency.setValueAtTime(freq,ctx.currentTime+startTime);
       gain.gain.setValueAtTime(vol||1.0,ctx.currentTime+startTime);
@@ -342,17 +398,15 @@ function playNotificationSound(){
       osc.start(ctx.currentTime+startTime);
       osc.stop(ctx.currentTime+startTime+duration);
     };
-    // Loud 3-tone chime x3
     playTone(880,0,0.12,1.0);
     playTone(1109,0.12,0.12,1.0);
     playTone(1319,0.24,0.25,1.0);
     playTone(880,0.55,0.12,1.0);
     playTone(1109,0.67,0.12,1.0);
-    playTone(1319,0.79,0.25,1.0);
-    playTone(1319,1.1,0.12,1.0);
-    playTone(1568,1.22,0.3,1.0);
-  }catch(e){console.warn('Notification sound failed:',e);}
+    playTone(1568,0.79,0.3,1.0);
+  }catch(e){}
 }
+
 // Unlock audio on ANY user interaction (critical for mobile)
 ['click','touchstart','touchend','keydown'].forEach(evt=>{
   document.addEventListener(evt,unlockAudio,{once:false,passive:true});
