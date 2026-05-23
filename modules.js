@@ -1151,7 +1151,7 @@ async function loadMeetingTab(tab) {
         <td>${p.waktu||'-'}</td>
         <td><span class="badge badge-primary">${escHtml(p.createdByName||'-')}</span></td>
         <td>${(p.pesertaIds||[]).length} orang</td>
-        <td><button class="btn btn-xs btn-info" onclick="detailMeeting('${d.id}')">👁️</button> <button class="btn btn-xs btn-warning" onclick="modalNotulensi('${d.id}')">📝</button>${p.onlineRoomId?` <button class="btn btn-xs btn-success" onclick="joinOnlineMeeting('${p.onlineRoomId}')">🎥</button>`:''}</td>
+        <td><button class="btn btn-xs btn-info" onclick="detailMeeting('${d.id}')">👁️</button> <button class="btn btn-xs btn-warning" onclick="modalNotulensi('${d.id}')">📝</button>${p.onlineRoomId?` <button class="btn btn-xs btn-success" onclick="joinOnlineMeeting('${p.onlineRoomId}')">🎥</button>`:''} <button class="btn btn-xs btn-primary" onclick="editMeeting('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusMeeting('${d.id}')">🗑️</button></td>
       </tr>`;
     });
     html += '</tbody></table></div>';
@@ -1281,8 +1281,47 @@ function detailMeeting(id) {
       </div>
       <div class="mb-16"><b>Agenda:</b><div class="text-sm mt-8">${escHtml(p.agenda||'-')}</div></div>
       <div class="mb-16"><b>RSVP Peserta:</b>${rsvpHtml||'<p class="text-sm" style="color:#999">Belum ada peserta</p>'}</div>
+      ${p.onlineRoomId?`<div class="mb-16"><button class="btn btn-success btn-sm" onclick="joinOnlineMeeting('${p.onlineRoomId}')">🎥 Join Video Call</button></div>`:''}
       ${p.notulensi?`<div><b>Notulensi:</b><div class="text-sm mt-8" style="white-space:pre-wrap">${escHtml(p.notulensi)}</div></div>`:''}`, true);
   });
+}
+
+async function editMeeting(id){
+  const d=await db.collection('hrd_meeting').doc(id).get();
+  const p=d.data();
+  openModal(`<div class="modal-title">✏️ Edit Meeting</div>
+    <div class="form-group"><label>Judul</label><input class="form-control" id="emJudul" value="${escHtml(p.judul||'')}"></div>
+    <div class="grid-3">
+      <div class="form-group"><label>Tanggal</label><input class="form-control" type="date" id="emTgl" value="${p.tanggal||''}"></div>
+      <div class="form-group"><label>Waktu</label><input class="form-control" type="time" id="emWaktu" value="${p.waktu||''}"></div>
+      <div class="form-group"><label>Durasi (menit)</label><input class="form-control" type="number" id="emDurasi" value="${p.durasi||60}"></div>
+    </div>
+    <div class="form-group"><label>Lokasi</label><input class="form-control" id="emLokasi" value="${escHtml(p.lokasi||'')}"></div>
+    <div class="form-group"><label>Agenda</label><textarea class="form-control" id="emAgenda" style="min-height:100px">${escHtml(p.agenda||'')}</textarea></div>
+    <div class="form-group"><label>Status</label><select class="form-control" id="emStatus"><option value="terjadwal" ${p.status==='terjadwal'?'selected':''}>Terjadwal</option><option value="berlangsung" ${p.status==='berlangsung'?'selected':''}>Berlangsung</option><option value="selesai" ${p.status==='selesai'?'selected':''}>Selesai</option><option value="dibatalkan" ${p.status==='dibatalkan'?'selected':''}>Dibatalkan</option></select></div>
+    <button class="btn btn-primary" onclick="simpanEditMeeting('${id}')">💾 Simpan</button>`,true);
+}
+
+async function simpanEditMeeting(id){
+  const data={
+    judul:document.getElementById('emJudul').value,
+    tanggal:document.getElementById('emTgl').value,
+    waktu:document.getElementById('emWaktu').value,
+    durasi:Number(document.getElementById('emDurasi').value)||60,
+    lokasi:document.getElementById('emLokasi').value,
+    agenda:document.getElementById('emAgenda').value,
+    status:document.getElementById('emStatus').value,
+    updatedAt:new Date().toISOString()
+  };
+  if(!data.judul)return toast('Judul wajib','warning');
+  await db.collection('hrd_meeting').doc(id).update(data);
+  closeModalDirect();toast('Meeting diupdate','success');renderMeeting();
+}
+
+async function hapusMeeting(id){
+  if(!confirm('Hapus/akhiri meeting ini?'))return;
+  await db.collection('hrd_meeting').doc(id).delete();
+  toast('Meeting dihapus','success');renderMeeting();
 }
 
 function modalNotulensi(id) {
