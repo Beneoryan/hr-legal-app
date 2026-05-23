@@ -219,12 +219,17 @@ function monthStr(){return new Date().toISOString().slice(0,7);}
 function getMonthDays(ym){const[y,m]=ym.split('-').map(Number);return new Date(y,m,0).getDate();}
 
 function listenNotifications(){
+  // Request notification permission on mobile
+  requestNotifPermission();
   // Listen for notifications targeted to this user's ID
   const unsub1=db.collection('hrd_notifikasi').where('targetUser','==',currentUser.id).where('read','==',false).onSnapshot(snap=>{
     updateNotifBadge();
-    // Play sound for new notifications
     snap.docChanges().forEach(change=>{
-      if(change.type==='added') playNotificationSound();
+      if(change.type==='added'){
+        playNotificationSound();
+        const d=change.doc.data();
+        showSystemNotification(d.title||'Notifikasi',d.message||'');
+      }
     });
   });
   unsubscribers.push(unsub1);
@@ -352,6 +357,20 @@ function playNotificationSound(){
 ['click','touchstart','touchend','keydown'].forEach(evt=>{
   document.addEventListener(evt,unlockAudio,{once:false,passive:true});
 });
+// Request notification permission for mobile (enables audio + system notifications)
+function requestNotifPermission(){
+  if('Notification' in window && Notification.permission==='default'){
+    Notification.requestPermission().then(p=>{
+      if(p==='granted') console.log('Notification permission granted');
+    });
+  }
+}
+// Show system notification (works even when tab is in background on mobile)
+function showSystemNotification(title,body){
+  if('Notification' in window && Notification.permission==='granted'){
+    try{new Notification(title,{body,icon:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🏛️</text></svg>',vibrate:[200,100,200]});}catch(e){}
+  }
+}
 
 async function updateNotifBadge(){
   const[s1,s2]=await Promise.all([

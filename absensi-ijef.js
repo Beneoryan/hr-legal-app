@@ -1032,7 +1032,7 @@ async function loadRekapGrid(){
 
   let h='<div class="table-wrap"><table><thead><tr><th style="min-width:120px">Nama</th>';
   for(let i=1;i<=days;i++)h+=`<th style="width:28px;text-align:center;font-size:.65rem">${i}</th>`;
-  h+='<th>Total</th><th>Lembur</th></tr></thead><tbody>';
+  h+='<th>Total</th><th>Lembur</th><th>Aksi</th></tr></thead><tbody>';
   let totalH=0,totalT=0,totalD=0,totalK=0,totalL=0,totalLembur=0,totalLemburJam=0;
 
   filteredUsers.forEach(u=>{
@@ -1060,7 +1060,8 @@ async function loadRekapGrid(){
       h+=`<td style="text-align:center;background:${color};color:#fff;font-size:.6rem;font-weight:700;padding:3px"${title}>${text}</td>`;
     }
     h+=`<td class="fw-700 text-center">${ut}</td>`;
-    h+=`<td class="fw-700 text-center" style="color:#7b1fa2">${userLemburJam>0?userLemburJam.toFixed(1)+'j':'-'}</td></tr>`;
+    h+=`<td class="fw-700 text-center" style="color:#7b1fa2">${userLemburJam>0?userLemburJam.toFixed(1)+'j':'-'}</td>`;
+    h+=`<td><button class="btn btn-xs btn-info" onclick="editAbsenKaryawan('${u.id}','${escHtml(u.nama)}','${bulan}')">✏️</button></td></tr>`;
   });
   h+='</tbody></table></div>';
   document.getElementById('rekapGrid').innerHTML=h;
@@ -1118,3 +1119,73 @@ async function processAbsenApiImport(){const rawUrl=document.getElementById('imp
 async function processAbsenImportText(text){const rows=parseCsvRows(text);if(rows.length<2)return toast('Data kosong atau format salah','warning');const headers=rows[0].map(h=>h.toLowerCase());const ni=headers.indexOf('nama'),ti=headers.indexOf('tanggal');if(ni===-1||ti===-1)return toast('Header CSV harus berisi kolom nama dan tanggal','error');const wi=headers.indexOf('waktu'),tpi=headers.indexOf('tipe'),si=headers.indexOf('status');let imported=0;let batch=db.batch();for(let i=1;i<rows.length;i++){const cols=rows[i];if(!cols[ni]||!cols[ti])continue;const nama=cols[ni];const tanggal=cols[ti];const waktu=wi>=0?cols[wi]||'08:00':'08:00';const tipe=tpi>=0?cols[tpi]||'masuk':'masuk';const status=si>=0?cols[si]||'tepat_waktu':'tepat_waktu';batch.set(db.collection('hrd_absensi').doc(),{nama,userId:nama.toLowerCase().replace(/\s+/g,''),departemen:'',tanggal,waktu,tipe,status,createdAt:new Date().toISOString()});imported++;if(imported>400){await batch.commit();batch=db.batch();imported=0;}}await batch.commit();document.getElementById('csvResult').innerHTML='<div class="badge badge-success" style="font-size:.9rem;padding:8px 16px">✅ Import selesai</div>';toast('Import absensi selesai','success');}
 
 
+
+// ── EDIT ABSEN PER KARYAWAN ───────────────────────────────────
+async function editAbsenKaryawan(userId, nama, bulan) {
+  const days = getMonthDays(bulan);
+  const startDate = bulan + '-01', endDate = bulan + '-' + String(days).padStart(2, '0');
+  const snap = await db.collection('hrd_absensi').where('userId', '==', userId).where('tanggal', '>=', startDate).where('tanggal', '<=', endDate).get();
+  
+  // Count attendance
+  let masuk = 0, pulang = 0, dinas = 0, lembur = 0;
+  snap.forEach(d => {
+    const p = d.data();
+    if (p.tipe === 'masuk') masuk++;
+    if (p.tipe === 'pulang') pulang++;
+    if (p.tipe === 'dinas_luar') dinas++;
+    if (p.tipe === 'pulang' && p.lembur) lembur += (p.lemburJam || 0);
+  });
+
+  openModal(`<div class="modal-title">✏️ Edit Absensi — ${escHtml(nama)}</div>
+    <div class="text-sm mb-16" style="color:#666">Periode: ${bulan} (${days} hari)</div>
+    <div class="stats-grid mb-16">
+      <div class="stat-card"><div class="stat-value">${masuk}</div><div class="stat-label">Clock In</div></div>
+      <div class="stat-card"><div class="stat-value">${pulang}</div><div class="stat-label">Clock Out</div></div>
+      <div class="stat-card"><div class="stat-value">${dinas}</div><div class="stat-label">Dinas Luar</div></div>
+      <div class="stat-card"><div class="stat-value">${lembur.toFixed(1)}</div><div class="stat-label">Lembur (jam)</div></div>
+    </div>
+    <div class="fw-700 text-sm mb-8 color-primary">➕ Tambah/Edit Absensi Manual</div>
+    <div class="grid-2">
+      <div class="form-group"><label>Tanggal</label><input class="form-control" type="date" id="editAbsTgl" value="${todayStr()}"></div>
+      <div class="form-group"><label>Tipe</label><select class="form-control" id="editAbsTipe"><option value="masuk">Clock In</option><option value="pulang">Clock Out</option><option value="dinas_luar">Dinas Luar</option></select></div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group"><label>Waktu</label><input class="form-control" type="time" id="editAbsWaktu" value="08:00"></div>
+      <div class="form-group"><label>Status</label><select class="form-control" id="editAbsStatus"><option value="tepat_waktu">Tepat Waktu</option><option value="hadir">Hadir</option><option value="terlambat">Terlambat</option><option value="lengkap">Lengkap</option><option value="kurang_jam">Kurang Jam</option></select></div>
+    </div>
+    <div class="flex gap-8 mt-16">
+      <button class="btn btn-primary" onclick="simpanEditAbsen('${userId}','${escHtml(nama)}')">💾 Simpan</button>
+      <button class="btn btn-danger" onclick="hapusAbsenHari('${userId}')">🗑️ Hapus Absen Tanggal Ini</button>
+    </div>`, true);
+}
+
+async function simpanEditAbsen(userId, nama) {
+  const tgl = document.getElementById('editAbsTgl').value;
+  const tipe = document.getElementById('editAbsTipe').value;
+  const waktu = document.getElementById('editAbsWaktu').value;
+  const status = document.getElementById('editAbsStatus').value;
+  if (!tgl) return toast('Pilih tanggal', 'warning');
+
+  await db.collection('hrd_absensi').add({
+    userId, nama, tanggal: tgl, waktu, tipe, status,
+    departemen: '', manual: true, editedBy: currentUser.nama,
+    createdAt: new Date().toISOString()
+  });
+  toast('Absensi ditambahkan', 'success');
+  closeModalDirect();
+  loadRekapGrid();
+}
+
+async function hapusAbsenHari(userId) {
+  const tgl = document.getElementById('editAbsTgl').value;
+  if (!tgl) return toast('Pilih tanggal', 'warning');
+  if (!confirm(`Hapus semua absensi ${tgl} untuk karyawan ini?`)) return;
+  const snap = await db.collection('hrd_absensi').where('userId', '==', userId).where('tanggal', '==', tgl).get();
+  if (snap.empty) return toast('Tidak ada data di tanggal ini', 'info');
+  const batch = db.batch();
+  snap.forEach(d => batch.delete(d.ref));
+  await batch.commit();
+  toast(`${snap.size} record dihapus`, 'success');
+  closeModalDirect();
+  loadRekapGrid();
+}

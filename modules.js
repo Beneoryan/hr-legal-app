@@ -1016,7 +1016,6 @@ function lihatSlip(id){db.collection('hrd_penggajian').doc(id).get().then(d=>{co
   openModal(`<div id="slipGajiPrint">
     <div style="text-align:center;padding:16px;border:2px solid var(--primary);border-radius:8px;margin-bottom:16px"><div class="fw-700 color-primary" style="font-size:1.2rem">LPK IJEF CORP</div><div class="text-xs">Slip Gaji Periode: ${p.periode}</div><div class="text-xs" style="color:#999">${p.periodeStart?`(${p.periodeStart} s/d ${p.periodeEnd})`:''}</div></div>
     <div style="background:#f8f9ff;padding:12px;border-radius:8px;margin-bottom:16px"><div class="grid-2" style="font-size:.82rem"><div><b>Nama:</b> ${escHtml(p.nama)}</div><div><b>Periode:</b> ${p.periode}</div></div></div>
-    ${p.hariKerja?`<div style="background:#e8f5e9;padding:12px;border-radius:8px;margin-bottom:16px;border-left:4px solid var(--success)"><div class="fw-700 text-sm mb-8">📍 Detail Kehadiran</div><div class="grid-2" style="font-size:.82rem"><div>Hari Kerja: <b>${p.hariKerja} hari</b></div><div>Hadir: <b>${p.kehadiran||0} hari</b></div><div>Cuti: <b>${p.cutiHari||0} hari</b></div><div>Tidak Hadir: <b style="color:var(--danger)">${p.tidakHadir||0} hari</b></div><div>Lembur: <b style="color:#7b1fa2">${p.lemburJam||0} jam</b></div><div></div></div></div>`:''}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
     <div><div class="fw-700 text-sm color-primary mb-8">💰 Pendapatan</div><table style="width:100%;font-size:.82rem"><tr><td>Gaji Pokok</td><td style="text-align:right">${formatCurrency(p.gajiPokok)}</td></tr><tr><td>Tunjangan</td><td style="text-align:right">${formatCurrency(p.tunjangan)}</td></tr>${p.tunjCuti?`<tr><td>Tunj. Cuti (1/12)</td><td style="text-align:right">${formatCurrency(p.tunjCuti)}</td></tr>`:''}${p.lembur?`<tr><td>Lembur (${p.lemburJam||0} jam)</td><td style="text-align:right">${formatCurrency(p.lembur)}</td></tr>`:''}${p.insentif?`<tr><td>Insentif</td><td style="text-align:right">${formatCurrency(p.insentif)}</td></tr>`:''}${p.bonus?`<tr><td>Bonus</td><td style="text-align:right">${formatCurrency(p.bonus)}</td></tr>`:''}${p.reimbursement?`<tr><td>Reimbursement</td><td style="text-align:right">${formatCurrency(p.reimbursement)}</td></tr>`:''}<tr style="border-top:2px solid var(--primary);font-weight:700"><td>Total Bruto</td><td style="text-align:right">${formatCurrency(bruto)}</td></tr></table></div>
     <div><div class="fw-700 text-sm color-danger mb-8">📉 Potongan</div><table style="width:100%;font-size:.82rem">${p.potongan?`<tr><td>Pot. Absen (${p.tidakHadir||0} hari)</td><td style="text-align:right;color:var(--danger)">-${formatCurrency(p.potongan)}</td></tr>`:''}<tr><td>BPJS Kesehatan (1%)</td><td style="text-align:right;color:var(--danger)">-${formatCurrency(p.bpjsKesehatan)}</td></tr><tr><td>BPJS TK (2%)</td><td style="text-align:right;color:var(--danger)">-${formatCurrency(p.bpjsTK)}</td></tr>${p.kasbon?`<tr><td>Kasbon/Loan</td><td style="text-align:right;color:var(--danger)">-${formatCurrency(p.kasbon)}</td></tr>`:''}<tr><td>PPH 21</td><td style="text-align:right;color:var(--danger)">-${formatCurrency(p.pph21)}</td></tr><tr style="border-top:2px solid var(--danger);font-weight:700"><td>Total Potongan</td><td style="text-align:right;color:var(--danger)">-${formatCurrency(totPot)}</td></tr></table></div></div>
@@ -1893,7 +1892,18 @@ async function approveItem(col,id,status){
 }
 
 // ── APPROVAL MANAGEMENT ───────────────────────────────────────
-async function renderApprovalMgmt(){if(!hasAccess(4))return document.getElementById('mainContent').innerHTML='<div class="card"><p>Akses ditolak.</p></div>';const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>⚙️ Approval Management</span><button class="btn btn-primary btn-sm" onclick="modalApprovalFlow()">+ Tambah Flow</button></div><div class="card"><p class="text-sm mb-16">Konfigurasi alur approval multi-step. Tentukan jenis pengajuan, siapa yang mengajukan, dan siapa yang approve.</p><div class="table-wrap"><table><thead><tr><th>Jenis</th><th>Pengaju</th><th>Approver Steps</th><th>Aksi</th></tr></thead><tbody id="tblApprFlow"></tbody></table></div></div>`;const snap=await db.collection('hrd_approval_flow').get();let h='';if(snap.empty)h='<tr><td colspan="4" class="text-center">Belum ada flow</td></tr>';else snap.forEach(d=>{const p=d.data();h+=`<tr><td class="fw-700">${escHtml(p.jenis)}</td><td>${escHtml(p.pengaju||'Semua')}</td><td>${(p.steps||[]).map(s=>`<span class="badge badge-primary">${escHtml(s.nama||s.role)}</span>`).join(' → ')}</td><td><button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_approval_flow','${d.id}','approval-mgmt')">🗑️</button></td></tr>`;});document.getElementById('tblApprFlow').innerHTML=h;}
+async function renderApprovalMgmt(){if(!hasAccess(4))return document.getElementById('mainContent').innerHTML='<div class="card"><p>Akses ditolak.</p></div>';const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>⚙️ Approval Management</span><button class="btn btn-primary btn-sm" onclick="modalApprovalFlow()">+ Tambah Flow</button></div><div class="card"><p class="text-sm mb-16">Konfigurasi alur approval multi-step. Tentukan jenis pengajuan, siapa yang mengajukan, dan siapa yang approve.</p><div class="table-wrap"><table><thead><tr><th>Jenis</th><th>Pengaju</th><th>Approver Steps</th><th>Aksi</th></tr></thead><tbody id="tblApprFlow"></tbody></table></div></div>`;const snap=await db.collection('hrd_approval_flow').get();let h='';if(snap.empty)h='<tr><td colspan="4" class="text-center">Belum ada flow</td></tr>';else snap.forEach(d=>{const p=d.data();h+=`<tr><td class="fw-700">${escHtml(p.jenis)}</td><td>${escHtml(p.pengaju||'Semua')}</td><td>${(p.steps||[]).map(s=>`<span class="badge badge-primary">${escHtml(s.nama||s.role)}</span>`).join(' → ')}</td><td><button class="btn btn-xs btn-info" onclick="viewApprovalFlow('${d.id}')">👁️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_approval_flow','${d.id}','approval-mgmt')">🗑️</button></td></tr>`;});document.getElementById('tblApprFlow').innerHTML=h;}
+function viewApprovalFlow(id){
+  db.collection('hrd_approval_flow').doc(id).get().then(d=>{
+    const p=d.data();
+    let stepsHtml='';
+    (p.steps||[]).forEach((s,i)=>{stepsHtml+=`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)"><span class="badge badge-primary" style="font-size:.8rem">Step ${i+1}</span><span class="fw-700">${escHtml(s.nama||s.role)}</span><span class="text-xs" style="color:#999">${escHtml(s.role||'')}</span></div>`;});
+    openModal(`<div class="modal-title">📋 Detail Approval Flow</div>
+      <div class="grid-2 mb-16"><div><b>Jenis:</b> ${escHtml(p.jenis)}</div><div><b>Pengaju:</b> ${escHtml(p.pengaju||'Semua')}</div></div>
+      <div class="fw-700 text-sm mb-8 color-primary">Alur Approval:</div>
+      <div style="background:#f8f9ff;padding:12px;border-radius:8px">${stepsHtml||'<p class="text-sm" style="color:#999">Tidak ada step</p>'}</div>`);
+  });
+}
 async function modalApprovalFlow(){
   const kSnap=await db.collection('hrd_karyawan').where('status','==','aktif').get();
   let karyOpts='<option value="Semua">Semua Karyawan</option>';
@@ -2103,6 +2113,12 @@ async function renderPortal(){const main=document.getElementById('mainContent');
         <span>✉️ Undangan / Invite</span><span id="portalInviteCount" class="badge badge-warning" style="font-size:.7rem">0</span>
       </div>
       <div id="portalInviteBody" style="display:none;padding:12px 16px;border:1px solid #fff3e0;border-top:none;border-radius:0 0 8px 8px"></div>
+    </div>
+    <!-- Obrolan Quick Access -->
+    <div class="portal-accordion mb-8">
+      <div onclick="navigateTo('chat')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#e8eaf6;border-radius:8px;cursor:pointer;font-weight:700;font-size:.9rem">
+        <span>💬 Obrolan</span><span class="badge" style="background:var(--primary);color:#fff;font-size:.7rem">→</span>
+      </div>
     </div>
   </div>
   <!-- AKSI CEPAT -->
