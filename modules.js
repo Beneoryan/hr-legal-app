@@ -740,11 +740,13 @@ async function hapusSemuaGaji(){if(!confirm('⚠️ HAPUS SEMUA slip gaji period
 
 async function generateAllGaji(){
   if(!confirm('Generate slip gaji untuk SEMUA karyawan aktif periode ini?\n\nSlip yang sudah ada akan di-UPDATE dengan data terbaru (insentif, kasbon, reimburse, tunjangan).'))return;
+  try{
   const bulan=document.getElementById('filterBulanGaji')?.value||monthStr();
   const kSnap=await db.collection('hrd_karyawan').where('status','==','aktif').get();
+  if(kSnap.empty){toast('Tidak ada karyawan aktif','warning');return;}
   // Delete existing slips for this period first (to re-generate fresh)
   const existSnap=await db.collection('hrd_penggajian').where('periode','==',bulan).get();
-  const delBatch=db.batch();existSnap.forEach(d=>delBatch.delete(d.ref));await delBatch.commit();
+  if(!existSnap.empty){const delBatch=db.batch();existSnap.forEach(d=>delBatch.delete(d.ref));await delBatch.commit();}
   // Load all related data
   const reimbSnap=await db.collection('hrd_reimbursement').where('status','==','approved').get();
   const kasbonSnap=await db.collection('hrd_kasbon').get();
@@ -772,16 +774,17 @@ async function generateAllGaji(){
     // BPJS
     const bpjsKes=Math.round(gaji*0.01);const bpjsTK=Math.round(gaji*0.02);
     // PPH21 Progressive
-    const bruto=gaji+tunj+insentif+reimb;const penghasilanNetto=(gaji+tunj-bpjsKes-bpjsTK)*12;
+    const bruto=gaji+tunj+insentif+reimb;const penghasilanNetto=Math.max(0,(gaji+tunj-bpjsKes-bpjsTK)*12);
     let pphT=0;if(penghasilanNetto<=60000000)pphT=penghasilanNetto*0.05;else if(penghasilanNetto<=250000000)pphT=3000000+(penghasilanNetto-60000000)*0.15;else pphT=3000000+28500000+(penghasilanNetto-250000000)*0.25;
     const pph21=Math.max(0,Math.round(pphT/12));
     // THP = Bruto - Semua Potongan
     const totalPotongan=bpjsKes+bpjsTK+loan+pph21;
     const thp=bruto-totalPotongan;
-    await db.collection('hrd_penggajian').add({nama:k.nama,periode:bulan,gajiPokok:gaji,tunjangan:tunj,insentif,bonus:0,reimbursement:reimb,lembur:0,bpjsKesehatan:bpjsKes,bpjsTK,potongan:0,kasbon:loan,pph21,totalBersih:thp,kpiScore,createdAt:new Date().toISOString()});
+    await db.collection('hrd_penggajian').add({nama:k.nama,periode:bulan,gajiPokok:gaji,tunjangan:tunj,insentif,bonus:0,reimbursement:reimb,lembur:0,bpjsKesehatan:bpjsKes,bpjsTK,potongan:0,kasbon:loan,pph21,totalBersih:thp,kpiScore:kpiMap[namaLow]||0,createdAt:new Date().toISOString()});
     count++;
   }
   toast(`${count} slip gaji di-generate (terintegrasi tunjangan, insentif, reimburse, loan, PPH)`,'success');loadGaji();
+  }catch(e){console.error('Generate gaji error:',e);toast('Error: '+e.message,'error');}
 }
 function modalGaji(){loadKaryawanDropdownGaji();}
 async function loadKaryawanDropdownGaji(){
