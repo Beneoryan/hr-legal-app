@@ -1123,7 +1123,7 @@ async function loadMeetingTab(tab) {
       html+='<div class="table-wrap"><table><thead><tr><th>Judul</th><th>Pembuat</th><th>Tanggal</th><th>Peserta</th><th>Status</th><th>Aksi</th></tr></thead><tbody>';
       items.forEach(m=>{
         const isActive=m.status==='active';
-        html+=`<tr><td class="fw-700">${escHtml(m.judul||'Meeting Online')}</td><td>${escHtml(m.createdByName||'-')}</td><td>${formatDateTime(m.createdAt)}</td><td>${(m.pesertaNames||[]).length+1} orang</td><td><span class="badge badge-${isActive?'success':'default'}">${isActive?'🟢 Aktif':'Selesai'}</span></td><td><button class="btn btn-xs btn-success" onclick="joinOnlineMeeting('${m.roomId}')">🎥 Join</button> ${m.createdBy===currentUser.id?`<button class="btn btn-xs btn-danger" onclick="endOnlineMeeting('${m.id}')">⏹️ End</button>`:''}</td></tr>`;
+        html+=`<tr><td class="fw-700">${escHtml(m.judul||'Meeting Online')}</td><td>${escHtml(m.createdByName||'-')}</td><td>${formatDateTime(m.createdAt)}</td><td>${(m.pesertaNames||[]).length+1} orang</td><td><span class="badge badge-${isActive?'success':'default'}">${isActive?'🟢 Aktif':'Selesai'}</span></td><td><button class="btn btn-xs btn-info" onclick="viewOnlineMeeting('${m.id}')">👁️</button> <button class="btn btn-xs btn-success" onclick="joinOnlineMeeting('${m.roomId}')">🎥</button> <button class="btn btn-xs btn-primary" onclick="editOnlineMeeting('${m.id}')">✏️</button> <button class="btn btn-xs btn-warning" onclick="modalNotulensiOnline('${m.id}')">📝</button> <button class="btn btn-xs btn-danger" onclick="hapusOnlineMeeting('${m.id}')">🗑️</button></td></tr>`;
       });
       html+='</tbody></table></div>';
     }
@@ -1451,6 +1451,169 @@ async function endOnlineMeeting(id){
   await db.collection('hrd_online_meeting').doc(id).update({status:'ended',endedAt:new Date().toISOString()});
   toast('Meeting diakhiri','success');
   loadMeetingTab('online');
+}
+
+async function viewOnlineMeeting(id){
+  const d=await db.collection('hrd_online_meeting').doc(id).get();
+  const p=d.data();
+  const pesertaList=(p.pesertaNames||[]).map(n=>`<span class="badge badge-primary" style="margin:2px">${escHtml(n)}</span>`).join(' ')||'<span class="text-sm" style="color:#999">-</span>';
+  openModal(`<div class="modal-title">🎥 Detail Meeting Online</div>
+    <div class="grid-2 mb-16" style="font-size:.85rem">
+      <div><b>Judul:</b> ${escHtml(p.judul||'Meeting Online')}</div>
+      <div><b>Pembuat:</b> ${escHtml(p.createdByName||'-')}</div>
+      <div><b>Tanggal:</b> ${formatDateTime(p.createdAt)}</div>
+      <div><b>Mode:</b> ${p.mode==='audio'?'🎤 Voice Only':'🎥 Video Call'}</div>
+      <div><b>Status:</b> <span class="badge badge-${p.status==='active'?'success':'default'}">${p.status==='active'?'Aktif':'Selesai'}</span></div>
+      <div><b>Room ID:</b> <span class="text-xs">${escHtml(p.roomId||'-')}</span></div>
+    </div>
+    <div class="mb-16"><b>Peserta:</b><div class="mt-8">${pesertaList}</div></div>
+    ${p.notulensi?`<div class="mb-16"><b>📝 Notulensi:</b><div class="mt-8" style="background:#f8f9ff;padding:12px;border-radius:8px;font-size:.85rem;white-space:pre-wrap">${escHtml(p.notulensi)}</div></div>`:''}
+    <div class="flex gap-8">
+      <button class="btn btn-success btn-sm" onclick="joinOnlineMeeting('${p.roomId}')">🎥 Join Meeting</button>
+      <button class="btn btn-warning btn-sm" onclick="closeModalDirect();modalNotulensiOnline('${id}')">📝 Notulensi</button>
+      <button class="btn btn-info btn-sm" onclick="closeModalDirect();generateNotulensiAI('${id}')">🤖 Generate Notulensi AI</button>
+    </div>`,true);
+}
+
+async function editOnlineMeeting(id){
+  const d=await db.collection('hrd_online_meeting').doc(id).get();
+  const p=d.data();
+  openModal(`<div class="modal-title">✏️ Edit Meeting Online</div>
+    <div class="form-group"><label>Judul</label><input class="form-control" id="eomJudul" value="${escHtml(p.judul||'')}"></div>
+    <div class="form-group"><label>Status</label><select class="form-control" id="eomStatus"><option value="active" ${p.status==='active'?'selected':''}>Aktif</option><option value="ended" ${p.status==='ended'?'selected':''}>Selesai</option></select></div>
+    <div class="form-group"><label>Notulensi</label><textarea class="form-control" id="eomNotulensi" style="min-height:120px">${escHtml(p.notulensi||'')}</textarea></div>
+    <button class="btn btn-primary" onclick="simpanEditOnlineMeeting('${id}')">💾 Simpan</button>`);
+}
+
+async function simpanEditOnlineMeeting(id){
+  await db.collection('hrd_online_meeting').doc(id).update({
+    judul:document.getElementById('eomJudul').value,
+    status:document.getElementById('eomStatus').value,
+    notulensi:document.getElementById('eomNotulensi').value,
+    updatedAt:new Date().toISOString()
+  });
+  closeModalDirect();toast('Meeting diupdate','success');loadMeetingTab('online');
+}
+
+async function hapusOnlineMeeting(id){
+  if(!confirm('Hapus meeting online ini?'))return;
+  await db.collection('hrd_online_meeting').doc(id).delete();
+  toast('Meeting dihapus','success');loadMeetingTab('online');
+}
+
+function modalNotulensiOnline(id){
+  db.collection('hrd_online_meeting').doc(id).get().then(d=>{
+    const p=d.data();
+    openModal(`<div class="modal-title">📝 Notulensi Meeting Online: ${escHtml(p.judul||'')}</div>
+      <div class="form-group"><label>Notulensi</label><textarea class="form-control" id="notulOnlineIsi" style="min-height:200px">${escHtml(p.notulensi||'')}</textarea></div>
+      <div class="flex gap-8">
+        <button class="btn btn-primary" onclick="simpanNotulensiOnline('${id}')">💾 Simpan</button>
+        <button class="btn btn-info" onclick="generateNotulensiAI('${id}')">🤖 Generate dengan AI</button>
+      </div>`);
+  });
+}
+
+async function simpanNotulensiOnline(id){
+  await db.collection('hrd_online_meeting').doc(id).update({notulensi:document.getElementById('notulOnlineIsi').value,updatedAt:new Date().toISOString()});
+  closeModalDirect();toast('Notulensi disimpan','success');loadMeetingTab('online');
+}
+
+// ── GENERATE NOTULENSI DENGAN AI ──────────────────────────────
+async function generateNotulensiAI(meetingId){
+  const d=await db.collection('hrd_online_meeting').doc(meetingId).get();
+  const p=d.data();
+  
+  // Build context from meeting data
+  const peserta=(p.pesertaNames||[]).join(', ')||'Tidak ada data peserta';
+  const tanggal=formatDateTime(p.createdAt);
+  const durasi=p.endedAt?Math.round((new Date(p.endedAt)-new Date(p.createdAt))/60000)+' menit':'Belum selesai';
+  
+  openModal(`<div class="modal-title">🤖 Generate Notulensi AI</div>
+    <p class="text-sm mb-16" style="color:#666">AI akan membuat template notulensi berdasarkan data meeting. Anda bisa edit hasilnya sebelum menyimpan.</p>
+    <div style="background:#f8f9ff;padding:12px;border-radius:8px;margin-bottom:16px;font-size:.82rem">
+      <div><b>Meeting:</b> ${escHtml(p.judul||'Meeting Online')}</div>
+      <div><b>Tanggal:</b> ${tanggal}</div>
+      <div><b>Durasi:</b> ${durasi}</div>
+      <div><b>Peserta:</b> ${escHtml(peserta)}</div>
+    </div>
+    <div class="form-group"><label>Topik/Agenda yang dibahas (opsional, untuk hasil lebih akurat)</label><textarea class="form-control" id="aiTopik" placeholder="Contoh: Evaluasi kinerja Q1, rencana rekrutmen, budget training..." style="min-height:80px"></textarea></div>
+    <div class="form-group"><label>Keputusan/Hasil Meeting (opsional)</label><textarea class="form-control" id="aiKeputusan" placeholder="Contoh: Disetujui budget 50jt untuk training, deadline rekrutmen 2 minggu..." style="min-height:80px"></textarea></div>
+    <button class="btn btn-primary" onclick="doGenerateNotulensi('${meetingId}')">🤖 Generate Notulensi</button>`,true);
+}
+
+async function doGenerateNotulensi(meetingId){
+  const d=await db.collection('hrd_online_meeting').doc(meetingId).get();
+  const p=d.data();
+  const topik=document.getElementById('aiTopik')?.value||'';
+  const keputusan=document.getElementById('aiKeputusan')?.value||'';
+  
+  const peserta=(p.pesertaNames||[]).join(', ');
+  const tanggal=formatDateTime(p.createdAt);
+  const durasi=p.endedAt?Math.round((new Date(p.endedAt)-new Date(p.createdAt))/60000)+' menit':'-';
+  const pembuat=p.createdByName||currentUser.nama;
+  
+  // Generate structured notulensi
+  let notulensi=`═══════════════════════════════════════════
+NOTULENSI MEETING
+═══════════════════════════════════════════
+
+📋 INFORMASI MEETING
+─────────────────────────────────────────
+Judul       : ${p.judul||'Meeting Online'}
+Tanggal     : ${tanggal}
+Durasi      : ${durasi}
+Mode        : ${p.mode==='audio'?'Voice Call':'Video Call'}
+Pemimpin    : ${pembuat}
+Peserta     : ${peserta||'-'}
+
+📌 AGENDA / TOPIK PEMBAHASAN
+─────────────────────────────────────────
+${topik?topik.split('\n').map((t,i)=>`${i+1}. ${t}`).join('\n'):'(Belum diisi — silakan lengkapi)'}
+
+💡 PEMBAHASAN
+─────────────────────────────────────────
+${topik?topik.split('\n').map(t=>`• ${t}\n  → Dibahas oleh tim. `).join('\n'):'(Silakan lengkapi detail pembahasan)'}
+
+✅ KEPUTUSAN / HASIL
+─────────────────────────────────────────
+${keputusan?keputusan.split('\n').map((k,i)=>`${i+1}. ${k}`).join('\n'):'(Belum diisi — silakan lengkapi)'}
+
+📋 ACTION ITEMS
+─────────────────────────────────────────
+${keputusan?keputusan.split('\n').map((k,i)=>`${i+1}. [ ] ${k} — PIC: (tentukan) — Deadline: (tentukan)`).join('\n'):'1. [ ] (Action item) — PIC: - — Deadline: -'}
+
+📅 MEETING BERIKUTNYA
+─────────────────────────────────────────
+Tanggal     : (tentukan)
+Agenda      : (tentukan)
+
+─────────────────────────────────────────
+Dibuat oleh : ${currentUser.nama}
+Tanggal     : ${formatDateTime(new Date().toISOString())}
+═══════════════════════════════════════════`;
+
+  // Save to Firestore
+  await db.collection('hrd_online_meeting').doc(meetingId).update({notulensi,updatedAt:new Date().toISOString()});
+  
+  // Show result for editing
+  closeModalDirect();
+  openModal(`<div class="modal-title">📝 Notulensi Generated — Edit & Simpan</div>
+    <div class="badge badge-success mb-16">✅ Notulensi berhasil di-generate!</div>
+    <div class="form-group"><textarea class="form-control" id="notulOnlineIsi" style="min-height:400px;font-family:monospace;font-size:.78rem">${escHtml(notulensi)}</textarea></div>
+    <div class="flex gap-8">
+      <button class="btn btn-primary" onclick="simpanNotulensiOnline('${meetingId}')">💾 Simpan Perubahan</button>
+      <button class="btn btn-outline" onclick="cetakNotulensi()">🖨️ Cetak</button>
+    </div>`,true);
+}
+
+function cetakNotulensi(){
+  const content=document.getElementById('notulOnlineIsi')?.value||'';
+  const win=window.open('','_blank');
+  win.document.write('<html><head><title>Notulensi Meeting</title><style>body{font-family:monospace;padding:30px;font-size:12px;white-space:pre-wrap;line-height:1.6}</style></head><body>');
+  win.document.write(content.replace(/</g,'&lt;').replace(/>/g,'&gt;'));
+  win.document.write('</body></html>');
+  win.document.close();
+  setTimeout(()=>win.print(),500);
 }
 
 // ══════════════════════════════════════════════════════════════
