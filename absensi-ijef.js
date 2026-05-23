@@ -444,7 +444,42 @@ function captureMainPhoto() {
   c.getContext('2d').drawImage(v,0,0);
   capturedPhoto=c.toDataURL('image/jpeg',0.6);
   document.getElementById('selfiePreview').innerHTML=`<img src="${capturedPhoto}" style="width:100px;border-radius:8px;border:2px solid var(--success)"><div class="text-xs color-success">✅ Foto diambil</div>`;
+  // Matikan kamera setelah foto diambil
   if(absensiStream){absensiStream.getTracks().forEach(t=>t.stop());absensiStream=null;}
+  v.srcObject=null;
+  // Langsung deteksi status absen setelah foto diambil
+  autoDetectAndReady();
+}
+
+// Setelah foto diambil, langsung cek GPS & status absen
+async function autoDetectAndReady(){
+  const btn=document.getElementById('btnAbsenAction');
+  const autoEl=document.getElementById('absenAutoStatus');
+  if(!btn)return;
+  // Jika GPS sudah ada, langsung cek status
+  if(currentGPS){
+    try{
+      const locStatus=await getNearestOfficeLocation(currentGPS.lat,currentGPS.lng);
+      if(locStatus.allowed){
+        const todaySnap=await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).get();
+        let hasMasuk=false,hasPulang=false;
+        todaySnap.forEach(d=>{if(d.data().tipe==='masuk')hasMasuk=true;if(d.data().tipe==='pulang')hasPulang=true;});
+        if(!hasMasuk){
+          btn.textContent='⏰ ABSEN MASUK (Selfie + GPS)';btn.style.background='var(--success)';btn.disabled=false;
+          if(autoEl)autoEl.innerHTML='<span class="badge badge-success">✅ Foto & lokasi siap — Klik untuk Clock In</span>';
+        }else if(!hasPulang){
+          btn.textContent='🏠 ABSEN PULANG (Selfie + GPS)';btn.style.background='var(--warning)';btn.disabled=false;
+          if(autoEl)autoEl.innerHTML='<span class="badge badge-success">✅ Foto & lokasi siap — Klik untuk Clock Out</span>';
+        }else{
+          btn.textContent='✅ Sudah Lengkap';btn.disabled=true;btn.style.background='#9e9e9e';
+          if(autoEl)autoEl.innerHTML='<span class="badge badge-success">✅ Absen hari ini sudah lengkap</span>';
+        }
+      }
+    }catch(e){console.error('autoDetectAndReady error:',e);}
+  }else{
+    // GPS belum ada, trigger deteksi
+    autoDetectLocation();
+  }
 }
 
 function getGPSLocation() {

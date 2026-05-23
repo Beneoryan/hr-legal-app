@@ -1829,12 +1829,102 @@ async function modalSurat(){const snap=await db.collection('hrd_surat').get();co
 async function simpanSurat(seq,mo,yr){const jenis=document.getElementById('srJenis').value;const nomor=`${seq}/${jenis}/IJEF/${mo}/${yr}`;await db.collection('hrd_surat').add({nomor,jenis,perihal:document.getElementById('srPerihal').value,tanggal:todayStr(),dibuatOleh:currentUser.nama,createdAt:new Date().toISOString()});closeModalDirect();toast('Nomor surat digenerate','success');renderSurat();}
 
 // ── PORTAL KARYAWAN ───────────────────────────────────────────
-async function renderPortal(){const main=document.getElementById('mainContent');const u=currentUser;main.innerHTML=`<div class="page-title"><span>🏠 Portal Saya</span></div><div class="card" style="border-left:4px solid var(--primary)"><div class="flex gap-16" style="align-items:center"><div style="width:60px;height:60px;font-size:1.5rem;background:var(--primary);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center">${u.nama.charAt(0)}</div><div><div class="fw-700" style="font-size:1.1rem">${escHtml(u.nama)}</div><div class="text-sm" style="color:#999">${escHtml(u.departemen||'-')} • ${escHtml(u.role)}</div><div class="text-xs" style="color:#999">NIP: ${escHtml(u.nip||'-')}</div></div></div></div><div class="stats-grid"><div class="stat-card" style="cursor:pointer" onclick="navigateTo('portal-absensi')"><div class="stat-icon">📍</div><div class="stat-value" id="pAbsen">-</div><div class="stat-label">Kehadiran Bulan Ini</div></div><div class="stat-card" style="cursor:pointer" onclick="navigateTo('portal-cuti')"><div class="stat-icon">🏖️</div><div class="stat-value" id="pCuti">-</div><div class="stat-label">Sisa Cuti</div></div><div class="stat-card" style="cursor:pointer" onclick="navigateTo('inbox')"><div class="stat-icon">📥</div><div class="stat-value" id="pInbox">-</div><div class="stat-label">Inbox Meeting</div></div></div><div class="card"><div class="card-title">📢 Pengumuman</div><div id="portalAnnounce">Loading...</div></div><div class="card"><div class="card-title">📲 Download / Install Aplikasi</div><p class="text-sm mb-8" style="color:#666">Install aplikasi ini di perangkat Anda untuk akses lebih cepat.</p>${renderDownloadAppSection()}</div>`;
-  const[absenSnap,cutiSnap,inboxSnap,pgSnap]=await Promise.all([db.collection('hrd_absensi').where('userId','==',u.id).where('tanggal','>=',monthStr()+'-01').get(),db.collection('hrd_cuti').where('userId','==',u.id).where('status','==','approved').get(),db.collection('hrd_meeting_invites').where('targetUser','==',u.id).where('read','==',false).get(),db.collection('hrd_pengumuman').get()]);
+async function renderPortal(){const main=document.getElementById('mainContent');const u=currentUser;main.innerHTML=`<div class="page-title"><span>🏠 Portal Saya</span></div><div class="card" style="border-left:4px solid var(--primary)"><div class="flex gap-16" style="align-items:center"><div style="width:60px;height:60px;font-size:1.5rem;background:var(--primary);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center">${u.nama.charAt(0)}</div><div><div class="fw-700" style="font-size:1.1rem">${escHtml(u.nama)}</div><div class="text-sm" style="color:#999">${escHtml(u.departemen||'-')} • ${escHtml(u.role)}</div><div class="text-xs" style="color:#999">NIP: ${escHtml(u.nip||'-')}</div></div></div></div><div class="stats-grid"><div class="stat-card" style="cursor:pointer" onclick="navigateTo('portal-absensi')"><div class="stat-icon">📍</div><div class="stat-value" id="pAbsen">-</div><div class="stat-label">Kehadiran Bulan Ini</div></div><div class="stat-card" style="cursor:pointer" onclick="navigateTo('portal-cuti')"><div class="stat-icon">🏖️</div><div class="stat-value" id="pCuti">-</div><div class="stat-label">Sisa Cuti</div></div><div class="stat-card" style="cursor:pointer" onclick="navigateTo('inbox')"><div class="stat-icon">📥</div><div class="stat-value" id="pInbox">-</div><div class="stat-label">Inbox Meeting</div></div></div>
+  <!-- KOLOM PENGUMUMAN, BROADCAST, MEETING & INVITE -->
+  <div class="card" id="portalInfoSections">
+    <div class="card-title mb-16">📋 Informasi & Komunikasi</div>
+    <!-- Pengumuman Accordion -->
+    <div class="portal-accordion mb-8">
+      <div class="portal-accordion-header" onclick="togglePortalSection('pengumuman')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#e3f2fd;border-radius:8px;cursor:pointer;font-weight:700;font-size:.9rem">
+        <span>📢 Pengumuman</span><span id="portalPengumumanCount" class="badge badge-info" style="font-size:.7rem">0</span>
+      </div>
+      <div id="portalPengumumanBody" style="display:none;padding:12px 16px;border:1px solid #e3f2fd;border-top:none;border-radius:0 0 8px 8px"></div>
+    </div>
+    <!-- Broadcast Accordion -->
+    <div class="portal-accordion mb-8">
+      <div class="portal-accordion-header" onclick="togglePortalSection('broadcast')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#f3e5f5;border-radius:8px;cursor:pointer;font-weight:700;font-size:.9rem">
+        <span>📡 Broadcast</span><span id="portalBroadcastCount" class="badge" style="background:#ce93d8;color:#fff;font-size:.7rem">0</span>
+      </div>
+      <div id="portalBroadcastBody" style="display:none;padding:12px 16px;border:1px solid #f3e5f5;border-top:none;border-radius:0 0 8px 8px"></div>
+    </div>
+    <!-- Meeting Accordion -->
+    <div class="portal-accordion mb-8">
+      <div class="portal-accordion-header" onclick="togglePortalSection('meeting')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#e8f5e9;border-radius:8px;cursor:pointer;font-weight:700;font-size:.9rem">
+        <span>📅 Meeting</span><span id="portalMeetingCount" class="badge badge-success" style="font-size:.7rem">0</span>
+      </div>
+      <div id="portalMeetingBody" style="display:none;padding:12px 16px;border:1px solid #e8f5e9;border-top:none;border-radius:0 0 8px 8px"></div>
+    </div>
+    <!-- Invite Accordion -->
+    <div class="portal-accordion mb-8">
+      <div class="portal-accordion-header" onclick="togglePortalSection('invite')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#fff3e0;border-radius:8px;cursor:pointer;font-weight:700;font-size:.9rem">
+        <span>✉️ Undangan / Invite</span><span id="portalInviteCount" class="badge badge-warning" style="font-size:.7rem">0</span>
+      </div>
+      <div id="portalInviteBody" style="display:none;padding:12px 16px;border:1px solid #fff3e0;border-top:none;border-radius:0 0 8px 8px"></div>
+    </div>
+  </div>
+  <div class="card"><div class="card-title">📲 Download / Install Aplikasi</div><p class="text-sm mb-8" style="color:#666">Install aplikasi ini di perangkat Anda untuk akses lebih cepat.</p>${renderDownloadAppSection()}</div>`;
+  // Load data
+  const[absenSnap,cutiSnap,inboxSnap]=await Promise.all([db.collection('hrd_absensi').where('userId','==',u.id).where('tanggal','>=',monthStr()+'-01').get(),db.collection('hrd_cuti').where('userId','==',u.id).where('status','==','approved').get(),db.collection('hrd_meeting_invites').where('targetUser','==',u.id).where('read','==',false).get()]);
   document.getElementById('pAbsen').textContent=absenSnap.size+' hari';
   document.getElementById('pCuti').textContent=Math.max(0,12-cutiSnap.size)+' hari';
   document.getElementById('pInbox').textContent=inboxSnap.size;
-  let pgH='';if(pgSnap.empty)pgH='<p class="text-sm" style="color:#999">Belum ada</p>';else pgSnap.forEach(d=>{const p=d.data();pgH+=`<div style="padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="viewPengumuman('${d.id}')"><div class="fw-700 text-sm">${escHtml(p.judul)}</div><div class="text-xs" style="color:#999">${formatDate(p.createdAt)}</div></div>`;});document.getElementById('portalAnnounce').innerHTML=pgH;
+  // Load portal info sections
+  loadPortalInfoSections();
+}
+
+// ── PORTAL INFO SECTIONS — Accordion Data Loader ──────────────
+async function loadPortalInfoSections(){
+  try{
+    const[pgSnap,bcSnap,mtSnap,invSnap]=await Promise.all([
+      db.collection('hrd_pengumuman').get(),
+      db.collection('hrd_broadcast').get(),
+      db.collection('hrd_meeting').get(),
+      db.collection('hrd_meeting_invites').where('targetUser','==',currentUser.id).get()
+    ]);
+    // Pengumuman
+    const pgCount=document.getElementById('portalPengumumanCount');
+    if(pgCount)pgCount.textContent=pgSnap.size;
+    let pgH='';
+    if(pgSnap.empty)pgH='<p class="text-sm" style="color:#999">Belum ada pengumuman</p>';
+    else{const items=[];pgSnap.forEach(d=>items.push({id:d.id,...d.data()}));items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));items.forEach(p=>{pgH+=`<div style="padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="viewPengumuman('${p.id}')"><div class="fw-700 text-sm">${escHtml(p.judul||'')}</div><div class="text-xs" style="color:#999">${formatDate(p.createdAt)} — ${escHtml(p.dibuatOleh||'')}</div></div>`;});}
+    const pgBody=document.getElementById('portalPengumumanBody');if(pgBody)pgBody.innerHTML=pgH;
+    // Broadcast
+    const bcCount=document.getElementById('portalBroadcastCount');
+    if(bcCount)bcCount.textContent=bcSnap.size;
+    let bcH='';
+    if(bcSnap.empty)bcH='<p class="text-sm" style="color:#999">Belum ada broadcast</p>';
+    else{const items=[];bcSnap.forEach(d=>items.push({id:d.id,...d.data()}));items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));items.forEach(p=>{bcH+=`<div style="padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="viewBroadcast('${p.id}')"><div class="fw-700 text-sm">${escHtml((p.pesan||'').substring(0,80))}${(p.pesan||'').length>80?'...':''}</div><div class="text-xs" style="color:#999">${formatDate(p.createdAt)} — ${escHtml(p.pengirim||'')} → ${escHtml(p.targetLabel||'Semua')}</div></div>`;});}
+    const bcBody=document.getElementById('portalBroadcastBody');if(bcBody)bcBody.innerHTML=bcH;
+    // Meeting
+    const mtCount=document.getElementById('portalMeetingCount');
+    if(mtCount)mtCount.textContent=mtSnap.size;
+    let mtH='';
+    if(mtSnap.empty)mtH='<p class="text-sm" style="color:#999">Belum ada meeting</p>';
+    else{const items=[];mtSnap.forEach(d=>items.push({id:d.id,...d.data()}));items.sort((a,b)=>(b.tanggal||'').localeCompare(a.tanggal||''));items.forEach(p=>{const isPast=p.tanggal<todayStr();mtH+=`<div style="padding:10px 0;border-bottom:1px solid var(--border)"><div class="fw-700 text-sm">${escHtml(p.judul||p.agenda||'Meeting')}</div><div class="text-xs" style="color:#999">📅 ${formatDate(p.tanggal)} ${p.jam||''} — ${escHtml(p.lokasi||'')}</div><div class="text-xs mt-4">${isPast?'<span class="badge" style="background:#eee;color:#999">Selesai</span>':'<span class="badge badge-success">Upcoming</span>'}</div></div>`;});}
+    const mtBody=document.getElementById('portalMeetingBody');if(mtBody)mtBody.innerHTML=mtH;
+    // Invite
+    const invCount=document.getElementById('portalInviteCount');
+    if(invCount)invCount.textContent=invSnap.size;
+    let invH='';
+    if(invSnap.empty)invH='<p class="text-sm" style="color:#999">Belum ada undangan</p>';
+    else{const items=[];invSnap.forEach(d=>items.push({id:d.id,...d.data()}));items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));items.forEach(p=>{invH+=`<div style="padding:10px 0;border-bottom:1px solid var(--border)"><div class="fw-700 text-sm">${escHtml(p.meetingTitle||p.judul||'Undangan Meeting')}</div><div class="text-xs" style="color:#999">📅 ${formatDate(p.tanggal||p.createdAt)} — Dari: ${escHtml(p.invitedBy||'')}</div><div class="text-xs mt-4">${p.status==='accepted'?'<span class="badge badge-success">Diterima</span>':p.status==='declined'?'<span class="badge badge-danger">Ditolak</span>':`<span class="badge badge-warning">Pending</span> <button class="btn btn-xs btn-success" onclick="respondInvite('${p.id}','accepted')">✅ Terima</button> <button class="btn btn-xs btn-danger" onclick="respondInvite('${p.id}','declined')">❌ Tolak</button>`}</div></div>`;});}
+    const invBody=document.getElementById('portalInviteBody');if(invBody)invBody.innerHTML=invH;
+  }catch(e){console.error('loadPortalInfoSections error:',e);}
+}
+
+function togglePortalSection(section){
+  const body=document.getElementById('portal'+section.charAt(0).toUpperCase()+section.slice(1)+'Body');
+  if(!body)return;
+  const isHidden=body.style.display==='none';
+  body.style.display=isHidden?'block':'none';
+}
+
+async function respondInvite(id,status){
+  try{
+    await db.collection('hrd_meeting_invites').doc(id).update({status,read:true,respondedAt:new Date().toISOString()});
+    toast(status==='accepted'?'✅ Undangan diterima':'❌ Undangan ditolak',status==='accepted'?'success':'info');
+    loadPortalInfoSections();
+  }catch(e){toast('Gagal: '+e.message,'error');}
 }
 function renderPortalAbsensi(){
   // For karyawan: use the same absensi page but portal-mode flag

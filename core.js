@@ -211,13 +211,72 @@ function listenNotifications(){
   // Listen for notifications targeted to this user's ID
   const unsub1=db.collection('hrd_notifikasi').where('targetUser','==',currentUser.id).where('read','==',false).onSnapshot(snap=>{
     updateNotifBadge();
+    // Play sound for new notifications
+    snap.docChanges().forEach(change=>{
+      if(change.type==='added') playNotificationSound();
+    });
   });
   unsubscribers.push(unsub1);
   // Also listen for notifications targeted to this user's role (e.g. 'hr', 'admin')
   const unsub2=db.collection('hrd_notifikasi').where('targetUser','==',currentUser.role).where('read','==',false).onSnapshot(snap=>{
     updateNotifBadge();
+    snap.docChanges().forEach(change=>{
+      if(change.type==='added') playNotificationSound();
+    });
   });
   unsubscribers.push(unsub2);
+  // Listen for broadcast messages
+  const unsub3=db.collection('hrd_broadcast').onSnapshot(snap=>{
+    snap.docChanges().forEach(change=>{
+      if(change.type==='added'&&change.doc.data().createdAt){
+        const created=new Date(change.doc.data().createdAt);
+        const now=new Date();
+        if((now-created)<30000) playNotificationSound(); // Only play for recent (30s)
+      }
+    });
+  });
+  unsubscribers.push(unsub3);
+  // Listen for meeting invites
+  const unsub4=db.collection('hrd_meeting_invites').where('targetUser','==',currentUser.id).where('read','==',false).onSnapshot(snap=>{
+    snap.docChanges().forEach(change=>{
+      if(change.type==='added') playNotificationSound();
+    });
+  });
+  unsubscribers.push(unsub4);
+}
+
+// ── NOTIFICATION SOUND — Loud & Clear ─────────────────────────
+let _notifSoundCooldown=false;
+function playNotificationSound(){
+  if(_notifSoundCooldown)return; // Prevent spam
+  _notifSoundCooldown=true;
+  setTimeout(()=>{_notifSoundCooldown=false;},2000);
+  try{
+    const AudioCtx=window.AudioContext||window.webkitAudioContext;
+    const ctx=new AudioCtx();
+    // Play a loud, clear 3-tone notification chime
+    const playTone=(freq,startTime,duration)=>{
+      const osc=ctx.createOscillator();
+      const gain=ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type='sine';
+      osc.frequency.setValueAtTime(freq,ctx.currentTime+startTime);
+      gain.gain.setValueAtTime(0.8,ctx.currentTime+startTime);
+      gain.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+startTime+duration);
+      osc.start(ctx.currentTime+startTime);
+      osc.stop(ctx.currentTime+startTime+duration);
+    };
+    // 3-tone chime: C5, E5, G5 (bright & attention-grabbing)
+    playTone(523,0,0.15);
+    playTone(659,0.15,0.15);
+    playTone(784,0.3,0.3);
+    // Second round (repeat for emphasis)
+    playTone(523,0.7,0.15);
+    playTone(659,0.85,0.15);
+    playTone(784,1.0,0.3);
+    setTimeout(()=>ctx.close(),2000);
+  }catch(e){console.warn('Notification sound failed:',e);}
 }
 
 async function updateNotifBadge(){
