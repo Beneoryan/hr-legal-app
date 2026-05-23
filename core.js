@@ -155,7 +155,7 @@ function buildNavItems(isPortalUser) {
   }
   // ADMIN / BOD / HEAD / MANAGER dashboard
   let nav='';
-  nav+=navGroup('🏠 Utama',[['dashboard','📊','Dashboard'],['approval-center','✅','Approval Center'],['notifikasi','🔔','Notifikasi'],['pengumuman','📢','Pengumuman']]);
+  nav+=navGroup('🏠 Utama',[['dashboard','🏠','Beranda'],['approval-center','✅','Approval Center'],['notifikasi','🔔','Notifikasi'],['pengumuman','📢','Pengumuman']]);
   nav+=navGroup('🏢 Perusahaan',[['departemen','🏢','Departemen'],['posisi','💼','Posisi'],['cabang','🏛️','Cabang']]);
   nav+=navGroup('👥 Karyawan',[['karyawan','👥','Data Karyawan'],['struktur-org','🌳','Struktur Org'],['jobdesk-mgmt','📋','Kelola Jobdesk'],['onboarding','🚀','Onboarding'],['offboarding','📦','Offboarding']]);
   // Manager+ gets Rekrutmen
