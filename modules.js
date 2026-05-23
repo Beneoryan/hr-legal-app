@@ -2385,10 +2385,13 @@ function loadCompanyBranding(){
 }
 function modalAkun(id){if(id)db.collection('hrd_users').doc(id).get().then(d=>showAkunForm(id,d.data()||{}));else showAkunForm(null,{});}
 async function showAkunForm(id,p){
-  // Load karyawan list for linking
-  const karySnap=await db.collection('hrd_karyawan').get();
+  // Load karyawan list for linking (only active)
+  const karySnap=await db.collection('hrd_karyawan').where('status','==','aktif').get();
+  let karyData=[];
+  karySnap.forEach(d=>{const k=d.data();karyData.push({id:d.id,nama:k.nama,nip:k.nip||'',departemen:k.departemen||'',posisi:k.posisi||''});});
+  karyData.sort((a,b)=>(a.nama||'').localeCompare(b.nama||''));
   let karyOpts='<option value="">-- Tidak disambungkan --</option>';
-  karySnap.forEach(d=>{const k=d.data();karyOpts+=`<option value="${d.id}" ${p.linkedKaryawan===d.id?'selected':''}>${escHtml(k.nama)} (${escHtml(k.nip||'-')} — ${escHtml(k.departemen||'-')})</option>`;});
+  karyData.forEach(k=>{karyOpts+=`<option value="${k.id}" ${p.linkedKaryawan===k.id?'selected':''}>${escHtml(k.nama)} (${escHtml(k.nip)} — ${escHtml(k.departemen)})</option>`;});
   openModal(`<div class="modal-title">${id?'Edit':'Tambah'} Akun</div>
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border)">
       <div id="akAvatarPreview" style="width:64px;height:64px;border-radius:50%;border:2px solid var(--accent);overflow:hidden;display:flex;align-items:center;justify-content:center;background:#f5f5f5;font-size:1.5rem;cursor:pointer" onclick="document.getElementById('akAvatarFile').click()">${p.profilePic?`<img src="${p.profilePic}" style="width:100%;height:100%;object-fit:cover">`:(p.nama||'?').charAt(0)}</div>
@@ -2397,7 +2400,7 @@ async function showAkunForm(id,p){
     <div class="grid-2"><div class="form-group"><label>Username</label><input class="form-control" id="akUser" value="${escHtml(id||'')}" data-old-id="${escHtml(id||'')}"></div><div class="form-group"><label>Password</label><input class="form-control" id="akPass" value="${escHtml(p.password||'')}"></div></div>
     <div class="grid-2"><div class="form-group"><label>Nama</label><input class="form-control" id="akNama" value="${escHtml(p.nama||'')}"></div><div class="form-group"><label>Role</label><select class="form-control" id="akRole"><option value="staff" ${p.role==='staff'||p.role==='karyawan'?'selected':''}>Staff</option><option value="leader" ${p.role==='leader'?'selected':''}>Leader</option><option value="manager" ${p.role==='manager'?'selected':''}>Manager</option><option value="head" ${p.role==='head'?'selected':''}>Head</option><option value="bod" ${p.role==='bod'?'selected':''}>BOD / Founder</option><option value="admin" ${p.role==='admin'||p.role==='superadmin'?'selected':''}>Admin (Full Access)</option></select></div></div>
     <div class="grid-2"><div class="form-group"><label>Departemen</label><input class="form-control" id="akDept" value="${escHtml(p.departemen||'')}"></div><div class="form-group"><label>Status</label><select class="form-control" id="akStatus"><option value="aktif" ${p.status==='aktif'?'selected':''}>Aktif</option><option value="nonaktif" ${p.status==='nonaktif'?'selected':''}>Nonaktif</option></select></div></div>
-    <div class="form-group" style="background:#f0f4ff;padding:12px;border-radius:8px;border-left:4px solid var(--primary)"><label style="color:var(--primary)">🔗 Sambungkan ke Data Karyawan</label><select class="form-control" id="akLinkedKary">${karyOpts}</select><div class="text-xs mt-8" style="color:#666">Pilih karyawan yang terdaftar untuk menyinkronkan data (nama, departemen, posisi) secara otomatis.</div></div>
+    <div class="form-group" style="background:#f0f4ff;padding:12px;border-radius:8px;border-left:4px solid var(--primary)"><label style="color:var(--primary)">🔗 Sambungkan ke Data Karyawan</label><input class="form-control mb-8" id="akLinkedSearch" placeholder="🔍 Ketik nama untuk mencari..." oninput="filterLinkedKary()"><select class="form-control" id="akLinkedKary" size="5" style="height:auto;max-height:150px">${karyOpts}</select><div class="text-xs mt-8" style="color:#666">Hanya karyawan aktif. Ketik nama untuk filter, lalu pilih dari daftar.</div></div>
     <div class="flex gap-8 mt-16"><button class="btn btn-primary" onclick="simpanAkun('${id||''}')">💾 Simpan</button>${id?`<button class="btn btn-danger" onclick="hapusDoc('hrd_users','${id}','akun')">🗑️ Hapus</button>`:''}</div>`,true);
 }
 
@@ -2415,6 +2418,16 @@ function previewAkunAvatar(input){
       document.getElementById('akAvatarPreview').innerHTML=`<img src="${window._akunProfilePic}" style="width:100%;height:100%;object-fit:cover">`;
     };img.src=e.target.result;
   };reader.readAsDataURL(file);
+}
+function filterLinkedKary(){
+  const q=(document.getElementById('akLinkedSearch')?.value||'').toLowerCase();
+  const sel=document.getElementById('akLinkedKary');
+  if(!sel)return;
+  Array.from(sel.options).forEach(opt=>{
+    if(!opt.value){opt.style.display='';return;}// Always show "tidak disambungkan"
+    const text=opt.textContent.toLowerCase();
+    opt.style.display=text.includes(q)?'':'none';
+  });
 }
 async function simpanAkun(id){
   const oldId = id;
