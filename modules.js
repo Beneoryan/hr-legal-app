@@ -248,84 +248,39 @@ function parseCsvRows(text){const lines=text.replace(/\r\n/g,'\n').replace(/\r/g
 // ── STRUKTUR ORG ──────────────────────────────────────────────
 async function renderStrukturOrg(){
   const main=document.getElementById('mainContent');
-  main.innerHTML=`<div class="page-title"><span>🌳 Struktur Organisasi</span></div><div class="card" id="orgChart" style="overflow-x:auto;padding:30px 20px">Loading...</div>`;
-  const snap=await db.collection('hrd_karyawan').get();
-  const all=[];
-  snap.forEach(d=>{const p=d.data();if((p.status||'').toLowerCase()!=='nonaktif')all.push(p);});
-
-  function posUp(k){return(k.posisi||'').toUpperCase();}
-  function isFounder(k){const p=posUp(k);return p.includes('FOUNDER')||p.includes('OWNER');}
-  function isGM(k){const p=posUp(k);return p.includes('GENERAL MANAGER')||p.includes('DIREKTUR UTAMA')||p.includes('CEO');}
-  function isHead(k){const p=posUp(k);return(p.startsWith('HEAD')||p.includes('HEAD OF'))&&!isFounder(k)&&!isGM(k);}
-
-  const founders=all.filter(isFounder);
-  const gm=all.filter(isGM);
-  const heads=all.filter(isHead);
-  const staff=all.filter(k=>!isFounder(k)&&!isGM(k)&&!isHead(k));
-
-  // Group staff by departemen, then assign to head with same departemen
-  const deptStaff={};
-  staff.forEach(s=>{const d=(s.departemen||'').toUpperCase();if(!deptStaff[d])deptStaff[d]=[];deptStaff[d].push(s);});
-
-  // Map each head to their staff via departemen match
-  const headData=heads.map(h=>{
-    const dept=(h.departemen||'').toUpperCase();
-    return{head:h,staff:deptStaff[dept]||[],dept:h.departemen||''};
-  });
-  // Find unassigned staff (dept doesn't match any head's dept)
-  const headDepts=new Set(heads.map(h=>(h.departemen||'').toUpperCase()));
-  const unassigned=staff.filter(s=>!headDepts.has((s.departemen||'').toUpperCase()));
-
-  let h=`<style>
-.oc{text-align:center}.oc-t{font-size:1.2rem;font-weight:700;color:#1a237e}.oc-s{font-size:.8rem;color:#666;margin-bottom:24px}
-.oc-vl{width:2px;background:#3949ab;margin:0 auto}
-.oc-nd{border:2px solid #3949ab;border-radius:8px;padding:10px 18px;display:inline-block;text-align:center;background:#e8eaf6;min-width:130px;position:relative}
-.oc-nd .nm{font-weight:700;font-size:.78rem;color:#1a237e}.oc-nd .ps{font-size:.66rem;color:#555;margin-top:2px}
-.oc-nd.fdr::after{content:'*';position:absolute;top:-9px;left:50%;transform:translateX(-50%);background:#1a237e;color:#fff;width:16px;height:16px;border-radius:50%;font-size:.55rem;line-height:16px}
-.oc-st{border:1.5px solid #aaa;border-radius:6px;padding:6px 10px;display:inline-block;text-align:center;background:#fff;min-width:100px}
-.oc-st .nm{font-weight:600;font-size:.7rem;color:#333}.oc-st .ps{font-size:.6rem;color:#888;margin-top:1px}
-.oc-row{display:flex;justify-content:center;align-items:flex-start;gap:12px;flex-wrap:wrap}
-.oc-col{display:flex;flex-direction:column;align-items:center}
-.oc-dept{font-size:.65rem;color:#3949ab;font-weight:600;margin-top:4px;margin-bottom:2px}
-</style>
-<div class="oc"><div class="oc-t">STRUKTUR ORGANISASI</div><div class="oc-s">LPK IJEF CORP</div>`;
-
-  // Founders
-  if(founders.length){
-    h+=`<div class="oc-row">`;founders.forEach(k=>{h+=`<div class="oc-nd fdr"><div class="nm">${escHtml(k.nama).toUpperCase()}</div><div class="ps">${escHtml(k.posisi)}</div></div>`;});
-    h+=`</div><div class="oc-vl" style="height:26px"></div>`;
-  }
-  // GM
-  if(gm.length){
-    h+=`<div class="oc-row">`;gm.forEach(k=>{h+=`<div class="oc-nd"><div class="nm">${escHtml(k.nama).toUpperCase()}</div><div class="ps">${escHtml(k.posisi)}</div></div>`;});
-    h+=`</div><div class="oc-vl" style="height:26px"></div>`;
-  }
-  // Horizontal connector
-  if(headData.length>1){h+=`<div style="width:${Math.min(headData.length*280,900)}px;height:2px;background:#3949ab;margin:0 auto"></div>`;}
-
-  // Heads + their staff
-  h+=`<div class="oc-row" style="align-items:flex-start;gap:32px">`;
-  headData.forEach(({head,staff:myStaff,dept})=>{
-    h+=`<div class="oc-col" style="min-width:180px">
-      <div class="oc-vl" style="height:18px"></div>
-      <div class="oc-nd"><div class="nm">${escHtml(head.nama).toUpperCase()}</div><div class="ps">${escHtml(head.posisi)}</div></div>`;
-    if(dept)h+=`<div class="oc-dept">${escHtml(dept)}</div>`;
-    if(myStaff.length){
-      h+=`<div class="oc-vl" style="height:14px"></div><div class="oc-row" style="gap:6px;max-width:${Math.max(myStaff.length*120,250)}px">`;
-      myStaff.forEach(s=>{h+=`<div class="oc-st"><div class="nm">${escHtml(s.nama)}</div><div class="ps">${escHtml(s.posisi||'-')}</div></div>`;});
-      h+=`</div>`;
-    }
-    h+=`</div>`;
-  });
-  h+=`</div>`;
-
-  // Unassigned
-  if(unassigned.length){
-    h+=`<div style="margin-top:24px;border-top:1px dashed #ccc;padding-top:14px"><div style="font-size:.72rem;color:#999;font-weight:600;margin-bottom:8px">Belum Terassign</div><div class="oc-row" style="gap:6px">`;
-    unassigned.forEach(s=>{h+=`<div class="oc-st"><div class="nm">${escHtml(s.nama)}</div><div class="ps">${escHtml(s.posisi||'-')} • ${escHtml(s.departemen||'-')}</div></div>`;});
-    h+=`</div></div>`;
-  }
-  h+=`</div>`;
+  main.innerHTML=`<div class="page-title"><span>🌳 Struktur Organisasi</span></div><div class="card" id="orgChart" style="overflow-x:auto;padding:30px 20px"></div>`;
+  const css=`<style>.oc{text-align:center;min-width:900px}.oc-t{font-size:1.2rem;font-weight:700;color:#1a237e}.oc-s{font-size:.8rem;color:#666;margin-bottom:20px}.oc-vl{width:2px;background:#3949ab;margin:0 auto}.oc-hl{height:2px;background:#3949ab;margin:0 auto}.oc-nd{border:2px solid #3949ab;border-radius:8px;padding:8px 14px;display:inline-block;text-align:center;background:#e8eaf6;min-width:120px}.oc-nd .nm{font-weight:700;font-size:.75rem;color:#1a237e}.oc-nd .ps{font-size:.62rem;color:#555;margin-top:2px;text-transform:uppercase}.oc-nd.fdr::before{content:"★";color:#ff6f00;font-size:.6rem;display:block}.oc-st{border:1.5px solid #bbb;border-radius:6px;padding:6px 10px;display:inline-block;text-align:center;background:#fff;min-width:100px}.oc-st .nm{font-weight:600;font-size:.68rem;color:#333}.oc-st .ps{font-size:.58rem;color:#888;margin-top:1px}.oc-row{display:flex;justify-content:center;align-items:flex-start;gap:10px;flex-wrap:wrap}.oc-col{display:flex;flex-direction:column;align-items:center}.oc-lbl{font-size:.62rem;color:#3949ab;font-weight:700;margin:4px 0;text-transform:uppercase}</style>`;
+  const h=css+`<div class="oc"><div class="oc-t">STRUKTUR ORGANISASI</div><div class="oc-s">LPK IJEF CORP</div>
+  <div class="oc-row"><div class="oc-nd fdr"><div class="nm">MISRIANA</div><div class="ps">Founder</div></div><div class="oc-nd fdr"><div class="nm">MAHPUDIN</div><div class="ps">Founder</div></div><div class="oc-nd fdr"><div class="nm">BUDI CAHYO</div><div class="ps">Founder</div></div></div>
+  <div class="oc-vl" style="height:24px"></div>
+  <div class="oc-row"><div class="oc-nd"><div class="nm">MUHAMMAD AGUS RYANDA</div><div class="ps">General Manager</div></div></div>
+  <div class="oc-vl" style="height:24px"></div>
+  <div class="oc-hl" style="width:500px"></div>
+  <div class="oc-row" style="gap:80px;align-items:flex-start">
+    <div class="oc-col">
+      <div class="oc-vl" style="height:16px"></div>
+      <div class="oc-nd"><div class="nm">AGUS PURIYANTO</div><div class="ps">Head of Academic</div></div>
+      <div class="oc-lbl">ACADEMIC</div>
+      <div class="oc-vl" style="height:12px"></div>
+      <div class="oc-row" style="gap:8px">
+        <div class="oc-st"><div class="nm">Salma Nurhaliza</div><div class="ps">Admin Documents</div></div>
+        <div class="oc-st"><div class="nm">Muhammad Ihsan Hilmi</div><div class="ps">Curriculum Leader</div></div>
+        <div class="oc-col"><div class="oc-st"><div class="nm">Winnie Delfina Welliam</div><div class="ps">Student Leader</div></div><div class="oc-vl" style="height:10px"></div><div class="oc-st" style="border-color:#7b1fa2"><div class="nm">Galih Resmayandi</div><div class="ps">Japan Instructor</div></div></div>
+      </div>
+    </div>
+    <div class="oc-col">
+      <div class="oc-vl" style="height:16px"></div>
+      <div class="oc-nd"><div class="nm">IRSAN JANWAR WIBAWA</div><div class="ps">Head of Office</div></div>
+      <div class="oc-lbl">OFFICE</div>
+      <div class="oc-vl" style="height:12px"></div>
+      <div class="oc-row" style="gap:8px">
+        <div class="oc-st"><div class="nm">Mira Tania</div><div class="ps">Admin Documents</div></div>
+        <div class="oc-col"><div class="oc-st"><div class="nm">Maharani Ali Putri</div><div class="ps">HR & Legal</div></div><div class="oc-vl" style="height:10px"></div><div class="oc-st" style="border-color:#7b1fa2"><div class="nm">Rafa Dame Siregar</div><div class="ps">Asisten HR & Legal</div></div></div>
+        <div class="oc-st"><div class="nm">Siti Sofuroh</div><div class="ps">Finance</div></div>
+        <div class="oc-st"><div class="nm">Nanda Yoga Maulana</div><div class="ps">General Affairs</div></div>
+      </div>
+    </div>
+  </div></div>`;
   document.getElementById('orgChart').innerHTML=h;
 }
 
