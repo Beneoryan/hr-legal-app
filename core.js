@@ -160,7 +160,7 @@ function buildNavItems(isKaryawan) {
 
 function navGroup(title, items) {
   const hasActive=items.some(([page])=>currentPage===page);
-  let html=`<div class="nav-group"><div class="nav-group-title" onclick="toggleNavGroup(this)"><span>${title}</span><span class="nav-arrow${hasActive?' open':''}">▾</span></div><div class="nav-group-items"${hasActive?'':' style="display:none"'}>`;
+  let html=`<div class="nav-group"><div class="nav-group-title" onclick="toggleNavGroup(this)"><span>${title}</span><span class="nav-arrow${hasActive?' open':''}">⌵</span></div><div class="nav-group-items"${hasActive?'':' style="display:none"'}>`;
   items.forEach(([page,icon,label])=>{html+=`<div class="nav-item${currentPage===page?' active':''}" onclick="navigateTo('${page}')"><span class="icon">${icon}</span><span>${label}</span></div>`;});
   return html+'</div></div>';
 }
