@@ -1,22 +1,24 @@
-const CACHE_NAME = 'hrd-ijef-v5.5';
-const ASSETS = ['/', '/index.html', '/core.js?v=5.5', '/modules.js?v=5.5', '/absensi-ijef.js?v=5.5'];
+const CACHE_NAME = 'hrd-ijef-v6.0';
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(ASSETS)));
   self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))));
+  e.waitUntil(caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))));
   self.clients.claim();
 });
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  // Network-first: always try to get fresh content
   e.respondWith(
     fetch(e.request).then(resp => {
-      const clone = resp.clone();
-      caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+      // Only cache non-JS assets (images, fonts, etc)
+      if (!e.request.url.includes('.js') && !e.request.url.includes('.html')) {
+        const clone = resp.clone();
+        caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+      }
       return resp;
     }).catch(() => caches.match(e.request))
   );

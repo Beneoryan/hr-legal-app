@@ -120,6 +120,7 @@ function renderApp() {
   <div class="main" id="mainContent"></div>`;
   navigateTo(currentPage);
   listenNotifications();
+  setupRealtimeSync();
   // Auto-load national holidays if not yet populated
   autoLoadHariLiburNasional().catch(()=>{});
 }
@@ -282,6 +283,23 @@ function triggerInstallPWA() {
 }
 
 if ('serviceWorker' in navigator) {
+  // Unregister old SW and register new one to force update
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    regs.forEach(r => r.unregister());
+  });
   navigator.serviceWorker.register('/sw.js').catch(() => {});
 }
 document.addEventListener('DOMContentLoaded', initApp);
+
+// ── REAL-TIME SYNC: Auto-refresh current page when data changes ───
+function setupRealtimeSync() {
+  // Listen to key collections and refresh current page when changes detected
+  const watchCollections = ['hrd_karyawan','hrd_absensi','hrd_disc_results','hrd_notifikasi','hrd_pengumuman','hrd_kandidat','hrd_cuti'];
+  watchCollections.forEach(col => {
+    const unsub = db.collection(col).onSnapshot(() => {
+      // Update notification badge always
+      if(currentUser) updateNotifBadge();
+    }, () => {});
+    unsubscribers.push(unsub);
+  });
+}
