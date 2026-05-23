@@ -285,61 +285,100 @@ async function hapusShift(idx) {
 // ══════════════════════════════════════════════════════════════
 
 function renderClockInOut(container) {
-  container.innerHTML = `<div class="card"><div class="card-title mb-16">� Absensi Otomatis</div>
-    <div style="text-align:center;padding:20px">
-      <div style="background:#f8f9ff;border-radius:12px;padding:20px;margin-bottom:16px">
-        <div id="absenGpsStatus" style="font-size:.85rem;color:var(--text-light);margin-bottom:8px">📍 Mendeteksi lokasi...</div>
-        <div id="absenLocationName" style="font-size:1rem;font-weight:700;color:var(--primary);margin-bottom:4px">-</div>
-        <div id="absenDistance" style="font-size:.8rem;color:var(--text-light)">-</div>
+  container.innerHTML = `<div class="card"><div class="card-title mb-16">📍 Absensi — Selfie + GPS</div>
+    <div class="grid-2" style="gap:16px">
+      <!-- KAMERA SELFIE (WAJIB) -->
+      <div>
+        <div class="text-sm fw-700 mb-8" style="color:var(--primary)">📸 Foto Selfie <span class="badge badge-danger" style="font-size:.6rem">WAJIB</span></div>
+        <div style="position:relative;border-radius:12px;overflow:hidden;background:#000;aspect-ratio:4/3">
+          <video id="selfieVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover"></video>
+          <canvas id="selfieCanvas" style="display:none"></canvas>
+        </div>
+        <div class="mt-8 flex gap-8">
+          <button class="btn btn-primary btn-sm" onclick="startCamera()">📷 Buka Kamera</button>
+          <button class="btn btn-success btn-sm" onclick="captureMainPhoto()">📸 Ambil Foto</button>
+        </div>
+        <div id="selfiePreview" class="mt-8"></div>
       </div>
-      <div id="absenAutoStatus" style="margin-bottom:16px"></div>
-      <button class="btn btn-primary btn-lg" id="btnAbsenOtomatis" onclick="doAbsenOtomatis()" style="padding:16px 40px;font-size:1rem;border-radius:12px" disabled>
-        ⏳ Mendeteksi...
-      </button>
-      <div id="clockStatus" class="mt-16"></div>
+      <!-- GPS & STATUS -->
+      <div>
+        <div class="text-sm fw-700 mb-8" style="color:var(--primary)">📍 Lokasi GPS</div>
+        <div style="background:#f8f9ff;border-radius:12px;padding:16px;margin-bottom:12px">
+          <div id="absenGpsStatus" style="font-size:.85rem;color:var(--text-light);margin-bottom:8px">📍 Mendeteksi lokasi...</div>
+          <div id="absenLocationName" style="font-size:1rem;font-weight:700;color:var(--primary);margin-bottom:4px">-</div>
+          <div id="absenDistance" style="font-size:.8rem;color:var(--text-light)">-</div>
+        </div>
+        <div id="absenAutoStatus" style="margin-bottom:12px"></div>
+        <div id="clockStatus" class="mb-12"></div>
+        <div id="breakActions" class="mb-8"></div>
+        <div id="breakStatus" class="mb-8"></div>
+        <div id="coreHoursStatus" class="mb-8"></div>
+        <div class="card mb-8" id="weeklyAccCard" style="display:none;padding:12px"></div>
+      </div>
     </div>
-    <div style="background:#fff3e0;border-radius:8px;padding:12px;margin-top:16px;border-left:4px solid var(--warning)">
-      <p class="text-xs" style="line-height:1.6"><b>Cara Kerja:</b><br>• Lokasi otomatis terdeteksi saat halaman dibuka<br>• Jika dalam radius kantor → tombol aktif<br>• Sistem otomatis menentukan: <b>Clock In</b> (belum absen hari ini) atau <b>Clock Out</b> (sudah clock in)<br>• Jika di luar radius → tidak bisa absen</p>
+    <!-- TOMBOL ABSEN -->
+    <div style="text-align:center;padding:20px 0">
+      <button class="btn btn-primary btn-lg" id="btnAbsenAction" onclick="doAbsenWithSelfie()" style="padding:16px 40px;font-size:1rem;border-radius:12px" disabled>
+        ⏳ Mendeteksi lokasi...
+      </button>
+    </div>
+    <div style="background:#fff3e0;border-radius:8px;padding:12px;margin-top:8px;border-left:4px solid var(--warning)">
+      <p class="text-xs" style="line-height:1.6"><b>Cara Kerja:</b><br>• Buka kamera dan ambil foto selfie (WAJIB sebagai validasi)<br>• Lokasi GPS otomatis terdeteksi<br>• Jika dalam radius kantor & foto sudah diambil → tombol aktif<br>• Sistem otomatis menentukan: <b>Clock In</b> atau <b>Clock Out</b></p>
     </div></div>
     <div class="card mt-16"><div class="card-title mb-8">📋 Riwayat Hari Ini</div><div id="todayHistory"></div></div>`;
-  loadTodayHistory(); checkTodayStatus(); autoDetectLocation();
+  loadTodayHistory(); checkTodayStatus(); autoDetectLocation(); loadBreakStatus(); loadCoreHoursStatus(); loadWeeklyAccumulation();
+  setTimeout(()=>startCamera(), 300);
 }
 
 async function autoDetectLocation(){
   const statusEl=document.getElementById('absenGpsStatus');
   const locEl=document.getElementById('absenLocationName');
   const distEl=document.getElementById('absenDistance');
-  const btn=document.getElementById('btnAbsenOtomatis');
+  const btn=document.getElementById('btnAbsenAction');
   const autoEl=document.getElementById('absenAutoStatus');
+  if(!statusEl||!btn)return;
   if(!navigator.geolocation){statusEl.textContent='❌ GPS tidak tersedia';return;}
   statusEl.textContent='📍 Mendeteksi lokasi...';
   navigator.geolocation.getCurrentPosition(async(pos)=>{
-    currentGPS={lat:pos.coords.latitude,lng:pos.coords.longitude};
-    statusEl.textContent=`📍 ${currentGPS.lat.toFixed(5)}, ${currentGPS.lng.toFixed(5)}`;
-    // Check nearest office
-    const locStatus=await getNearestOfficeLocation(currentGPS.lat,currentGPS.lng);
-    if(locStatus.allowed){
-      locEl.textContent=`✅ ${locStatus.nearest.nama}`;
-      distEl.textContent=`Jarak: ${locStatus.distance.toFixed(0)}m (dalam radius ${locStatus.nearest.radius}m)`;
-      // Determine: clock in or clock out
-      const todaySnap=await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).get();
-      let hasMasuk=false,hasPulang=false;
-      todaySnap.forEach(d=>{if(d.data().tipe==='masuk')hasMasuk=true;if(d.data().tipe==='pulang')hasPulang=true;});
-      if(!hasMasuk){
-        btn.textContent='⏰ ABSEN MASUK';btn.style.background='var(--success)';btn.disabled=false;
-        autoEl.innerHTML='<span class="badge badge-info">Belum absen hari ini — Klik untuk Clock In</span>';
-      }else if(!hasPulang){
-        btn.textContent='🏠 ABSEN PULANG';btn.style.background='var(--warning)';btn.disabled=false;
-        autoEl.innerHTML='<span class="badge badge-success">Sudah Clock In — Klik untuk Clock Out</span>';
+    try{
+      currentGPS={lat:pos.coords.latitude,lng:pos.coords.longitude,accuracy:pos.coords.accuracy};
+      statusEl.textContent=`📍 ${currentGPS.lat.toFixed(5)}, ${currentGPS.lng.toFixed(5)} (±${currentGPS.accuracy?.toFixed(0)||'?'}m)`;
+      // Check nearest office
+      const locStatus=await getNearestOfficeLocation(currentGPS.lat,currentGPS.lng);
+      if(locStatus.allowed){
+        locEl.textContent=`✅ ${locStatus.nearest.nama}`;
+        distEl.textContent=`Jarak: ${locStatus.dist.toFixed(0)}m (dalam radius ${locStatus.nearest.radius||locStatus.radius}m)`;
+        // Determine: clock in or clock out
+        try{
+          const todaySnap=await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).get();
+          let hasMasuk=false,hasPulang=false;
+          todaySnap.forEach(d=>{if(d.data().tipe==='masuk')hasMasuk=true;if(d.data().tipe==='pulang')hasPulang=true;});
+          if(!hasMasuk){
+            btn.textContent='⏰ ABSEN MASUK (Selfie + GPS)';btn.style.background='var(--success)';btn.disabled=false;
+            if(autoEl)autoEl.innerHTML='<span class="badge badge-info">Belum absen hari ini — Ambil foto lalu klik untuk Clock In</span>';
+          }else if(!hasPulang){
+            btn.textContent='🏠 ABSEN PULANG (Selfie + GPS)';btn.style.background='var(--warning)';btn.disabled=false;
+            if(autoEl)autoEl.innerHTML='<span class="badge badge-success">Sudah Clock In — Ambil foto lalu klik untuk Clock Out</span>';
+          }else{
+            btn.textContent='✅ Sudah Lengkap';btn.disabled=true;btn.style.background='#9e9e9e';
+            if(autoEl)autoEl.innerHTML='<span class="badge badge-success">✅ Absen hari ini sudah lengkap (masuk & pulang)</span>';
+          }
+        }catch(e){
+          console.error('Error check today status:',e);
+          // Tetap aktifkan tombol meskipun gagal cek status
+          btn.textContent='⏰ ABSEN (Selfie + GPS)';btn.style.background='var(--success)';btn.disabled=false;
+          if(autoEl)autoEl.innerHTML='<span class="badge badge-warning">⚠️ Gagal cek status hari ini, tapi lokasi valid</span>';
+        }
       }else{
-        btn.textContent='✅ Sudah Lengkap';btn.disabled=true;btn.style.background='#9e9e9e';
-        autoEl.innerHTML='<span class="badge badge-success">✅ Absen hari ini sudah lengkap (masuk & pulang)</span>';
+        locEl.textContent=`❌ Di luar radius kantor`;
+        distEl.textContent=locStatus.nearest?`Jarak: ${locStatus.dist.toFixed(0)}m (radius max: ${locStatus.nearest.radius||locStatus.radius}m)`:'Tidak ada lokasi kantor terdaftar';
+        btn.textContent='❌ Tidak Bisa Absen';btn.disabled=true;btn.style.background='var(--danger)';
+        if(autoEl)autoEl.innerHTML='<span class="badge badge-danger">Anda berada di luar radius lokasi kantor yang terdaftar</span>';
       }
-    }else{
-      locEl.textContent=`❌ Di luar radius kantor`;
-      distEl.textContent=locStatus.nearest?`Jarak: ${locStatus.distance.toFixed(0)}m (radius max: ${locStatus.nearest.radius}m)`:'Tidak ada lokasi kantor terdaftar';
-      btn.textContent='❌ Tidak Bisa Absen';btn.disabled=true;btn.style.background='var(--danger)';
-      autoEl.innerHTML='<span class="badge badge-danger">Anda berada di luar radius lokasi kantor yang terdaftar</span>';
+    }catch(e){
+      console.error('Error autoDetectLocation:',e);
+      statusEl.textContent=`❌ Error: ${e.message}`;
+      btn.textContent='🔄 Coba Lagi';btn.disabled=false;btn.style.background='var(--primary)';btn.onclick=()=>autoDetectLocation();
     }
   },(err)=>{
     statusEl.textContent='❌ Gagal deteksi: '+err.message;
@@ -347,28 +386,26 @@ async function autoDetectLocation(){
   },{enableHighAccuracy:true,timeout:10000});
 }
 
-async function doAbsenOtomatis(){
-  if(!currentGPS)return toast('Lokasi belum terdeteksi','warning');
-  const locStatus=await getNearestOfficeLocation(currentGPS.lat,currentGPS.lng);
-  if(!locStatus.allowed)return toast('Di luar radius kantor','error');
-  // Determine action
+// ── ABSEN DENGAN SELFIE — Validasi foto wajib sebelum clock in/out ──
+async function doAbsenWithSelfie(){
+  if(!capturedPhoto) return toast('📸 Ambil foto selfie dulu! Foto wajib sebagai validasi kehadiran.','warning');
+  if(!currentGPS) return toast('📍 Lokasi GPS belum terdeteksi. Tunggu sebentar...','warning');
+  // Determine action: clock in or clock out
   const todaySnap=await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).get();
   let hasMasuk=false,hasPulang=false;
   todaySnap.forEach(d=>{if(d.data().tipe==='masuk')hasMasuk=true;if(d.data().tipe==='pulang')hasPulang=true;});
-  const now=new Date();const jam=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
   if(!hasMasuk){
-    await db.collection('hrd_absensi').add({userId:currentUser.id,nama:currentUser.nama,tanggal:todayStr(),tipe:'masuk',jam,lat:currentGPS.lat,lng:currentGPS.lng,lokasi:locStatus.nearest.nama,status:'hadir',createdAt:now.toISOString()});
-    toast(`✅ Clock In berhasil — ${jam} di ${locStatus.nearest.nama}`,'success');
+    await doClockIn();
   }else if(!hasPulang){
-    // Calculate jam kerja
-    let jamKerja=0;todaySnap.forEach(d=>{const p=d.data();if(p.tipe==='masuk'&&p.jam){const[h,m]=p.jam.split(':').map(Number);const masukMin=h*60+m;const nowMin=now.getHours()*60+now.getMinutes();jamKerja=(nowMin-masukMin)/60;}});
-    const status=jamKerja>=8?'lengkap':'kurang_jam';
-    await db.collection('hrd_absensi').add({userId:currentUser.id,nama:currentUser.nama,tanggal:todayStr(),tipe:'pulang',jam,lat:currentGPS.lat,lng:currentGPS.lng,lokasi:locStatus.nearest.nama,status,jamKerjaActual:parseFloat(jamKerja.toFixed(1)),createdAt:now.toISOString()});
-    toast(`✅ Clock Out — ${jam} (${jamKerja.toFixed(1)} jam kerja, ${status==='lengkap'?'LENGKAP':'KURANG JAM'})`,'success');
+    await doClockOut();
   }else{
-    toast('Sudah absen masuk & pulang hari ini','info');
+    toast('✅ Sudah absen masuk & pulang hari ini','info');
   }
-  renderClockInOut(document.getElementById('absenContent'));
+}
+
+async function doAbsenOtomatis(){
+  // Legacy fallback — redirect ke doAbsenWithSelfie
+  return doAbsenWithSelfie();
 }
 
 async function loadShiftInfo() {
@@ -455,7 +492,7 @@ async function getNearestOfficeLocation(lat, lng) {
     });
   }
 
-  return { nearest, dist: nearestDist, radius, allowed: nearestDist <= radius };
+  return { nearest, dist: nearestDist, distance: nearestDist, radius, allowed: nearestDist <= radius };
 }
 
 function haversine(lat1,lon1,lat2,lon2){const R=6371000,dLat=(lat2-lat1)*Math.PI/180,dLon=(lon2-lon1)*Math.PI/180,a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}

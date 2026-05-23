@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hrd-ijef-v6.0';
+const CACHE_NAME = 'hrd-ijef-v6.1';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
