@@ -112,7 +112,25 @@ async function simpanKaryawan(id){const data={nama:document.getElementById('kNam
     }
     await db.collection('hrd_karyawan').doc(id).update(data);
   } else await db.collection('hrd_karyawan').add({...data,createdAt:new Date().toISOString()});
-  closeModalDirect();toast('Disimpan','success');renderKaryawan();}
+  // Sync to linked user account (auto-update portal karyawan)
+  try{
+    const usersSnap=await db.collection('hrd_users').where('linkedKaryawan','==',id||'__none__').get();
+    if(!usersSnap.empty){
+      const userDoc=usersSnap.docs[0];
+      const syncData={nama:data.nama,departemen:data.departemen,posisi:data.posisi,updatedAt:new Date().toISOString()};
+      if(data.foto)syncData.profilePic=data.foto;
+      await db.collection('hrd_users').doc(userDoc.id).update(syncData);
+    }else{
+      // Try match by nama
+      const byNameSnap=await db.collection('hrd_users').where('nama','==',data.nama).get();
+      if(!byNameSnap.empty){
+        const syncData={departemen:data.departemen,posisi:data.posisi,updatedAt:new Date().toISOString()};
+        if(data.foto)syncData.profilePic=data.foto;
+        await db.collection('hrd_users').doc(byNameSnap.docs[0].id).update(syncData);
+      }
+    }
+  }catch(e){console.warn('Sync to user failed:',e);}
+  closeModalDirect();toast('Disimpan & disinkronkan ke portal','success');renderKaryawan();}
 
 async function lihatHistoryKontrak(karyawanId){
   const snap=await db.collection('hrd_kontrak_history').where('karyawanId','==',karyawanId).get();
@@ -268,63 +286,69 @@ function parseCsvRows(text){const lines=text.replace(/\r\n/g,'\n').replace(/\r/g
 // ── STRUKTUR ORG ──────────────────────────────────────────────
 async function renderStrukturOrg(){
   const main=document.getElementById('mainContent');
-  main.innerHTML=`<div class="page-title"><span>🌳 Struktur Organisasi</span></div><div class="card" id="orgChart" style="overflow-x:auto;padding:30px 20px"></div>`;
-  document.getElementById('orgChart').innerHTML=`<style>
-.org{text-align:center;min-width:1000px;position:relative}
-.org h2{font-size:1.2rem;font-weight:700;color:#1a237e;margin:0}.org .sub{font-size:.8rem;color:#666;margin-bottom:20px}
-.org .box{border:2px solid #3949ab;border-radius:8px;padding:8px 16px;display:inline-block;text-align:center;background:#e8eaf6;min-width:130px;position:relative}
-.org .box .n{font-weight:700;font-size:.76rem;color:#1a237e}.org .box .p{font-size:.63rem;color:#555;margin-top:2px;text-transform:uppercase}
-.org .box.f::before{content:"★";color:#ff6f00;font-size:.55rem;display:block;margin-bottom:2px}
-.org .sbox{border:1.5px solid #90a4ae;border-radius:6px;padding:6px 10px;display:inline-block;text-align:center;background:#fff;min-width:100px;position:relative}
-.org .sbox .n{font-weight:600;font-size:.68rem;color:#333}.org .sbox .p{font-size:.58rem;color:#888;margin-top:1px}
-.org .sbox.purple{border-color:#7b1fa2}
-.org .v{width:2px;background:#3949ab;margin:0 auto}
-.org .row{display:flex;justify-content:center;align-items:flex-start;flex-wrap:nowrap}
-.org .col{display:flex;flex-direction:column;align-items:center}
-.org .lbl{font-size:.63rem;color:#3949ab;font-weight:700;margin:6px 0 4px;text-transform:uppercase;letter-spacing:1px}
-.org .tree{display:flex;flex-direction:column;align-items:center}
-.org .children{display:flex;justify-content:center;position:relative;padding-top:20px}
-.org .children::before{content:'';position:absolute;top:0;left:calc(50% - 1px);width:2px;height:20px;background:#3949ab}
-.org .children-h{position:absolute;top:20px;height:2px;background:#3949ab}
-.org .child{display:flex;flex-direction:column;align-items:center;position:relative;padding:0 6px}
-.org .child::before{content:'';position:absolute;top:-0px;left:50%;width:2px;height:14px;background:#3949ab;transform:translateX(-1px)}
-.org .child>.sbox,.org .child>.box{margin-top:14px}
+  main.innerHTML=`<div class="page-title"><span>🌳 Struktur Organisasi</span></div><div class="card" id="orgChart" style="overflow-x:auto;padding:30px 20px">Loading...</div>`;
+  // Load karyawan data dynamically
+  const snap=await db.collection('hrd_karyawan').where('status','==','aktif').get();
+  const karyawan=[];snap.forEach(d=>karyawan.push({id:d.id,...d.data()}));
+  // Group by level: Founder/Owner, GM, Head, Staff
+  const founders=karyawan.filter(k=>(k.posisi||'').toLowerCase().includes('founder')||(k.posisi||'').toLowerCase().includes('owner')||(k.posisi||'').toLowerCase().includes('direktur'));
+  const gm=karyawan.filter(k=>(k.posisi||'').toLowerCase().includes('general manager')||(k.posisi||'').toLowerCase().includes('gm')||(k.posisi||'').toLowerCase().includes('ceo'));
+  const heads=karyawan.filter(k=>(k.posisi||'').toLowerCase().includes('head')||(k.posisi||'').toLowerCase().includes('manager')&&!(k.posisi||'').toLowerCase().includes('general'));
+  const staff=karyawan.filter(k=>!founders.includes(k)&&!gm.includes(k)&&!heads.includes(k));
+  // Group staff by departemen
+  const deptStaff={};
+  staff.forEach(k=>{const dept=k.departemen||'Lainnya';if(!deptStaff[dept])deptStaff[dept]=[];deptStaff[dept].push(k);});
+  // Helper: render person box with photo
+  const personBox=(k,cls)=>{
+    const foto=k.foto?`<img src="${k.foto}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;margin-bottom:4px">`:`<div style="width:40px;height:40px;border-radius:50%;background:${cls==='box'?'#fce4ec':'#f5f5f5'};display:flex;align-items:center;justify-content:center;margin:0 auto 4px;font-weight:700;color:var(--accent)">${(k.nama||'?').charAt(0)}</div>`;
+    return `<div class="${cls}"><div style="text-align:center">${foto}</div><div class="n">${escHtml(k.nama)}</div><div class="p">${escHtml(k.posisi||'-')}</div></div>`;
+  };
+  let html=`<style>
+.org{text-align:center;min-width:800px;position:relative}
+.org h2{font-size:1.2rem;font-weight:700;color:var(--accent);margin:0}.org .sub{font-size:.8rem;color:#666;margin-bottom:20px}
+.org .box{border:2px solid var(--accent);border-radius:10px;padding:10px 14px;display:inline-block;text-align:center;background:#fff;min-width:120px;box-shadow:0 2px 8px rgba(198,40,40,.1)}
+.org .box .n{font-weight:700;font-size:.72rem;color:#1a1a1a}.org .box .p{font-size:.6rem;color:#666;margin-top:2px;text-transform:uppercase}
+.org .sbox{border:1.5px solid #ccc;border-radius:8px;padding:8px 10px;display:inline-block;text-align:center;background:#fff;min-width:100px}
+.org .sbox .n{font-weight:600;font-size:.68rem;color:#333}.org .sbox .p{font-size:.56rem;color:#888;margin-top:1px}
+.org .v{width:2px;background:var(--accent);margin:0 auto}
+.org .row{display:flex;justify-content:center;align-items:flex-start;flex-wrap:wrap;gap:12px}
+.org .dept-section{margin-top:20px;padding:16px;border:1px solid #eee;border-radius:12px;background:#fafafa}
+.org .dept-title{font-size:.7rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
 </style>
 <div class="org">
-<h2>STRUKTUR ORGANISASI</h2><div class="sub">LPK IJEF CORP</div>
-
-<div class="row" style="gap:12px;justify-content:center"><div class="box f"><div class="n">MISRIANA</div><div class="p">Founder</div></div><div class="box f"><div class="n">MAHPUDIN</div><div class="p">Founder</div></div><div class="box f"><div class="n">BUDI CAHYO</div><div class="p">Founder</div></div></div>
-<div class="v" style="height:30px"></div>
-<div class="box"><div class="n">MUHAMMAD AGUS RYANDA</div><div class="p">General Manager</div></div>
-
-<div class="children" style="padding-top:30px">
-<div class="children-h" style="left:25%;right:25%;top:30px"></div>
-
-<div class="child" style="padding:0 50px">
-<div class="box" style="margin-top:24px"><div class="n">AGUS PURIYANTO</div><div class="p">Head of Academic</div></div>
-<div class="lbl">ACADEMIC</div>
-<div class="children" style="padding-top:20px">
-<div class="children-h" style="left:10%;right:10%;top:20px"></div>
-<div class="child"><div class="sbox" style="margin-top:14px"><div class="n">Salma Nurhaliza</div><div class="p">Admin Documents</div></div></div>
-<div class="child"><div class="sbox" style="margin-top:14px"><div class="n">M. Ihsan Hilmi</div><div class="p">Curriculum Leader</div></div></div>
-<div class="child"><div class="sbox" style="margin-top:14px"><div class="n">Winnie D. Welliam</div><div class="p">Student Leader</div></div><div class="v" style="height:14px"></div><div class="sbox purple"><div class="n">Galih Resmayandi</div><div class="p">Japan Instructor</div></div></div>
-</div>
-</div>
-
-<div class="child" style="padding:0 50px">
-<div class="box" style="margin-top:24px"><div class="n">IRSAN JANWAR WIBAWA</div><div class="p">Head of Office</div></div>
-<div class="lbl">OFFICE</div>
-<div class="children" style="padding-top:20px">
-<div class="children-h" style="left:5%;right:5%;top:20px"></div>
-<div class="child"><div class="sbox" style="margin-top:14px"><div class="n">Mira Tania</div><div class="p">Admin Documents</div></div></div>
-<div class="child"><div class="sbox" style="margin-top:14px"><div class="n">Maharani Ali Putri</div><div class="p">HR & Legal</div></div><div class="v" style="height:14px"></div><div class="sbox purple"><div class="n">Rafa Dame Siregar</div><div class="p">Asisten HR & Legal</div></div></div>
-<div class="child"><div class="sbox" style="margin-top:14px"><div class="n">Siti Sofuroh</div><div class="p">Finance</div></div></div>
-<div class="child"><div class="sbox" style="margin-top:14px"><div class="n">Nanda Yoga Maulana</div><div class="p">General Affairs</div></div></div>
-</div>
-</div>
-
-</div>
-</div>`;
+<h2>STRUKTUR ORGANISASI</h2><div class="sub">LPK IJEF CORP — IMS</div>`;
+  // Founders
+  if(founders.length){
+    html+=`<div class="row" style="margin-bottom:16px">`;
+    founders.forEach(k=>{html+=personBox(k,'box');});
+    html+=`</div><div class="v" style="height:20px"></div>`;
+  }
+  // GM
+  if(gm.length){
+    html+=`<div class="row" style="margin-bottom:16px">`;
+    gm.forEach(k=>{html+=personBox(k,'box');});
+    html+=`</div><div class="v" style="height:20px"></div>`;
+  }
+  // Heads
+  if(heads.length){
+    html+=`<div class="row" style="margin-bottom:20px">`;
+    heads.forEach(k=>{html+=personBox(k,'box');});
+    html+=`</div>`;
+  }
+  // Staff by department
+  const deptKeys=Object.keys(deptStaff).sort();
+  if(deptKeys.length){
+    html+=`<div class="row" style="flex-wrap:wrap;gap:16px;margin-top:16px">`;
+    deptKeys.forEach(dept=>{
+      html+=`<div class="dept-section"><div class="dept-title">${escHtml(dept)}</div><div class="row" style="gap:8px">`;
+      deptStaff[dept].forEach(k=>{html+=personBox(k,'sbox');});
+      html+=`</div></div>`;
+    });
+    html+=`</div>`;
+  }
+  if(!karyawan.length) html+=`<div class="empty-state"><div class="icon">🌳</div><p>Belum ada data karyawan. Tambahkan di menu Data Karyawan.</p></div>`;
+  html+=`</div>`;
+  document.getElementById('orgChart').innerHTML=html;
 }
 
 // ── ONBOARDING ────────────────────────────────────────────────
