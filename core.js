@@ -135,26 +135,26 @@ function renderApp() {
 function buildNavItems(isKaryawan) {
   if (isKaryawan) {
     let nav='';
-    nav+=navGroup('Utama',[['portal','🏠','Beranda'],['portal-absensi','📍','Absensi'],['portal-cuti','🏖️','Cuti & Izin'],['portal-overtime','⏰','Overtime']]);
-    nav+=navGroup('Keuangan',[['portal-gaji','💰','Slip Gaji'],['portal-reimburse','🧾','Reimburse'],['portal-kasbon','💳','Kasbon & Loan']]);
-    nav+=navGroup('Pekerjaan',[['portal-jobdesk','📋','Jobdesk'],['portal-disc','🧠','DISC Test'],['portal-kpi','📈','KPI Saya']]);
-    nav+=navGroup('Organisasi',[['portal-struktur','🌳','Struktur Org'],['portal-libur','📅','Hari Libur'],['portal-peraturan','📜','Peraturan']]);
-    nav+=navGroup('Komunikasi',[['portal-pengumuman','📢','Pengumuman'],['portal-broadcast','📡','Broadcast'],['portal-meeting','📅','Meeting'],['portal-invite','✉️','Undangan'],['inbox','📥','Inbox'],['chat','💬','Obrolan']]);
-    nav+=navGroup('Pengaturan',[['portal-setting','⚙️','Setting Akun']]);
+    nav+=navGroup('🏠 Utama',[['portal','🏠','Beranda'],['portal-absensi','📍','Absensi'],['portal-cuti','🏖️','Cuti & Izin'],['portal-overtime','⏰','Overtime']]);
+    nav+=navGroup('💰 Keuangan',[['portal-gaji','💰','Slip Gaji'],['portal-reimburse','🧾','Reimburse'],['portal-kasbon','💳','Kasbon & Loan']]);
+    nav+=navGroup('💼 Pekerjaan',[['portal-jobdesk','📋','Jobdesk'],['portal-disc','🧠','DISC Test'],['portal-kpi','📈','KPI Saya']]);
+    nav+=navGroup('🏢 Organisasi',[['portal-struktur','🌳','Struktur Org'],['portal-libur','📅','Hari Libur'],['portal-peraturan','📜','Peraturan']]);
+    nav+=navGroup('💬 Komunikasi',[['portal-pengumuman','📢','Pengumuman'],['portal-broadcast','📡','Broadcast'],['portal-meeting','📅','Meeting'],['portal-invite','✉️','Undangan'],['inbox','📥','Inbox'],['chat','💬','Obrolan']]);
+    nav+=navGroup('⚙️ Pengaturan',[['portal-setting','⚙️','Setting Akun']]);
     return nav;
   }
   let nav='';
-  nav+=navGroup('Utama',[['dashboard','📊','Dashboard'],['approval-center','✅','Approval Center'],['notifikasi','🔔','Notifikasi'],['pengumuman','📢','Pengumuman']]);
-  nav+=navGroup('Perusahaan',[['departemen','🏢','Departemen'],['posisi','💼','Posisi'],['cabang','🏛️','Cabang']]);
-  nav+=navGroup('Karyawan',[['karyawan','👥','Data Karyawan'],['struktur-org','🌳','Struktur Org'],['jobdesk-mgmt','📋','Kelola Jobdesk'],['onboarding','🚀','Onboarding'],['offboarding','📦','Offboarding']]);
-  nav+=navGroup('Rekrutmen',[['lowongan','📝','Lowongan'],['pipeline','🔄','Pipeline Kanban'],['kandidat','🧑‍💼','Kandidat']]);
-  nav+=navGroup('Kehadiran',[['absensi','📍','Absensi IJEF'],['cuti','🏖️','Cuti/Izin/WFH'],['overtime','⏰','Overtime'],['hari-libur','📅','Hari Libur'],['penalty','⚠️','Penalty Point']]);
-  nav+=navGroup('Keuangan',[['penggajian','💰','Penggajian'],['insentif','🏆','Insentif'],['reimbursement','🧾','Reimbursement'],['kasbon','💳','Kasbon & Loan'],['tunjangan','🎁','Tunjangan']]);
-  nav+=navGroup('Kinerja',[['kpi','📈','KPI & Penilaian'],['pelatihan','🎓','Pelatihan'],['disc-test','🧠','DISC Test']]);
-  nav+=navGroup('Legal & Aset',[['kontrak','📄','Kontrak'],['asset','💻','Asset'],['peraturan','📜','Peraturan'],['surat','✉️','Generator Surat']]);
-  nav+=navGroup('Komunikasi',[['meeting','📅','Meeting & Invite'],['chat','💬','Obrolan Divisi'],['broadcast','📡','Broadcast'],['inbox','📥','Inbox Saya']]);
-  nav+=navGroup('Portal',[['portal-share','🔗','Download Aplikasi']]);
-  nav+=navGroup('Pengaturan',[['akun','👤','Manajemen Akun'],['approval-mgmt','⚙️','Approval Mgmt'],['qr-share','📱','QR & PWA']]);
+  nav+=navGroup('🏠 Utama',[['dashboard','📊','Dashboard'],['approval-center','✅','Approval Center'],['notifikasi','🔔','Notifikasi'],['pengumuman','📢','Pengumuman']]);
+  nav+=navGroup('🏢 Perusahaan',[['departemen','🏢','Departemen'],['posisi','💼','Posisi'],['cabang','🏛️','Cabang']]);
+  nav+=navGroup('👥 Karyawan',[['karyawan','👥','Data Karyawan'],['struktur-org','🌳','Struktur Org'],['jobdesk-mgmt','📋','Kelola Jobdesk'],['onboarding','🚀','Onboarding'],['offboarding','📦','Offboarding']]);
+  nav+=navGroup('🔍 Rekrutmen',[['lowongan','📝','Lowongan'],['pipeline','🔄','Pipeline Kanban'],['kandidat','🧑‍💼','Kandidat']]);
+  nav+=navGroup('📍 Kehadiran',[['absensi','📍','Absensi IJEF'],['cuti','🏖️','Cuti/Izin/WFH'],['overtime','⏰','Overtime'],['hari-libur','📅','Hari Libur'],['penalty','⚠️','Penalty Point']]);
+  nav+=navGroup('💰 Keuangan',[['penggajian','💰','Penggajian'],['insentif','🏆','Insentif'],['reimbursement','🧾','Reimbursement'],['kasbon','💳','Kasbon & Loan'],['tunjangan','🎁','Tunjangan']]);
+  nav+=navGroup('📈 Kinerja',[['kpi','📈','KPI & Penilaian'],['pelatihan','🎓','Pelatihan'],['disc-test','🧠','DISC Test']]);
+  nav+=navGroup('📄 Legal & Aset',[['kontrak','📄','Kontrak'],['asset','💻','Asset'],['peraturan','📜','Peraturan'],['surat','✉️','Generator Surat']]);
+  nav+=navGroup('💬 Komunikasi',[['meeting','📅','Meeting & Invite'],['chat','💬','Obrolan Divisi'],['broadcast','📡','Broadcast'],['inbox','📥','Inbox Saya']]);
+  nav+=navGroup('🔗 Portal',[['portal-share','🔗','Download Aplikasi']]);
+  nav+=navGroup('⚙️ Pengaturan',[['akun','👤','Manajemen Akun'],['approval-mgmt','⚙️','Approval Mgmt'],['qr-share','📱','QR & PWA']]);
   return nav;
 }
 
