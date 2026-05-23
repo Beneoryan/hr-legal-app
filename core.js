@@ -123,6 +123,8 @@ function renderApp() {
   navigateTo(currentPage);
   listenNotifications();
   setupRealtimeSync();
+  // Load company branding (logo)
+  if(typeof loadCompanyBranding==='function') loadCompanyBranding();
   // Auto-load national holidays if not yet populated
   autoLoadHariLiburNasional().catch(()=>{});
 }

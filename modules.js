@@ -2115,7 +2115,128 @@ function modalPengumuman(){openModal(`<div class="modal-title">Tambah Pengumuman
 async function simpanPengumuman(){const data={judul:document.getElementById('pgJudul').value,isi:document.getElementById('pgIsi').value,dibuatOleh:currentUser.nama,createdAt:new Date().toISOString()};if(!data.judul)return toast('Judul wajib','warning');await db.collection('hrd_pengumuman').add(data);const users=await getAllUsers();await sendNotificationBulk(users.map(u=>u.id),'📢 Pengumuman',data.judul);closeModalDirect();toast('Dipublikasikan','success');renderPengumuman();}
 
 // ── MANAJEMEN AKUN ────────────────────────────────────────────
-async function renderAkun(){if(!hasAccess(4))return document.getElementById('mainContent').innerHTML='<div class="card"><p>Akses ditolak.</p></div>';const main=document.getElementById('mainContent');const baseUrl = window.location.origin + window.location.pathname;main.innerHTML=`<div class="page-title"><span>👤 Manajemen Akun</span><button class="btn btn-primary btn-sm" onclick="modalAkun()">+ Tambah</button></div><div class="card mb-16"><div class="card-title">📲 Bagikan Aplikasi</div><p class="text-sm mb-16" style="color:#666">Bagikan link download aplikasi ke karyawan agar mereka dapat mengakses portal lewat browser atau PWA di Android, iOS, Windows, dan Mac.</p><div class="form-group"><label>Link Aplikasi</label><input class="form-control" readonly id="adminAppLink" value="${baseUrl}"></div><div class="flex gap-8"><button class="btn btn-primary btn-sm" onclick="copyDownloadLink()">📋 Salin Link</button><button class="btn btn-success btn-sm" onclick="shareDownloadWhatsApp()">💬 Share WA</button><button class="btn btn-info btn-sm" onclick="shareDownloadEmail()">✉️ Email</button></div></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Username</th><th>Nama</th><th>Role</th><th>Dept</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="tblAkun"></tbody></table></div></div>`;const snap=await db.collection('hrd_users').get();let h='';snap.forEach(d=>{const p=d.data();h+=`<tr><td class="fw-700">${escHtml(d.id)}</td><td>${escHtml(p.nama)}</td><td><span class="badge badge-primary">${p.role}</span></td><td>${escHtml(p.departemen||'-')}</td><td><span class="badge badge-${p.status==='aktif'?'success':'danger'}">${p.status||'aktif'}</span></td><td><button class="btn btn-xs btn-info" onclick="modalAkun('${d.id}')">✏️</button></td></tr>`;});document.getElementById('tblAkun').innerHTML=h;}
+async function renderAkun(){if(!hasAccess(4))return document.getElementById('mainContent').innerHTML='<div class="card"><p>Akses ditolak.</p></div>';const main=document.getElementById('mainContent');const baseUrl = window.location.origin + window.location.pathname;main.innerHTML=`<div class="page-title"><span>👤 Manajemen Akun</span><button class="btn btn-primary btn-sm" onclick="modalAkun()">+ Tambah</button></div>
+  <!-- DATA PERUSAHAAN -->
+  <div class="card mb-16" id="companyDataCard">
+    <div class="card-title mb-16">🏢 Data Perusahaan</div>
+    <div class="fw-700 text-sm mb-8 color-primary">Informasi Perusahaan</div>
+    <div class="grid-2">
+      <div class="form-group"><label>Nama Perusahaan</label><input class="form-control" id="cpNama" placeholder="PT. IJEF Corp"></div>
+      <div class="form-group"><label>NPWP</label><input class="form-control" id="cpNpwp" placeholder="00.000.000.0-000.000"></div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group"><label>Alamat</label><input class="form-control" id="cpAlamat" placeholder="Jl. ..."></div>
+      <div class="form-group"><label>Kota</label><input class="form-control" id="cpKota"></div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group"><label>Telepon</label><input class="form-control" id="cpTelp"></div>
+      <div class="form-group"><label>Email</label><input class="form-control" id="cpEmail" type="email"></div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group"><label>Jumlah Karyawan</label><input class="form-control" id="cpJmlKaryawan" type="number" placeholder="50"></div>
+      <div class="form-group"><label>Tahun Berdiri</label><input class="form-control" id="cpTahunBerdiri" type="number" placeholder="2020"></div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group"><label>No. Izin Usaha (NIB)</label><input class="form-control" id="cpNIB" placeholder="No. NIB"></div>
+      <div class="form-group"><label>No. Izin Kemenkumham</label><input class="form-control" id="cpKemenkumham" placeholder="No. SK Kemenkumham"></div>
+    </div>
+    <div class="form-group"><label>Logo Perusahaan</label>
+      <div style="display:flex;align-items:center;gap:16px;margin-top:8px">
+        <div id="cpLogoPreview" style="width:64px;height:64px;border-radius:8px;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;background:#f8f9ff"><span style="font-size:1.5rem">🏛️</span></div>
+        <div>
+          <input type="file" id="cpLogoFile" accept="image/png,image/jpeg,image/webp" style="display:none" onchange="previewCompanyLogo(this)">
+          <button class="btn btn-primary btn-sm" onclick="document.getElementById('cpLogoFile').click()">📁 Upload Logo (JPG/PNG)</button>
+          <div class="text-xs mt-4" style="color:#999">Format: JPG/PNG/WebP. Akan digunakan sebagai ikon aplikasi IMS.</div>
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-primary mt-16" onclick="simpanDataPerusahaan()">💾 Simpan Data Perusahaan</button>
+  </div>
+  <div class="card mb-16"><div class="card-title">📲 Bagikan Aplikasi</div><p class="text-sm mb-16" style="color:#666">Bagikan link download aplikasi ke karyawan agar mereka dapat mengakses portal lewat browser atau PWA di Android, iOS, Windows, dan Mac.</p><div class="form-group"><label>Link Aplikasi</label><input class="form-control" readonly id="adminAppLink" value="${baseUrl}"></div><div class="flex gap-8"><button class="btn btn-primary btn-sm" onclick="copyDownloadLink()">📋 Salin Link</button><button class="btn btn-success btn-sm" onclick="shareDownloadWhatsApp()">💬 Share WA</button><button class="btn btn-info btn-sm" onclick="shareDownloadEmail()">✉️ Email</button></div></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Username</th><th>Nama</th><th>Role</th><th>Dept</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="tblAkun"></tbody></table></div></div>`;loadCompanyData();const snap=await db.collection('hrd_users').get();let h='';snap.forEach(d=>{const p=d.data();h+=`<tr><td class="fw-700">${escHtml(d.id)}</td><td>${escHtml(p.nama)}</td><td><span class="badge badge-primary">${p.role}</span></td><td>${escHtml(p.departemen||'-')}</td><td><span class="badge badge-${p.status==='aktif'?'success':'danger'}">${p.status||'aktif'}</span></td><td><button class="btn btn-xs btn-info" onclick="modalAkun('${d.id}')">✏️</button></td></tr>`;});document.getElementById('tblAkun').innerHTML=h;}
+
+// ── DATA PERUSAHAAN ───────────────────────────────────────────
+async function loadCompanyData(){
+  const doc=await db.collection('hrd_settings').doc('perusahaan').get();
+  if(!doc.exists)return;
+  const d=doc.data();
+  if(d.nama)document.getElementById('cpNama').value=d.nama;
+  if(d.npwp)document.getElementById('cpNpwp').value=d.npwp;
+  if(d.alamat)document.getElementById('cpAlamat').value=d.alamat;
+  if(d.kota)document.getElementById('cpKota').value=d.kota;
+  if(d.telepon)document.getElementById('cpTelp').value=d.telepon;
+  if(d.email)document.getElementById('cpEmail').value=d.email;
+  if(d.jumlahKaryawan)document.getElementById('cpJmlKaryawan').value=d.jumlahKaryawan;
+  if(d.tahunBerdiri)document.getElementById('cpTahunBerdiri').value=d.tahunBerdiri;
+  if(d.nib)document.getElementById('cpNIB').value=d.nib;
+  if(d.kemenkumham)document.getElementById('cpKemenkumham').value=d.kemenkumham;
+  if(d.logo){
+    document.getElementById('cpLogoPreview').innerHTML=`<img src="${d.logo}" style="width:100%;height:100%;object-fit:contain">`;
+    window._companyLogo=d.logo;
+  }
+}
+
+function previewCompanyLogo(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    // Resize to max 128x128 for storage efficiency
+    const img=new Image();
+    img.onload=()=>{
+      const canvas=document.createElement('canvas');
+      const size=128;
+      canvas.width=size;canvas.height=size;
+      const ctx=canvas.getContext('2d');
+      const scale=Math.min(size/img.width,size/img.height);
+      const w=img.width*scale,h=img.height*scale;
+      ctx.drawImage(img,(size-w)/2,(size-h)/2,w,h);
+      window._companyLogo=canvas.toDataURL('image/png',0.9);
+      document.getElementById('cpLogoPreview').innerHTML=`<img src="${window._companyLogo}" style="width:100%;height:100%;object-fit:contain">`;
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function simpanDataPerusahaan(){
+  const data={
+    nama:document.getElementById('cpNama').value,
+    npwp:document.getElementById('cpNpwp').value,
+    alamat:document.getElementById('cpAlamat').value,
+    kota:document.getElementById('cpKota').value,
+    telepon:document.getElementById('cpTelp').value,
+    email:document.getElementById('cpEmail').value,
+    jumlahKaryawan:Number(document.getElementById('cpJmlKaryawan').value)||0,
+    tahunBerdiri:Number(document.getElementById('cpTahunBerdiri').value)||0,
+    nib:document.getElementById('cpNIB').value,
+    kemenkumham:document.getElementById('cpKemenkumham').value,
+    logo:window._companyLogo||'',
+    updatedAt:new Date().toISOString()
+  };
+  await db.collection('hrd_settings').doc('perusahaan').set(data,{merge:true});
+  // Update PWA manifest icon if logo exists
+  if(data.logo) updateAppIcon(data.logo);
+  toast('Data perusahaan disimpan','success');
+}
+
+function updateAppIcon(logoDataUrl){
+  // Update favicon
+  let link=document.querySelector("link[rel*='icon']");
+  if(!link){link=document.createElement('link');link.rel='icon';document.head.appendChild(link);}
+  link.href=logoDataUrl;
+  // Store for PWA usage
+  localStorage.setItem('ims_company_logo',logoDataUrl);
+}
+
+// Load company logo on app start for branding
+function loadCompanyBranding(){
+  const logo=localStorage.getItem('ims_company_logo');
+  if(logo){
+    updateAppIcon(logo);
+    // Update sidebar logo
+    const logoEl=document.querySelector('.logo');
+    if(logoEl)logoEl.innerHTML=`<img src="${logo}" style="width:28px;height:28px;border-radius:4px;object-fit:contain;margin-right:8px"><span>IMS</span>`;
+  }
+}
 function modalAkun(id){if(id)db.collection('hrd_users').doc(id).get().then(d=>showAkunForm(id,d.data()||{}));else showAkunForm(null,{});}
 async function showAkunForm(id,p){
   // Load karyawan list for linking

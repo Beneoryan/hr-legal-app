@@ -1,7 +1,7 @@
 {
-  "name": "HRD & Legal IJEF Corp",
-  "short_name": "HRD IJEF",
-  "description": "Sistem HRD & Legal LPK IJEF Corp — Absensi, Cuti, Penggajian, dan lainnya",
+  "name": "IMS - IJEF Management System",
+  "short_name": "IMS",
+  "description": "IJEF Management System — Absensi, Penggajian, Meeting Online, dan lainnya",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
@@ -10,13 +10,13 @@
   "categories": ["business", "productivity"],
   "icons": [
     {
-      "src": "https://ui-avatars.com/api/?name=HRD+IJEF&background=1a237e&color=fff&size=192&format=png",
+      "src": "https://ui-avatars.com/api/?name=IMS&background=1a237e&color=fff&size=192&format=png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "https://ui-avatars.com/api/?name=HRD+IJEF&background=1a237e&color=fff&size=512&format=png",
+      "src": "https://ui-avatars.com/api/?name=IMS&background=1a237e&color=fff&size=512&format=png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
