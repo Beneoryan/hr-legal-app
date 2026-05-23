@@ -1422,7 +1422,7 @@ function joinOnlineMeeting(roomId,mode){
     window._currentMeetingRoom=roomId;
     openModal(`<div class="modal-title">🎥 Meeting Online</div>
       <div style="margin-bottom:8px" class="flex gap-8">
-        <button class="btn btn-sm btn-info" onclick="window.open(window._currentMeetingUrl,'_blank')">↗️ Buka di Tab Baru</button>
+        <button class="btn btn-sm btn-info" onclick="window.open(window._currentMeetingUrl,'_blank');closeModalDirect();">↗️ Buka di Tab Baru</button>
         <button class="btn btn-sm btn-outline" onclick="copyMeetingLink(window._currentMeetingRoom)">📋 Salin Link</button>
         <button class="btn btn-sm btn-warning" onclick="shareMeetingWA(window._currentMeetingRoom,'Meeting')">💬 Share WA</button>
       </div>

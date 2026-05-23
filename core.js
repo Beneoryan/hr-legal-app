@@ -104,14 +104,14 @@ function renderApp() {
   const isKaryawan = currentUser.role === 'karyawan';
   document.getElementById('app').innerHTML = `
   <div class="sidebar" id="sidebar">
-    <div class="logo">🏛️ <span>IJEF Corp HRD</span></div>
+    <div class="logo">🏛️ <span>IMS (IJEF Management System)</span></div>
     <nav>${buildNavItems(isKaryawan)}</nav>
     <div style="padding:16px 20px;border-top:1px solid rgba(255,255,255,.1)"><div style="font-size:.75rem;color:rgba(255,255,255,.5)">v5.0 — ${currentUser.nama}</div></div>
   </div>
   <div class="header">
     <button class="menu-btn" onclick="toggleSidebar()">☰</button>
     <div class="home-btn" onclick="navigateTo('${isKaryawan?'portal':'dashboard'}')" title="Beranda" style="cursor:pointer;font-size:1.3rem;margin-right:8px">🏠</div>
-    <div class="title">${isKaryawan?'Portal Karyawan IJEF':'HRD & Legal IJEF Corp'}</div>
+    <div class="title">${isKaryawan?'IMS Karyawan':'IMS (IJEF Management System)'}</div>
     <div class="notif-badge" onclick="navigateTo('notifikasi')" title="Notifikasi">🔔<span class="count" id="notifCount" style="display:none">0</span></div>
     <div class="user-info">
       <div class="avatar">${currentUser.nama.charAt(0)}</div>
