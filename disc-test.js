@@ -317,6 +317,21 @@ async function saveResult(r){
 }
 
 function renderResult(r){
+  // Calon karyawan: jangan tampilkan hasil, hanya ucapan terima kasih
+  if(testState.mode==='calon'){
+    document.getElementById('app').innerHTML=`
+    <div style="max-width:600px;margin:60px auto;text-align:center">
+      <div style="background:#fff;border-radius:16px;padding:40px 30px;box-shadow:0 4px 20px rgba(0,0,0,.1)">
+        <div style="font-size:3rem;margin-bottom:16px">✅</div>
+        <h2 style="color:var(--primary);margin-bottom:12px">TERIMA KASIH</h2>
+        <p style="font-size:1rem;color:var(--text);line-height:1.8;margin-bottom:24px">Tes DISC Anda telah selesai dan tersimpan.<br><br><strong style="color:var(--primary);font-size:1.1rem">SEGERA HUBUNGI PIC UNTUK MENGETAHUI HASIL TEST ANDA</strong></p>
+        <p style="font-size:.85rem;color:var(--text-light);margin-bottom:24px">Hasil tes akan dievaluasi oleh tim HR IJEF Corp dan akan diinformasikan melalui kontak yang Anda berikan.</p>
+        <button onclick="startMode('calon')" style="padding:12px 28px;border:none;background:var(--primary);color:#fff;border-radius:8px;font-size:.9rem;font-weight:600;cursor:pointer">🔄 Tes Baru</button>
+      </div>
+      <p style="margin-top:20px;font-size:.72rem;color:#999">© 2026 LPK IJEF Corp — HR Assessment System</p>
+    </div>`;
+    return;
+  }
   const{s1,s2,s3,pattern,profile,desc,rawP,rawK}=r;
   function buildLineGraph(data,title,subtitle){
     const vals=['D','I','S','C'].map(t=>data[t]||0);const h=160;
