@@ -44,7 +44,7 @@ async function initApp() {
   }
   await seedDefaultAccounts();
   const saved = localStorage.getItem('hrd_session');
-  if (saved) { try { currentUser = JSON.parse(saved); renderApp(); } catch(e) { renderLogin(); } }
+  if (saved) { try { currentUser = JSON.parse(saved); currentPage = currentUser.role === 'karyawan' ? 'portal' : 'dashboard'; renderApp(); } catch(e) { renderLogin(); } }
   else renderLogin();
 }
 
@@ -130,7 +130,7 @@ function renderApp() {
 function buildNavItems(isKaryawan) {
   if (isKaryawan) {
     let nav='';
-    nav+=navGroup('Utama',[['portal','🏠','Beranda'],['portal-absensi','📍','Absensi'],['portal-cuti','🏖️','Cuti & Izin']]);
+    nav+=navGroup('Utama',[['portal','🏠','Beranda'],['portal-absensi','📍','Absensi'],['portal-cuti','🏖️','Cuti & Izin'],['portal-overtime','⏰','Overtime']]);
     nav+=navGroup('Keuangan',[['portal-gaji','💰','Slip Gaji'],['portal-reimburse','🧾','Reimburse'],['portal-kasbon','💳','Kasbon & Loan']]);
     nav+=navGroup('Pekerjaan',[['portal-jobdesk','📋','Jobdesk'],['portal-disc','🧠','DISC Test'],['portal-kpi','📈','KPI Saya']]);
     nav+=navGroup('Organisasi',[['portal-struktur','🌳','Struktur Org'],['portal-libur','📅','Hari Libur'],['portal-peraturan','📜','Peraturan']]);
@@ -182,7 +182,7 @@ function navigateTo(page) {
     'portal-disc':renderPortalDisc,'portal-reimburse':renderPortalReimburse,'portal-kasbon':renderPortalKasbon,
     'portal-kpi':renderPortalKPI,'portal-struktur':renderStrukturOrg,'portal-libur':renderHariLibur,
     'portal-pengumuman':renderPortalPengumuman,'portal-broadcast':renderPortalBroadcast,
-    'portal-meeting':renderPortalMeeting,'portal-invite':renderPortalInvite,
+    'portal-meeting':renderPortalMeeting,'portal-invite':renderPortalInvite,'portal-overtime':renderPortalOvertime,
     'portal-setting':renderPortalSetting,'portal-share':renderPortalShare,
   };
   const fn=routes[page];
@@ -295,6 +295,7 @@ function listenNotifications(){
 // ── NOTIFICATION SOUND — Loud & Clear ─────────────────────────
 let _notifSoundCooldown=false;
 let _notifAudioCtx=null;
+let _audioUnlocked=false;
 function getAudioContext(){
   if(!_notifAudioCtx||_notifAudioCtx.state==='closed'){
     const AudioCtx=window.AudioContext||window.webkitAudioContext;
@@ -303,18 +304,32 @@ function getAudioContext(){
   if(_notifAudioCtx.state==='suspended') _notifAudioCtx.resume();
   return _notifAudioCtx;
 }
+function unlockAudio(){
+  if(_audioUnlocked)return;
+  try{
+    const ctx=getAudioContext();
+    // Play silent buffer to unlock audio on mobile
+    const buf=ctx.createBuffer(1,1,22050);
+    const src=ctx.createBufferSource();
+    src.buffer=buf;src.connect(ctx.destination);src.start(0);
+    _audioUnlocked=true;
+  }catch(e){}
+}
 function playNotificationSound(){
   if(_notifSoundCooldown)return;
   _notifSoundCooldown=true;
   setTimeout(()=>{_notifSoundCooldown=false;},3000);
+  // Vibrate on mobile (fallback if audio fails)
+  if(navigator.vibrate) navigator.vibrate([200,100,200,100,300]);
   try{
     const ctx=getAudioContext();
+    if(ctx.state==='suspended'){ctx.resume();}
     const playTone=(freq,startTime,duration,vol)=>{
       const osc=ctx.createOscillator();
       const gain=ctx.createGain();
       osc.connect(gain);
       gain.connect(ctx.destination);
-      osc.type='square'; // square wave = louder & more piercing
+      osc.type='square';
       osc.frequency.setValueAtTime(freq,ctx.currentTime+startTime);
       gain.gain.setValueAtTime(vol||1.0,ctx.currentTime+startTime);
       gain.gain.setValueAtTime(vol||1.0,ctx.currentTime+startTime+duration*0.7);
@@ -322,22 +337,21 @@ function playNotificationSound(){
       osc.start(ctx.currentTime+startTime);
       osc.stop(ctx.currentTime+startTime+duration);
     };
-    // Loud 3-tone chime x3 (very attention-grabbing)
-    playTone(880,0,0.12,1.0);      // A5
-    playTone(1109,0.12,0.12,1.0);  // C#6
-    playTone(1319,0.24,0.25,1.0);  // E6
-    // Repeat louder
+    // Loud 3-tone chime x3
+    playTone(880,0,0.12,1.0);
+    playTone(1109,0.12,0.12,1.0);
+    playTone(1319,0.24,0.25,1.0);
     playTone(880,0.55,0.12,1.0);
     playTone(1109,0.67,0.12,1.0);
     playTone(1319,0.79,0.25,1.0);
-    // Third time
     playTone(1319,1.1,0.12,1.0);
-    playTone(1568,1.22,0.3,1.0);   // G6 - highest
+    playTone(1568,1.22,0.3,1.0);
   }catch(e){console.warn('Notification sound failed:',e);}
 }
-// Activate audio context on first user interaction (required by browsers)
-document.addEventListener('click',function _initAudio(){getAudioContext();document.removeEventListener('click',_initAudio);},{once:true});
-document.addEventListener('touchstart',function _initAudio2(){getAudioContext();document.removeEventListener('touchstart',_initAudio2);},{once:true});
+// Unlock audio on ANY user interaction (critical for mobile)
+['click','touchstart','touchend','keydown'].forEach(evt=>{
+  document.addEventListener(evt,unlockAudio,{once:false,passive:true});
+});
 
 async function updateNotifBadge(){
   const[s1,s2]=await Promise.all([

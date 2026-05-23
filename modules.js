@@ -1010,12 +1010,30 @@ async function processImportPenggajianFromText(text){
 }
 
 async function processImportPenggajian(){const file=document.getElementById('importGajiFile')?.files?.[0];if(!file)return toast('Pilih file CSV','warning');const text=await file.text();await processImportPenggajianFromText(text);}
-function lihatSlip(id){db.collection('hrd_penggajian').doc(id).get().then(d=>{const p=d.data();const bruto=(p.gajiPokok||0)+(p.tunjangan||0)+(p.insentif||0)+(p.bonus||0)+(p.reimbursement||0);const totPot=(p.bpjsKesehatan||0)+(p.bpjsTK||0)+(p.potongan||0)+(p.kasbon||0);openModal(`<div class="modal-title">📄 Slip Gaji — ${escHtml(p.nama)}</div><div style="text-align:center;padding:12px;border:2px solid var(--primary);border-radius:8px;margin-bottom:16px"><div class="fw-700 color-primary" style="font-size:1.1rem">LPK IJEF CORP</div><div class="text-xs">Slip Gaji Periode: ${p.periode}</div></div>
+function lihatSlip(id){db.collection('hrd_penggajian').doc(id).get().then(d=>{const p=d.data();
+  const bruto=(p.gajiPokok||0)+(p.tunjangan||0)+(p.tunjCuti||0)+(p.insentif||0)+(p.bonus||0)+(p.reimbursement||0)+(p.lembur||0);
+  const totPot=(p.bpjsKesehatan||0)+(p.bpjsTK||0)+(p.potongan||0)+(p.kasbon||0)+(p.pph21||0);
+  openModal(`<div id="slipGajiPrint">
+    <div style="text-align:center;padding:16px;border:2px solid var(--primary);border-radius:8px;margin-bottom:16px"><div class="fw-700 color-primary" style="font-size:1.2rem">LPK IJEF CORP</div><div class="text-xs">Slip Gaji Periode: ${p.periode}</div><div class="text-xs" style="color:#999">${p.periodeStart?`(${p.periodeStart} s/d ${p.periodeEnd})`:''}</div></div>
+    <div style="background:#f8f9ff;padding:12px;border-radius:8px;margin-bottom:16px"><div class="grid-2" style="font-size:.82rem"><div><b>Nama:</b> ${escHtml(p.nama)}</div><div><b>Periode:</b> ${p.periode}</div></div></div>
+    ${p.hariKerja?`<div style="background:#e8f5e9;padding:12px;border-radius:8px;margin-bottom:16px;border-left:4px solid var(--success)"><div class="fw-700 text-sm mb-8">📍 Detail Kehadiran</div><div class="grid-2" style="font-size:.82rem"><div>Hari Kerja: <b>${p.hariKerja} hari</b></div><div>Hadir: <b>${p.kehadiran||0} hari</b></div><div>Cuti: <b>${p.cutiHari||0} hari</b></div><div>Tidak Hadir: <b style="color:var(--danger)">${p.tidakHadir||0} hari</b></div><div>Lembur: <b style="color:#7b1fa2">${p.lemburJam||0} jam</b></div><div></div></div></div>`:''}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-    <div><div class="fw-700 text-sm color-primary mb-8">💰 Pendapatan</div><table style="width:100%;font-size:.82rem"><tr><td>Gaji Pokok</td><td style="text-align:right">${formatCurrency(p.gajiPokok)}</td></tr>${p.tunjJabatan?`<tr><td>Tunj. Jabatan</td><td style="text-align:right">${formatCurrency(p.tunjJabatan)}</td></tr>`:''}${p.tunjTransport?`<tr><td>Tunj. Transport</td><td style="text-align:right">${formatCurrency(p.tunjTransport)}</td></tr>`:''}${p.tunjMakan?`<tr><td>Tunj. Makan</td><td style="text-align:right">${formatCurrency(p.tunjMakan)}</td></tr>`:''}${p.tunjKomunikasi?`<tr><td>Tunj. Komunikasi</td><td style="text-align:right">${formatCurrency(p.tunjKomunikasi)}</td></tr>`:''}${p.lembur?`<tr><td>Lembur</td><td style="text-align:right">${formatCurrency(p.lembur)}</td></tr>`:''}${p.insentif?`<tr><td>Insentif Kinerja</td><td style="text-align:right">${formatCurrency(p.insentif)}</td></tr>`:''}${p.bonus?`<tr><td>Bonus</td><td style="text-align:right">${formatCurrency(p.bonus)}</td></tr>`:''}${p.reimbursement?`<tr><td>Reimbursement</td><td style="text-align:right">${formatCurrency(p.reimbursement)}</td></tr>`:''}${p.tunjLain?`<tr><td>Tunjangan Lain</td><td style="text-align:right">${formatCurrency(p.tunjLain)}</td></tr>`:''}<tr style="border-top:2px solid var(--primary);font-weight:700"><td>Total Bruto</td><td style="text-align:right">${formatCurrency(bruto)}</td></tr></table></div>
-    <div><div class="fw-700 text-sm color-danger mb-8">📉 Potongan</div><table style="width:100%;font-size:.82rem">${p.bpjsKesehatan?`<tr><td>BPJS Kesehatan</td><td style="text-align:right;color:var(--danger)">-${formatCurrency(p.bpjsKesehatan)}</td></tr>`:''}${p.bpjsTK?`<tr><td>BPJS TK</td><td style="text-align:right;color:var(--danger)">-${formatCurrency(p.bpjsTK)}</td></tr>`:''}${p.kasbon?`<tr><td>Kasbon/Loan</td><td style="text-align:right;color:var(--danger)">-${formatCurrency(p.kasbon)}</td></tr>`:''}${p.potongan?`<tr><td>Potongan Lain</td><td style="text-align:right;color:var(--danger)">-${formatCurrency(p.potongan)}</td></tr>`:''}<tr><td>PPH 21</td><td style="text-align:right;color:var(--danger)">-${formatCurrency(p.pph21)}</td></tr><tr style="border-top:2px solid var(--danger);font-weight:700"><td>Total Potongan</td><td style="text-align:right;color:var(--danger)">-${formatCurrency(totPot+(p.pph21||0))}</td></tr></table></div></div>
+    <div><div class="fw-700 text-sm color-primary mb-8">💰 Pendapatan</div><table style="width:100%;font-size:.82rem"><tr><td>Gaji Pokok</td><td style="text-align:right">${formatCurrency(p.gajiPokok)}</td></tr><tr><td>Tunjangan</td><td style="text-align:right">${formatCurrency(p.tunjangan)}</td></tr>${p.tunjCuti?`<tr><td>Tunj. Cuti (1/12)</td><td style="text-align:right">${formatCurrency(p.tunjCuti)}</td></tr>`:''}${p.lembur?`<tr><td>Lembur (${p.lemburJam||0} jam)</td><td style="text-align:right">${formatCurrency(p.lembur)}</td></tr>`:''}${p.insentif?`<tr><td>Insentif</td><td style="text-align:right">${formatCurrency(p.insentif)}</td></tr>`:''}${p.bonus?`<tr><td>Bonus</td><td style="text-align:right">${formatCurrency(p.bonus)}</td></tr>`:''}${p.reimbursement?`<tr><td>Reimbursement</td><td style="text-align:right">${formatCurrency(p.reimbursement)}</td></tr>`:''}<tr style="border-top:2px solid var(--primary);font-weight:700"><td>Total Bruto</td><td style="text-align:right">${formatCurrency(bruto)}</td></tr></table></div>
+    <div><div class="fw-700 text-sm color-danger mb-8">📉 Potongan</div><table style="width:100%;font-size:.82rem">${p.potongan?`<tr><td>Pot. Absen (${p.tidakHadir||0} hari)</td><td style="text-align:right;color:var(--danger)">-${formatCurrency(p.potongan)}</td></tr>`:''}<tr><td>BPJS Kesehatan (1%)</td><td style="text-align:right;color:var(--danger)">-${formatCurrency(p.bpjsKesehatan)}</td></tr><tr><td>BPJS TK (2%)</td><td style="text-align:right;color:var(--danger)">-${formatCurrency(p.bpjsTK)}</td></tr>${p.kasbon?`<tr><td>Kasbon/Loan</td><td style="text-align:right;color:var(--danger)">-${formatCurrency(p.kasbon)}</td></tr>`:''}<tr><td>PPH 21</td><td style="text-align:right;color:var(--danger)">-${formatCurrency(p.pph21)}</td></tr><tr style="border-top:2px solid var(--danger);font-weight:700"><td>Total Potongan</td><td style="text-align:right;color:var(--danger)">-${formatCurrency(totPot)}</td></tr></table></div></div>
     <div style="background:var(--primary);color:#fff;padding:16px;border-radius:8px;text-align:center"><div style="font-size:.8rem;opacity:.8">TAKE HOME PAY</div><div style="font-size:1.5rem;font-weight:700">${formatCurrency(p.totalBersih)}</div></div>
-    <div class="mt-16 text-center"><button class="btn btn-outline btn-sm" onclick="window.print()">🖨️ Cetak</button></div>`);});}
+    ${p.hariKerja?`<div class="mt-16" style="background:#fff3e0;padding:10px;border-radius:6px;font-size:.72rem;line-height:1.6"><b>Dasar Perhitungan:</b><br>• Gaji/hari: ${formatCurrency(Math.round((p.gajiPokok||0)/(p.hariKerja||22)))} (${p.gajiPokok?formatCurrency(p.gajiPokok):'-'} ÷ ${p.hariKerja} hari)<br>• Lembur: 1.5x jam pertama + 2x jam berikutnya (UU Cipta Kerja)<br>• PPH21: Tarif progresif UU HPP 2022 (PTKP TK/0 = Rp 54.000.000)<br>• Periode: Tgl 20 bulan lalu s/d Tgl 20 bulan ini</div>`:''}</div>
+    <div class="mt-16 flex gap-8" style="justify-content:center"><button class="btn btn-primary btn-sm" onclick="cetakSlipPDF()">📄 Cetak / Save PDF</button><button class="btn btn-outline btn-sm" onclick="window.print()">🖨️ Print</button></div>`,true);});}
+
+function cetakSlipPDF(){
+  const content=document.getElementById('slipGajiPrint');
+  if(!content)return;
+  const win=window.open('','_blank');
+  win.document.write('<html><head><title>Slip Gaji</title><style>body{font-family:Arial,sans-serif;padding:20px;font-size:12px}table{border-collapse:collapse;width:100%}td{padding:4px 8px}.fw-700{font-weight:700}.color-primary{color:#1a237e}.color-danger{color:#d32f2f}.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}.text-sm{font-size:11px}.text-xs{font-size:10px}.mb-8{margin-bottom:8px}.mt-16{margin-top:16px}</style></head><body>');
+  win.document.write(content.innerHTML);
+  win.document.write('</body></html>');
+  win.document.close();
+  setTimeout(()=>{win.print();},500);
+}
 
 function editGaji(id){db.collection('hrd_penggajian').doc(id).get().then(d=>{const p=d.data();openModal(`<div class="modal-title">✏️ Edit Slip Gaji — ${escHtml(p.nama)}</div><div class="grid-2"><div class="form-group"><label>Karyawan</label><input class="form-control" id="egNama" value="${escHtml(p.nama||'')}"></div><div class="form-group"><label>Periode</label><input class="form-control" type="month" id="egPeriode" value="${p.periode||''}"></div></div><div class="grid-2"><div class="form-group"><label>Gaji Pokok</label><input class="form-control" type="number" id="egPokok" value="${p.gajiPokok||0}"></div><div class="form-group"><label>Tunjangan</label><input class="form-control" type="number" id="egTunjangan" value="${p.tunjangan||0}"></div></div><div class="grid-2"><div class="form-group"><label>Potongan</label><input class="form-control" type="number" id="egPotongan" value="${p.potongan||0}"></div><div class="form-group"><label>PPH21</label><input class="form-control" type="number" id="egPPH" value="${p.pph21||0}"></div></div><div class="form-group"><label>Total Bersih</label><input class="form-control" type="number" id="egTotal" value="${p.totalBersih||0}"></div><div class="flex gap-8 mt-16"><button class="btn btn-primary" onclick="updateGaji('${id}')">💾 Simpan</button><button class="btn btn-danger" onclick="hapusDoc('hrd_penggajian','${id}','penggajian')">🗑️ Hapus</button></div>`,true);});}
 async function updateGaji(id){const data={nama:document.getElementById('egNama').value,periode:document.getElementById('egPeriode').value,gajiPokok:Number(document.getElementById('egPokok').value)||0,tunjangan:Number(document.getElementById('egTunjangan').value)||0,potongan:Number(document.getElementById('egPotongan').value)||0,pph21:Number(document.getElementById('egPPH').value)||0,totalBersih:Number(document.getElementById('egTotal').value)||0,updatedAt:new Date().toISOString()};await db.collection('hrd_penggajian').doc(id).update(data);closeModalDirect();toast('Slip gaji diupdate','success');renderPenggajian();}
@@ -1346,17 +1364,42 @@ async function rsvpInvite(inviteId, meetingId, status) {
 async function renderChat() {
   const main = document.getElementById('mainContent');
   main.innerHTML = `
-    <div class="page-title"><span>💬 Obrolan</span><div class="flex gap-8"><button class="btn btn-primary btn-sm" onclick="modalNewChat()">+ Chat Personal</button><button class="btn btn-info btn-sm" onclick="modalGroupChat()">👥 Group Departemen</button><button class="btn btn-danger btn-sm" onclick="hapusSemuaChat()">🗑️ Hapus Semua</button></div></div>
-    <div class="grid-2">
-      <div class="card">
+    <div class="page-title"><span>💬 Obrolan</span><div class="flex gap-8"><button class="btn btn-primary btn-sm" onclick="modalNewChat()">+ Chat</button><button class="btn btn-info btn-sm" onclick="modalGroupChat()">👥 Group</button><button class="btn btn-danger btn-sm" onclick="hapusSemuaChat()">🗑️</button></div></div>
+    <div class="chat-layout">
+      <div class="card chat-sidebar-panel" id="chatSidebarPanel">
         <div class="card-title mb-8">📤 Percakapan</div>
-        <div id="chatThreadList" style="max-height:500px;overflow-y:auto">Loading...</div>
+        <div id="chatThreadList" style="max-height:calc(100vh - 250px);overflow-y:auto">Loading...</div>
       </div>
-      <div class="card" id="chatArea">
+      <div class="card chat-main-panel" id="chatArea" style="display:none">
+        <div style="padding:8px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+          <button class="btn btn-xs btn-outline chat-back-btn" onclick="showChatList()" style="display:none">← Kembali</button>
+          <span class="fw-700 text-sm" id="chatPartnerName">Pilih percakapan</span>
+        </div>
         <div class="empty-state"><div class="icon">💬</div><p>Pilih percakapan atau mulai obrolan baru</p></div>
       </div>
     </div>`;
+  // Add responsive chat layout styles
+  const style=document.createElement('style');
+  style.id='chatLayoutStyle';
+  style.textContent=`.chat-layout{display:grid;grid-template-columns:300px 1fr;gap:16px;min-height:500px}
+    .chat-back-btn{display:none!important}
+    @media(max-width:768px){
+      .chat-layout{grid-template-columns:1fr;gap:0}
+      .chat-main-panel{display:none}
+      .chat-layout.chat-open .chat-sidebar-panel{display:none}
+      .chat-layout.chat-open .chat-main-panel{display:block!important}
+      .chat-layout.chat-open .chat-back-btn{display:inline-flex!important}
+    }`;
+  if(!document.getElementById('chatLayoutStyle'))document.head.appendChild(style);
   loadChatThreads();
+}
+
+function showChatList(){
+  document.querySelector('.chat-layout')?.classList.remove('chat-open');
+  const area=document.getElementById('chatArea');
+  if(area)area.style.display='none';
+  const panel=document.getElementById('chatSidebarPanel');
+  if(panel)panel.style.display='block';
 }
 
 async function hapusSemuaChat(){
@@ -1364,7 +1407,6 @@ async function hapusSemuaChat(){
   const snap=await db.collection('hrd_chat_threads').where('participants','array-contains',currentUser.id).get();
   const batch=db.batch();
   for(const d of snap.docs){
-    // Delete messages in thread
     const msgSnap=await db.collection('hrd_chat_messages').where('threadId','==',d.id).get();
     msgSnap.forEach(m=>batch.delete(m.ref));
     batch.delete(d.ref);
@@ -1379,8 +1421,7 @@ async function hapusChatThread(threadId){
   msgSnap.forEach(m=>batch.delete(m.ref));
   batch.delete(db.collection('hrd_chat_threads').doc(threadId));
   await batch.commit();
-  toast('Percakapan dihapus','success');loadChatThreads();
-  document.getElementById('chatArea').innerHTML='<div class="empty-state"><div class="icon">💬</div><p>Pilih percakapan</p></div>';
+  toast('Percakapan dihapus','success');loadChatThreads();showChatList();
 }
 
 async function loadChatThreads() {
@@ -1529,42 +1570,66 @@ async function sendGroupChat(){
 }
 
 function openChatThread(threadId) {
+  // Show chat area (mobile: switch view)
+  const layout=document.querySelector('.chat-layout');
+  if(layout)layout.classList.add('chat-open');
   const area = document.getElementById('chatArea');
-  area.innerHTML = `<div class="chat-container">
-    <div class="chat-messages" id="chatMsgs"></div>
-    <div class="chat-input">
-      <input class="form-control" id="chatInput" placeholder="Ketik pesan..." onkeydown="if(event.key==='Enter')kirimChatMsg('${threadId}')">
-      <button class="btn btn-primary btn-sm" onclick="kirimChatMsg('${threadId}')">Kirim</button>
-    </div>
-  </div>`;
+  area.style.display='block';
 
-  // Mark as read
-  db.collection('hrd_chat_threads').doc(threadId).get().then(d => {
-    const data = d.data();
-    if (data && data.unreadBy === currentUser.id) {
-      db.collection('hrd_chat_threads').doc(threadId).update({unreadBy: ''});
+  // Get partner name
+  db.collection('hrd_chat_threads').doc(threadId).get().then(d=>{
+    const data=d.data();
+    const partnerName=data.fromUser===currentUser.id?data.toName:data.fromName;
+    const nameEl=document.getElementById('chatPartnerName');
+    if(nameEl)nameEl.textContent=partnerName||'Chat';
+  });
+
+  area.innerHTML = `
+    <div style="padding:8px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+      <button class="btn btn-xs btn-outline chat-back-btn" onclick="showChatList()">← Kembali</button>
+      <span class="fw-700 text-sm" id="chatPartnerName">...</span>
+      <button class="btn btn-xs btn-danger" onclick="hapusChatThread('${threadId}')" style="margin-left:auto" title="Hapus">🗑️</button>
+    </div>
+    <div class="chat-container">
+      <div class="chat-messages" id="chatMsgs"></div>
+      <div class="chat-input">
+        <input class="form-control" id="chatInput" placeholder="Ketik pesan..." onkeydown="if(event.key==='Enter')kirimChatMsg('${threadId}')">
+        <button class="btn btn-primary" onclick="kirimChatMsg('${threadId}')">➤</button>
+      </div>
+    </div>`;
+
+  // Update partner name
+  db.collection('hrd_chat_threads').doc(threadId).get().then(d=>{
+    const data=d.data();
+    const partnerName=data.fromUser===currentUser.id?data.toName:data.fromName;
+    const nameEl=document.getElementById('chatPartnerName');
+    if(nameEl)nameEl.textContent='💬 '+partnerName;
+    if(data&&data.unreadBy===currentUser.id){
+      db.collection('hrd_chat_threads').doc(threadId).update({unreadBy:''});
     }
   });
 
   // Real-time messages
   const unsub = db.collection('hrd_chat_messages')
     .where('threadId', '==', threadId)
-    
     .onSnapshot(snap => {
+      const messages=[];
+      snap.forEach(d=>messages.push({id:d.id,...d.data()}));
+      messages.sort((a,b)=>(a.createdAt||'').localeCompare(b.createdAt||''));
       let html = '';
-      snap.forEach(d => {
-        const p = d.data();
+      messages.forEach(p => {
         const isMine = p.senderId === currentUser.id;
+        const time=p.createdAt?new Date(p.createdAt).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}):'';
         html += `<div class="chat-msg${isMine?' mine':''}">
           <div class="msg-avatar">${(p.senderName||'?').charAt(0)}</div>
           <div>
             <div class="msg-body">${escHtml(p.message)}</div>
-            <div class="msg-time">${escHtml(p.senderName)} • ${formatDateTime(p.createdAt)}</div>
+            <div class="msg-time">${isMine?'':escHtml(p.senderName)+' • '}${time}</div>
           </div>
         </div>`;
       });
       const msgs = document.getElementById('chatMsgs');
-      if (msgs) { msgs.innerHTML = html || '<div class="text-center text-sm" style="color:#999;padding:40px">Belum ada pesan</div>'; msgs.scrollTop = msgs.scrollHeight; }
+      if (msgs) { msgs.innerHTML = html || '<div class="text-center text-sm" style="color:#999;padding:40px">Belum ada pesan. Mulai obrolan!</div>'; msgs.scrollTop = msgs.scrollHeight; }
     });
   unsubscribers.push(unsub);
 }
@@ -2046,6 +2111,7 @@ async function renderPortal(){const main=document.getElementById('mainContent');
     <div class="flex flex-wrap gap-8">
       <button class="btn btn-primary btn-sm" onclick="navigateTo('portal-absensi')">📍 Absensi</button>
       <button class="btn btn-info btn-sm" onclick="navigateTo('portal-cuti')">🏖️ Ajukan Cuti</button>
+      <button class="btn btn-sm" style="background:#ff6f00;color:#fff" onclick="navigateTo('portal-overtime')">⏰ Overtime</button>
       <button class="btn btn-success btn-sm" onclick="navigateTo('portal-reimburse')">🧾 Reimburse</button>
       <button class="btn btn-warning btn-sm" onclick="navigateTo('portal-kasbon')">💳 Kasbon</button>
       <button class="btn btn-sm" style="background:#7b1fa2;color:#fff" onclick="navigateTo('portal-gaji')">💰 Slip Gaji</button>
@@ -2257,6 +2323,23 @@ function toggleAccordion(el){
   const isHidden=body.style.display==='none';
   body.style.display=isHidden?'block':'none';
 }
+
+// ── PORTAL OVERTIME ───────────────────────────────────────────
+async function renderPortalOvertime(){
+  const main=document.getElementById('mainContent');
+  main.innerHTML=`<div class="page-title"><span>⏰ Overtime Saya</span><button class="btn btn-primary btn-sm" onclick="modalOvertime()">+ Ajukan Overtime</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Jam</th><th>Durasi</th><th>Alasan</th><th>Status</th></tr></thead><tbody id="tblPortalOT"></tbody></table></div></div>`;
+  const snap=await db.collection('hrd_overtime').where('userId','==',currentUser.id).get();
+  const items=[];snap.forEach(d=>items.push({id:d.id,...d.data()}));
+  items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+  let h='';
+  if(!items.length)h='<tr><td colspan="5" class="text-center">Belum ada pengajuan overtime</td></tr>';
+  else items.forEach(p=>{
+    const badge=p.status==='approved'?'badge-success':p.status==='rejected'?'badge-danger':'badge-warning';
+    h+=`<tr><td>${formatDate(p.tanggal)}</td><td>${p.jamMulai||'-'} - ${p.jamSelesai||'-'}</td><td class="fw-700">${p.durasi||0} jam</td><td class="text-sm">${escHtml((p.alasan||'').substring(0,50))}</td><td><span class="badge ${badge}">${p.status}</span></td></tr>`;
+  });
+  document.getElementById('tblPortalOT').innerHTML=h;
+}
+
 function renderPortalAbsensi(){
   // For karyawan: use the same absensi page but portal-mode flag
   window._portalAbsensiMode=true;
@@ -2289,7 +2372,15 @@ async function renderPortalCuti(){
   else{const items=[];snap.forEach(d=>items.push({id:d.id,...d.data()}));items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));items.forEach(p=>{h+=`<tr><td>${escHtml(p.jenis)}</td><td>${formatDate(p.mulai)}-${formatDate(p.selesai)}</td><td>${p.durasi||1} hari</td><td><span class="badge badge-${p.status==='approved'?'success':p.status==='rejected'?'danger':'warning'}">${p.status}</span></td></tr>`;});}
   document.getElementById('tblPortalCuti').innerHTML=h;
 }
-async function renderPortalGaji(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>💰 Slip Gaji Saya</span></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Periode</th><th>Gaji Pokok</th><th>Total</th><th>Aksi</th></tr></thead><tbody id="tblPortalGaji"></tbody></table></div></div>`;const snap=await db.collection('hrd_penggajian').where('nama','==',currentUser.nama).get();let h='';if(snap.empty)h='<tr><td colspan="4" class="text-center">Belum ada</td></tr>';else snap.forEach(d=>{const p=d.data();h+=`<tr><td>${p.periode}</td><td>${formatCurrency(p.gajiPokok)}</td><td class="fw-700">${formatCurrency(p.totalBersih)}</td><td><button class="btn btn-xs btn-info" onclick="lihatSlip('${d.id}')">📄</button></td></tr>`;});document.getElementById('tblPortalGaji').innerHTML=h;}
+async function renderPortalGaji(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>💰 Slip Gaji Saya</span></div><div class="card"><div class="flex gap-8 mb-16"><input class="form-control" type="month" id="portalGajiBulan" value="${monthStr()}" onchange="loadPortalGaji()" style="max-width:160px"><button class="btn btn-sm btn-info" onclick="loadPortalGaji()">🔍 Cari</button></div><div class="table-wrap"><table><thead><tr><th>Periode</th><th>Gaji Pokok</th><th>Lembur</th><th>Potongan</th><th>THP</th><th>Aksi</th></tr></thead><tbody id="tblPortalGaji"></tbody></table></div></div>`;loadPortalGaji();}
+async function loadPortalGaji(){
+  const snap=await db.collection('hrd_penggajian').where('nama','==',currentUser.nama).get();
+  const items=[];snap.forEach(d=>items.push({id:d.id,...d.data()}));
+  items.sort((a,b)=>(b.periode||'').localeCompare(a.periode||''));
+  let h='';if(!items.length)h='<tr><td colspan="6" class="text-center">Belum ada slip gaji</td></tr>';
+  else items.forEach(p=>{const totPot=(p.bpjsKesehatan||0)+(p.bpjsTK||0)+(p.potongan||0)+(p.kasbon||0)+(p.pph21||0);h+=`<tr><td class="fw-700">${p.periode}</td><td>${formatCurrency(p.gajiPokok)}</td><td>${formatCurrency(p.lembur||0)}</td><td style="color:var(--danger)">${formatCurrency(totPot)}</td><td class="fw-700" style="color:var(--success)">${formatCurrency(p.totalBersih)}</td><td><button class="btn btn-xs btn-info" onclick="lihatSlip('${p.id}')">📄 View</button></td></tr>`;});
+  document.getElementById('tblPortalGaji').innerHTML=h;
+}
 function renderPortalJobdesk(){
   const main=document.getElementById('mainContent');
   main.innerHTML=`<div class="page-title"><span>📋 Jobdesk Saya</span></div><div class="card" id="jobdeskContent">Loading...</div>`;
