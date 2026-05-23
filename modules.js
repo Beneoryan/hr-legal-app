@@ -83,7 +83,10 @@ function showKaryForm(id,p){openModal(`<div class="modal-title">${id?'Edit':'Tam
     </div>
     <div style="border-bottom:2px solid var(--border);padding-bottom:14px;margin-bottom:14px"><div class="fw-700 color-primary mb-8">👤 Data Personal</div><div class="grid-2"><div class="form-group"><label>Nama Lengkap</label><input class="form-control" id="kNama" value="${escHtml(p.nama||'')}"></div><div class="form-group"><label>NIP</label><input class="form-control" id="kNip" value="${escHtml(p.nip||generateNIP())}"></div><div class="form-group"><label>NIK (KTP)</label><input class="form-control" id="kNIK" value="${escHtml(p.nik||'')}" placeholder="16 digit"></div><div class="form-group"><label>No. Kartu Keluarga</label><input class="form-control" id="kNoKK" value="${escHtml(p.noKK||'')}"></div><div class="form-group"><label>No. Passport</label><input class="form-control" id="kPassport" value="${escHtml(p.noPassport||'')}"></div><div class="form-group"><label>Jenis Kelamin</label><select class="form-control" id="kGender"><option value="">-- Pilih --</option><option value="Laki-laki" ${p.jenisKelamin==='Laki-laki'?'selected':''}>Laki-laki</option><option value="Perempuan" ${p.jenisKelamin==='Perempuan'?'selected':''}>Perempuan</option></select></div><div class="form-group"><label>Tanggal Lahir</label><input class="form-control" type="date" id="kTglLahir" value="${p.tanggalLahir||''}"></div><div class="form-group"><label>Tempat Lahir</label><input class="form-control" id="kTmptLahir" value="${escHtml(p.tempatLahir||'')}"></div><div class="form-group"><label>Email</label><input class="form-control" id="kEmail" value="${escHtml(p.email||'')}"></div><div class="form-group"><label>Telepon</label><input class="form-control" id="kTelp" value="${escHtml(p.telepon||'')}"></div></div><div class="form-group"><label>Alamat</label><textarea class="form-control" id="kAlamat" style="min-height:50px">${escHtml(p.alamat||'')}</textarea></div></div>
     <div style="border-bottom:2px solid var(--border);padding-bottom:14px;margin-bottom:14px"><div class="fw-700 color-primary mb-8">🏢 Office Detail</div><div class="grid-2"><div class="form-group"><label>Departemen</label><input class="form-control" id="kDept" value="${escHtml(p.departemen||'')}"></div><div class="form-group"><label>Posisi</label><input class="form-control" id="kPos" value="${escHtml(p.posisi||'')}"></div><div class="form-group"><label>Cabang</label><input class="form-control" id="kCabang" value="${escHtml(p.cabang||'')}"></div><div class="form-group"><label>Jadwal Kantor</label><input class="form-control" id="kJadwal" value="${escHtml(p.jadwalKantor||'')}" placeholder="Senin-Jumat 08:00-17:00"></div><div class="form-group"><label>Tipe Karyawan</label><select class="form-control" id="kTipeKary"><option value="tetap" ${p.tipeKaryawan==='tetap'?'selected':''}>Tetap</option><option value="kontrak" ${p.tipeKaryawan==='kontrak'?'selected':''}>Kontrak</option><option value="magang" ${p.tipeKaryawan==='magang'?'selected':''}>Magang</option><option value="freelance" ${p.tipeKaryawan==='freelance'?'selected':''}>Freelance</option></select></div><div class="form-group"><label>Tipe User</label><select class="form-control" id="kTipeUser"><option value="office" ${p.tipeUser==='office'?'selected':''}>Office</option><option value="field" ${p.tipeUser==='field'?'selected':''}>Field</option><option value="remote" ${p.tipeUser==='remote'?'selected':''}>Remote</option><option value="hybrid" ${p.tipeUser==='hybrid'?'selected':''}>Hybrid</option></select></div><div class="form-group"><label>Ruang Kerja</label><input class="form-control" id="kRuangKerja" value="${escHtml(p.ruangKerja||'')}" placeholder="Office, Lantai 2, dll"></div><div class="form-group"><label>Tgl Bergabung</label><input class="form-control" type="date" id="kJoin" value="${p.tanggalMasuk||''}"></div><div class="form-group"><label>Status</label><select class="form-control" id="kStatus"><option value="aktif" ${p.status==='aktif'?'selected':''}>Aktif</option><option value="nonaktif" ${p.status==='nonaktif'?'selected':''}>Nonaktif</option><option value="probation" ${p.status==='probation'?'selected':''}>Probation</option><option value="kontrak" ${p.status==='kontrak'?'selected':''}>Kontrak</option></select></div><div class="form-group"><label>Atasan</label><input class="form-control" id="kAtasan" value="${escHtml(p.atasan||'')}"></div></div></div>
-    <div style="border-bottom:2px solid var(--border);padding-bottom:14px;margin-bottom:14px"><div class="fw-700 color-primary mb-8">💳 Detail Rekening & BPJS</div><div class="grid-2"><div class="form-group"><label>Nama Bank / E-Wallet</label><input class="form-control" id="kBank" value="${escHtml(p.namaBank||'')}" placeholder="BCA, Mandiri, GoPay, dll"></div><div class="form-group"><label>No. Rekening / E-Wallet</label><input class="form-control" id="kNoRek" value="${escHtml(p.noRekening||'')}"></div><div class="form-group"><label>Tipe Rekening</label><select class="form-control" id="kTipeRek"><option value="salary" ${p.tipeRekening==='salary'?'selected':''}>Salary</option><option value="savings" ${p.tipeRekening==='savings'?'selected':''}>Savings</option><option value="ewallet" ${p.tipeRekening==='ewallet'?'selected':''}>E-Wallet</option></select></div><div class="form-group"><label>No. BPJS Kesehatan</label><input class="form-control" id="kBPJSKes" value="${escHtml(p.bpjsKesehatan||'')}"></div><div class="form-group"><label>No. BPJS Ketenagakerjaan</label><input class="form-control" id="kBPJSTK" value="${escHtml(p.bpjsKetenagakerjaan||'')}"></div><div class="form-group"><label>Gaji Pokok</label><input class="form-control" type="number" id="kGaji" value="${p.gajiPokok||0}"></div></div></div>
+    <div style="border-bottom:2px solid var(--border);padding-bottom:14px;margin-bottom:14px"><div class="fw-700 color-primary mb-8">💳 Detail Rekening & BPJS</div><div class="grid-2"><div class="form-group"><label>Nama Bank / E-Wallet</label><input class="form-control" id="kBank" value="${escHtml(p.namaBank||'')}" placeholder="BCA, Mandiri, GoPay, dll"></div><div class="form-group"><label>No. Rekening / E-Wallet</label><input class="form-control" id="kNoRek" value="${escHtml(p.noRekening||'')}"></div><div class="form-group"><label>Nama di Rekening</label><input class="form-control" id="kNamaRek" value="${escHtml(p.namaDiRekening||'')}"></div><div class="form-group"><label>Tipe Rekening</label><select class="form-control" id="kTipeRek"><option value="salary" ${p.tipeRekening==='salary'?'selected':''}>Salary</option><option value="savings" ${p.tipeRekening==='savings'?'selected':''}>Savings</option><option value="ewallet" ${p.tipeRekening==='ewallet'?'selected':''}>E-Wallet</option></select></div><div class="form-group"><label>No. BPJS TK</label><input class="form-control" id="kBPJSTK" value="${escHtml(p.bpjsKetenagakerjaan||'')}"></div><div class="form-group"><label>No. Asuransi</label><input class="form-control" id="kAsuransi" value="${escHtml(p.asuransi||'')}"></div><div class="form-group"><label>Gaji Pokok</label><input class="form-control" type="number" id="kGaji" value="${p.gajiPokok||0}"></div><div class="form-group"><label>Grade Jabatan</label><input class="form-control" id="kGrade" value="${escHtml(p.gradeJabatan||'')}" placeholder="BOD/HEAD/SENIOR HEAD/STAFF"></div></div></div>
+    <div style="border-bottom:2px solid var(--border);padding-bottom:14px;margin-bottom:14px"><div class="fw-700 color-primary mb-8">📚 Pendidikan & Pribadi</div><div class="grid-2"><div class="form-group"><label>Pendidikan Terakhir</label><select class="form-control" id="kPendidikan"><option value="">-- Pilih --</option><option ${p.pendidikan==='SD'?'selected':''}>SD</option><option ${p.pendidikan==='SMP'?'selected':''}>SMP</option><option ${p.pendidikan==='SMA'?'selected':''}>SMA</option><option ${p.pendidikan==='SMK'?'selected':''}>SMK</option><option ${p.pendidikan==='D3'?'selected':''}>D3</option><option ${p.pendidikan==='S1'?'selected':''}>S1</option><option ${p.pendidikan==='S2'?'selected':''}>S2</option></select></div><div class="form-group"><label>Nama Sekolah/Universitas</label><input class="form-control" id="kSekolah" value="${escHtml(p.namaSekolah||'')}"></div><div class="form-group"><label>Status Pernikahan</label><select class="form-control" id="kNikah"><option value="">-- Pilih --</option><option ${p.statusPernikahan==='Belum Menikah'?'selected':''}>Belum Menikah</option><option ${p.statusPernikahan==='Menikah'?'selected':''}>Menikah</option><option ${p.statusPernikahan==='Bercerai'?'selected':''}>Bercerai</option></select></div><div class="form-group"><label>Agama</label><select class="form-control" id="kAgama"><option value="">-- Pilih --</option><option ${p.agama==='Islam'?'selected':''}>Islam</option><option ${p.agama==='Kristen'?'selected':''}>Kristen</option><option ${p.agama==='Katolik'?'selected':''}>Katolik</option><option ${p.agama==='Hindu'?'selected':''}>Hindu</option><option ${p.agama==='Buddha'?'selected':''}>Buddha</option><option ${p.agama==='Konghucu'?'selected':''}>Konghucu</option></select></div><div class="form-group"><label>Kendaraan</label><input class="form-control" id="kKendaraan" value="${escHtml(p.kendaraan||'')}" placeholder="Sepeda Motor/Mobil/Umum"></div><div class="form-group"><label>Alamat Domisili</label><input class="form-control" id="kAlamatDom" value="${escHtml(p.alamatDomisili||'')}"></div></div></div>
+    <div style="border-bottom:2px solid var(--border);padding-bottom:14px;margin-bottom:14px"><div class="fw-700 color-primary mb-8">🆘 Kontak Darurat</div><div class="grid-2"><div class="form-group"><label>Nama Kontak Darurat</label><input class="form-control" id="kKontakNama" value="${escHtml(p.kontakDaruratNama||'')}"></div><div class="form-group"><label>No. Kontak Darurat</label><input class="form-control" id="kKontakNo" value="${escHtml(p.kontakDaruratNo||'')}"></div></div></div>
+    <div style="border-bottom:2px solid var(--border);padding-bottom:14px;margin-bottom:14px"><div class="fw-700 color-primary mb-8">📁 Kelengkapan Dokumen</div><div class="grid-3"><div class="form-group"><label>SIM</label><select class="form-control" id="kDocSIM"><option value="ADA" ${p.docSIM==='ADA'?'selected':''}>ADA</option><option value="TIDAK ADA" ${p.docSIM==='TIDAK ADA'?'selected':''}>TIDAK ADA</option></select></div><div class="form-group"><label>Ijazah</label><select class="form-control" id="kDocIjazah"><option value="ADA" ${p.docIjazah==='ADA'?'selected':''}>ADA</option><option value="TIDAK ADA" ${p.docIjazah==='TIDAK ADA'?'selected':''}>TIDAK ADA</option></select></div><div class="form-group"><label>SKCK</label><select class="form-control" id="kDocSKCK"><option value="ADA" ${p.docSKCK==='ADA'?'selected':''}>ADA</option><option value="TIDAK ADA" ${p.docSKCK==='TIDAK ADA'?'selected':''}>TIDAK ADA</option></select></div><div class="form-group"><label>CV Lamaran</label><select class="form-control" id="kDocCV"><option value="ADA" ${p.docCV==='ADA'?'selected':''}>ADA</option><option value="TIDAK ADA" ${p.docCV==='TIDAK ADA'?'selected':''}>TIDAK ADA</option></select></div><div class="form-group"><label>Form CV</label><select class="form-control" id="kDocFormCV"><option value="ADA" ${p.docFormCV==='ADA'?'selected':''}>ADA</option><option value="TIDAK ADA" ${p.docFormCV==='TIDAK ADA'?'selected':''}>TIDAK ADA</option></select></div><div class="form-group"><label>Status Kontrak Dok</label><select class="form-control" id="kDocKontrak"><option value="ADA" ${p.docKontrak==='ADA'?'selected':''}>ADA</option><option value="TIDAK ADA" ${p.docKontrak==='TIDAK ADA'?'selected':''}>TIDAK ADA</option></select></div></div></div>
     <div style="border-bottom:2px solid var(--border);padding-bottom:14px;margin-bottom:14px"><div class="fw-700 color-primary mb-8">📄 Data Kontrak</div><div class="grid-2"><div class="form-group"><label>Jenis Kontrak</label><select class="form-control" id="kKontrakJenis"><option value="tetap" ${p.kontrakJenis==='tetap'?'selected':''}>Karyawan Tetap (PKWTT)</option><option value="kontrak" ${p.kontrakJenis==='kontrak'?'selected':''}>Kontrak (PKWT)</option><option value="magang" ${p.kontrakJenis==='magang'?'selected':''}>Magang</option></select></div><div class="form-group"><label>Durasi Kontrak</label><input class="form-control" id="kKontrakDurasi" value="${escHtml(p.kontrakDurasi||'')}" placeholder="12 bulan"></div><div class="form-group"><label>Kontrak Mulai</label><input class="form-control" type="date" id="kKontrakMulai" value="${p.kontrakMulai||''}"></div><div class="form-group"><label>Kontrak Berakhir</label><input class="form-control" type="date" id="kKontrakAkhir" value="${p.kontrakAkhir||''}"></div></div><div class="form-group"><label>Kontrak Ke-</label><input class="form-control" type="number" id="kKontrakKe" value="${p.kontrakKe||1}" min="1"></div></div>
     <div class="flex gap-8 mt-16"><button class="btn btn-primary" onclick="simpanKaryawan('${id||''}')">💾 Simpan</button>${id?`<button class="btn btn-danger" onclick="hapusDoc('hrd_karyawan','${id}','karyawan')">🗑️ Hapus</button><button class="btn btn-info" onclick="lihatHistoryKontrak('${id}')">📋 History Kontrak</button>`:''}</div>`,true);}
 function previewKaryFoto(input){
@@ -101,7 +104,7 @@ function previewKaryFoto(input){
     };img.src=e.target.result;
   };reader.readAsDataURL(file);
 }
-async function simpanKaryawan(id){const data={nama:document.getElementById('kNama').value,nip:document.getElementById('kNip').value,nik:document.getElementById('kNIK').value,noKK:document.getElementById('kNoKK').value,noPassport:document.getElementById('kPassport').value,jenisKelamin:document.getElementById('kGender').value,tanggalLahir:document.getElementById('kTglLahir').value,tempatLahir:document.getElementById('kTmptLahir').value,email:document.getElementById('kEmail').value,telepon:document.getElementById('kTelp').value,alamat:document.getElementById('kAlamat').value,departemen:document.getElementById('kDept').value,posisi:document.getElementById('kPos').value,cabang:document.getElementById('kCabang').value,jadwalKantor:document.getElementById('kJadwal').value,tipeKaryawan:document.getElementById('kTipeKary').value,tipeUser:document.getElementById('kTipeUser').value,ruangKerja:document.getElementById('kRuangKerja').value,tanggalMasuk:document.getElementById('kJoin').value,status:document.getElementById('kStatus').value,atasan:document.getElementById('kAtasan').value,namaBank:document.getElementById('kBank').value,noRekening:document.getElementById('kNoRek').value,tipeRekening:document.getElementById('kTipeRek').value,bpjsKesehatan:document.getElementById('kBPJSKes').value,bpjsKetenagakerjaan:document.getElementById('kBPJSTK').value,gajiPokok:Number(document.getElementById('kGaji').value)||0,kontrakJenis:document.getElementById('kKontrakJenis').value,kontrakDurasi:document.getElementById('kKontrakDurasi').value,kontrakMulai:document.getElementById('kKontrakMulai').value,kontrakAkhir:document.getElementById('kKontrakAkhir').value,kontrakKe:Number(document.getElementById('kKontrakKe').value)||1,updatedAt:new Date().toISOString()};if(window._karyFoto)data.foto=window._karyFoto;if(!data.nama)return toast('Nama wajib','warning');
+async function simpanKaryawan(id){const data={nama:document.getElementById('kNama').value,nip:document.getElementById('kNip').value,nik:document.getElementById('kNIK').value,noKK:document.getElementById('kNoKK').value,noPassport:document.getElementById('kPassport').value,jenisKelamin:document.getElementById('kGender').value,tanggalLahir:document.getElementById('kTglLahir').value,tempatLahir:document.getElementById('kTmptLahir').value,email:document.getElementById('kEmail').value,telepon:document.getElementById('kTelp').value,alamat:document.getElementById('kAlamat').value,departemen:document.getElementById('kDept').value,posisi:document.getElementById('kPos').value,cabang:document.getElementById('kCabang').value,jadwalKantor:document.getElementById('kJadwal').value,tipeKaryawan:document.getElementById('kTipeKary').value,tipeUser:document.getElementById('kTipeUser').value,ruangKerja:document.getElementById('kRuangKerja').value,tanggalMasuk:document.getElementById('kJoin').value,status:document.getElementById('kStatus').value,atasan:document.getElementById('kAtasan').value,namaBank:document.getElementById('kBank').value,noRekening:document.getElementById('kNoRek').value,namaDiRekening:document.getElementById('kNamaRek')?.value||'',tipeRekening:document.getElementById('kTipeRek').value,bpjsKetenagakerjaan:document.getElementById('kBPJSTK').value,asuransi:document.getElementById('kAsuransi')?.value||'',gajiPokok:Number(document.getElementById('kGaji').value)||0,gradeJabatan:document.getElementById('kGrade')?.value||'',pendidikan:document.getElementById('kPendidikan')?.value||'',namaSekolah:document.getElementById('kSekolah')?.value||'',statusPernikahan:document.getElementById('kNikah')?.value||'',agama:document.getElementById('kAgama')?.value||'',kendaraan:document.getElementById('kKendaraan')?.value||'',alamatDomisili:document.getElementById('kAlamatDom')?.value||'',kontakDaruratNama:document.getElementById('kKontakNama')?.value||'',kontakDaruratNo:document.getElementById('kKontakNo')?.value||'',docSIM:document.getElementById('kDocSIM')?.value||'',docIjazah:document.getElementById('kDocIjazah')?.value||'',docSKCK:document.getElementById('kDocSKCK')?.value||'',docCV:document.getElementById('kDocCV')?.value||'',docFormCV:document.getElementById('kDocFormCV')?.value||'',docKontrak:document.getElementById('kDocKontrak')?.value||'',kontrakJenis:document.getElementById('kKontrakJenis').value,kontrakDurasi:document.getElementById('kKontrakDurasi').value,kontrakMulai:document.getElementById('kKontrakMulai').value,kontrakAkhir:document.getElementById('kKontrakAkhir').value,kontrakKe:Number(document.getElementById('kKontrakKe').value)||1,updatedAt:new Date().toISOString()};if(window._karyFoto)data.foto=window._karyFoto;if(!data.nama)return toast('Nama wajib','warning');
   window._karyFoto=null;
   if(id){
     // Save contract history if contract dates changed
@@ -287,66 +290,78 @@ function parseCsvRows(text){const lines=text.replace(/\r\n/g,'\n').replace(/\r/g
 async function renderStrukturOrg(){
   const main=document.getElementById('mainContent');
   main.innerHTML=`<div class="page-title"><span>🌳 Struktur Organisasi</span></div><div class="card" id="orgChart" style="overflow-x:auto;padding:30px 20px">Loading...</div>`;
-  // Load karyawan data dynamically
   const snap=await db.collection('hrd_karyawan').where('status','==','aktif').get();
   const karyawan=[];snap.forEach(d=>karyawan.push({id:d.id,...d.data()}));
-  // Group by level: Founder/Owner, GM, Head, Staff
-  const founders=karyawan.filter(k=>(k.posisi||'').toLowerCase().includes('founder')||(k.posisi||'').toLowerCase().includes('owner')||(k.posisi||'').toLowerCase().includes('direktur'));
-  const gm=karyawan.filter(k=>(k.posisi||'').toLowerCase().includes('general manager')||(k.posisi||'').toLowerCase().includes('gm')||(k.posisi||'').toLowerCase().includes('ceo'));
-  const heads=karyawan.filter(k=>(k.posisi||'').toLowerCase().includes('head')||(k.posisi||'').toLowerCase().includes('manager')&&!(k.posisi||'').toLowerCase().includes('general'));
-  const staff=karyawan.filter(k=>!founders.includes(k)&&!gm.includes(k)&&!heads.includes(k));
-  // Group staff by departemen
-  const deptStaff={};
-  staff.forEach(k=>{const dept=k.departemen||'Lainnya';if(!deptStaff[dept])deptStaff[dept]=[];deptStaff[dept].push(k);});
   // Helper: render person box with photo
-  const personBox=(k,cls)=>{
-    const foto=k.foto?`<img src="${k.foto}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;margin-bottom:4px">`:`<div style="width:40px;height:40px;border-radius:50%;background:${cls==='box'?'#fce4ec':'#f5f5f5'};display:flex;align-items:center;justify-content:center;margin:0 auto 4px;font-weight:700;color:var(--accent)">${(k.nama||'?').charAt(0)}</div>`;
-    return `<div class="${cls}"><div style="text-align:center">${foto}</div><div class="n">${escHtml(k.nama)}</div><div class="p">${escHtml(k.posisi||'-')}</div></div>`;
+  const personBox=(k,cls,extra)=>{
+    const foto=k.foto?`<img src="${k.foto}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;margin:0 auto 4px;display:block">`:`<div style="width:40px;height:40px;border-radius:50%;background:${cls==='box'?'#fce4ec':'#f5f5f5'};display:flex;align-items:center;justify-content:center;margin:0 auto 4px;font-weight:700;color:var(--accent)">${(k.nama||'?').charAt(0)}</div>`;
+    return `<div class="${cls}" ${extra||''}>${foto}<div class="n">${escHtml(k.nama)}</div><div class="p">${escHtml(k.posisi||'-')}</div></div>`;
   };
+  // Build hierarchy from atasan field
+  const byAtasan={};const topLevel=[];
+  karyawan.forEach(k=>{
+    const atasan=(k.atasan||'').trim();
+    if(!atasan||atasan.toLowerCase()==='founder'){topLevel.push(k);}
+    else{if(!byAtasan[atasan])byAtasan[atasan]=[];byAtasan[atasan].push(k);}
+  });
+  // Categorize top level
+  const founders=topLevel.filter(k=>(k.posisi||'').toLowerCase().includes('founder'));
+  const nonFounders=topLevel.filter(k=>!(k.posisi||'').toLowerCase().includes('founder'));
+
   let html=`<style>
-.org{text-align:center;min-width:800px;position:relative}
-.org h2{font-size:1.2rem;font-weight:700;color:var(--accent);margin:0}.org .sub{font-size:.8rem;color:#666;margin-bottom:20px}
-.org .box{border:2px solid var(--accent);border-radius:10px;padding:10px 14px;display:inline-block;text-align:center;background:#fff;min-width:120px;box-shadow:0 2px 8px rgba(198,40,40,.1)}
+.org{text-align:center;min-width:800px}
+.org h2{font-size:1.2rem;font-weight:700;color:var(--accent);margin:0}.org .sub{font-size:.8rem;color:#666;margin-bottom:24px}
+.org .box{border:2px solid var(--accent);border-radius:10px;padding:10px 14px;display:inline-block;text-align:center;background:#fff;min-width:120px;box-shadow:0 2px 8px rgba(198,40,40,.1);margin:4px}
 .org .box .n{font-weight:700;font-size:.72rem;color:#1a1a1a}.org .box .p{font-size:.6rem;color:#666;margin-top:2px;text-transform:uppercase}
-.org .sbox{border:1.5px solid #ccc;border-radius:8px;padding:8px 10px;display:inline-block;text-align:center;background:#fff;min-width:100px}
+.org .sbox{border:1.5px solid #ccc;border-radius:8px;padding:8px 10px;display:inline-block;text-align:center;background:#fff;min-width:100px;margin:4px}
 .org .sbox .n{font-weight:600;font-size:.68rem;color:#333}.org .sbox .p{font-size:.56rem;color:#888;margin-top:1px}
-.org .v{width:2px;background:var(--accent);margin:0 auto}
-.org .row{display:flex;justify-content:center;align-items:flex-start;flex-wrap:wrap;gap:12px}
-.org .dept-section{margin-top:20px;padding:16px;border:1px solid #eee;border-radius:12px;background:#fafafa}
-.org .dept-title{font-size:.7rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
-</style>
-<div class="org">
-<h2>STRUKTUR ORGANISASI</h2><div class="sub">LPK IJEF CORP — IMS</div>`;
-  // Founders
-  if(founders.length){
-    html+=`<div class="row" style="margin-bottom:16px">`;
-    founders.forEach(k=>{html+=personBox(k,'box');});
-    html+=`</div><div class="v" style="height:20px"></div>`;
-  }
-  // GM
-  if(gm.length){
-    html+=`<div class="row" style="margin-bottom:16px">`;
-    gm.forEach(k=>{html+=personBox(k,'box');});
-    html+=`</div><div class="v" style="height:20px"></div>`;
-  }
-  // Heads
-  if(heads.length){
-    html+=`<div class="row" style="margin-bottom:20px">`;
-    heads.forEach(k=>{html+=personBox(k,'box');});
-    html+=`</div>`;
-  }
-  // Staff by department
-  const deptKeys=Object.keys(deptStaff).sort();
-  if(deptKeys.length){
-    html+=`<div class="row" style="flex-wrap:wrap;gap:16px;margin-top:16px">`;
-    deptKeys.forEach(dept=>{
-      html+=`<div class="dept-section"><div class="dept-title">${escHtml(dept)}</div><div class="row" style="gap:8px">`;
-      deptStaff[dept].forEach(k=>{html+=personBox(k,'sbox');});
-      html+=`</div></div>`;
+.org .v{width:2px;height:20px;background:var(--accent);margin:0 auto}
+.org .row{display:flex;justify-content:center;align-items:flex-start;flex-wrap:wrap;gap:8px}
+.org .tree-node{display:flex;flex-direction:column;align-items:center}
+.org .tree-children{display:flex;justify-content:center;flex-wrap:wrap;gap:4px;padding-top:8px;border-top:2px solid var(--accent);margin-top:8px}
+</style><div class="org"><h2>STRUKTUR ORGANISASI</h2><div class="sub">LPK IJEF CORP — IMS</div>`;
+
+  // Founders row
+  if(founders.length){html+=`<div class="row">${founders.map(k=>personBox(k,'box')).join('')}</div><div class="v"></div>`;}
+  // Non-founder top level (GM etc)
+  if(nonFounders.length){html+=`<div class="row">${nonFounders.map(k=>personBox(k,'box')).join('')}</div><div class="v"></div>`;}
+
+  // Recursive render children
+  function renderChildren(parentName){
+    const children=byAtasan[parentName]||[];
+    if(!children.length)return'';
+    // Separate leaders from staff
+    const leaders=children.filter(c=>(c.posisi||'').toLowerCase().includes('head')||(c.posisi||'').toLowerCase().includes('leader')||(c.posisi||'').toLowerCase().includes('manager'));
+    const staff=children.filter(c=>!leaders.includes(c));
+    let h='<div class="tree-children">';
+    // Leaders first (with their own sub-tree)
+    leaders.forEach(l=>{
+      const subChildren=byAtasan[l.nama]||[];
+      h+=`<div class="tree-node">${personBox(l,'box')}`;
+      if(subChildren.length){h+=`<div class="v"></div><div class="tree-children">${subChildren.map(s=>personBox(s,'sbox')).join('')}</div>`;}
+      h+=`</div>`;
     });
-    html+=`</div>`;
+    // Staff
+    staff.forEach(s=>{
+      const subChildren=byAtasan[s.nama]||[];
+      h+=`<div class="tree-node">${personBox(s,'sbox')}`;
+      if(subChildren.length){h+=`<div class="v"></div><div class="tree-children">${subChildren.map(sc=>personBox(sc,'sbox')).join('')}</div>`;}
+      h+=`</div>`;
+    });
+    h+='</div>';
+    return h;
   }
-  if(!karyawan.length) html+=`<div class="empty-state"><div class="icon">🌳</div><p>Belum ada data karyawan. Tambahkan di menu Data Karyawan.</p></div>`;
+
+  // Render from top-level non-founders
+  nonFounders.forEach(gm=>{
+    const children=byAtasan[gm.nama]||[];
+    if(children.length){html+=renderChildren(gm.nama);}
+  });
+  // If no hierarchy found, show flat
+  if(!founders.length&&!nonFounders.length){
+    html+=`<div class="row" style="flex-wrap:wrap;gap:8px">${karyawan.map(k=>personBox(k,'sbox')).join('')}</div>`;
+  }
+  if(!karyawan.length)html+=`<div class="empty-state"><div class="icon">🌳</div><p>Belum ada data karyawan.</p></div>`;
   html+=`</div>`;
   document.getElementById('orgChart').innerHTML=html;
 }
@@ -2689,8 +2704,16 @@ async function simpanSurat(seq,mo,yr){const jenis=document.getElementById('srJen
 // ── PORTAL KARYAWAN ───────────────────────────────────────────
 async function renderPortal(){const main=document.getElementById('mainContent');const u=currentUser;
   // Refresh user data from Firestore to get latest profilePic/foto
-  try{const freshDoc=await db.collection('hrd_users').doc(u.id).get();if(freshDoc.exists){const freshData=freshDoc.data();if(freshData.profilePic)currentUser.profilePic=freshData.profilePic;if(freshData.departemen)currentUser.departemen=freshData.departemen;if(freshData.posisi)currentUser.posisi=freshData.posisi;localStorage.setItem('hrd_session',JSON.stringify(currentUser));}}catch(e){}
-  const avatarHtml=currentUser.profilePic?`<img src="${currentUser.profilePic}" style="width:60px;height:60px;border-radius:50%;object-fit:cover">`:`<div style="width:60px;height:60px;font-size:1.5rem;background:var(--primary);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center">${u.nama.charAt(0)}</div>`;
+  let avatarUrl='';
+  try{
+    const freshDoc=await db.collection('hrd_users').doc(u.id).get();
+    if(freshDoc.exists){const freshData=freshDoc.data();if(freshData.profilePic)currentUser.profilePic=freshData.profilePic;if(freshData.departemen)currentUser.departemen=freshData.departemen;if(freshData.posisi)currentUser.posisi=freshData.posisi;localStorage.setItem('hrd_session',JSON.stringify(currentUser));}
+    // Get foto from hrd_karyawan (priority over profilePic)
+    const kSnap=await db.collection('hrd_karyawan').where('nama','==',u.nama).limit(1).get();
+    if(!kSnap.empty){const kData=kSnap.docs[0].data();if(kData.foto)avatarUrl=kData.foto;}
+    if(!avatarUrl)avatarUrl=currentUser.profilePic||'';
+  }catch(e){}
+  const avatarHtml=avatarUrl?`<img src="${avatarUrl}" style="width:60px;height:60px;border-radius:50%;object-fit:cover">`:`<div style="width:60px;height:60px;font-size:1.5rem;background:var(--primary);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center">${u.nama.charAt(0)}</div>`;
   main.innerHTML=`<div class="page-title"><span>🏠 Portal Saya</span></div><div class="card" style="border-left:4px solid var(--accent)"><div class="flex gap-16" style="align-items:center">${avatarHtml}<div><div class="fw-700" style="font-size:1.1rem">${escHtml(u.nama)}</div><div class="text-sm" style="color:#999">${escHtml(u.departemen||'-')} • ${escHtml(u.posisi||u.role)}</div><div class="text-xs" style="color:#999">NIP: ${escHtml(u.nip||'-')}</div></div></div></div><div class="stats-grid"><div class="stat-card" style="cursor:pointer" onclick="navigateTo('portal-absensi')"><div class="stat-icon">📍</div><div class="stat-value" id="pAbsen">-</div><div class="stat-label">Kehadiran Bulan Ini</div></div><div class="stat-card" style="cursor:pointer" onclick="navigateTo('portal-cuti')"><div class="stat-icon">🏖️</div><div class="stat-value" id="pCuti">-</div><div class="stat-label">Sisa Cuti</div></div><div class="stat-card" style="cursor:pointer" onclick="navigateTo('inbox')"><div class="stat-icon">📥</div><div class="stat-value" id="pInbox">-</div><div class="stat-label">Inbox Meeting</div></div></div>
   <!-- KOLOM PENGUMUMAN, BROADCAST, MEETING & INVITE -->
   <div class="card" id="portalInfoSections">
