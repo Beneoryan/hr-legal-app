@@ -347,7 +347,79 @@ function showKandForm(id,p){openModal(`<div class="modal-title">${id?'Edit':'Tam
 async function simpanKandidat(id){const data={nama:document.getElementById('kdNama').value,posisi:document.getElementById('kdPos').value,email:document.getElementById('kdEmail').value,stage:document.getElementById('kdStage').value,updatedAt:new Date().toISOString()};if(!data.nama)return toast('Nama wajib','warning');if(id)await db.collection('hrd_kandidat').doc(id).update(data);else await db.collection('hrd_kandidat').add({...data,createdAt:new Date().toISOString()});closeModalDirect();toast('Disimpan','success');renderKandidat();}
 
 // ── CUTI / IZIN / WFH ─────────────────────────────────────────
-async function renderCuti(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>🏖️ Cuti / Izin / WFH</span><button class="btn btn-primary btn-sm" onclick="modalCuti()">+ Pengajuan</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Jenis</th><th>Tanggal</th><th>Durasi</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="tblCuti"></tbody></table></div></div>`;const snap=await db.collection('hrd_cuti').get();let h='';if(snap.empty)h='<tr><td colspan="6" class="text-center">Belum ada</td></tr>';else snap.forEach(d=>{const p=d.data();const badge=p.status==='approved'?'badge-success':p.status==='rejected'?'badge-danger':'badge-warning';h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.jenis)}</td><td>${formatDate(p.mulai)}-${formatDate(p.selesai)}</td><td>${p.durasi||1}h</td><td><span class="badge ${badge}">${p.status}</span></td><td>${p.status==='pending'&&hasAccess(3)?`<button class="btn btn-xs btn-success" onclick="approveCuti('${d.id}','approved')">✅</button> <button class="btn btn-xs btn-danger" onclick="approveCuti('${d.id}','rejected')">❌</button>`:''} <button class="btn btn-xs btn-warning" onclick="editCutiDoc('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_cuti','${d.id}','cuti')">🗑️</button></td></tr>`;});document.getElementById('tblCuti').innerHTML=h;}
+async function renderCuti(){
+  const main=document.getElementById('mainContent');
+  main.innerHTML=`<div class="page-title"><span>🏖️ Cuti / Izin / WFH</span><button class="btn btn-primary btn-sm" onclick="modalCuti()">+ Pengajuan</button></div>
+    <div class="card mb-16"><div class="card-title mb-8">📊 Sisa Jatah Cuti Karyawan</div><div id="cutiQuotaList">Loading...</div></div>
+    <div class="card"><div class="card-title mb-8">📋 Daftar Pengajuan</div><div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Jenis</th><th>Tanggal</th><th>Durasi</th><th>Sisa Cuti</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="tblCuti"></tbody></table></div></div>`;
+  // Load data
+  const[cutiSnap,karySnap]=await Promise.all([db.collection('hrd_cuti').get(),db.collection('hrd_karyawan').where('status','==','aktif').get()]);
+  // Calculate quota per karyawan
+  const cutiUsed={};// userId -> total hari cuti tahunan approved
+  cutiSnap.forEach(d=>{const p=d.data();if(p.status==='approved'&&p.jenis==='Cuti Tahunan'){const uid=p.userId||p.nama;cutiUsed[uid]=(cutiUsed[uid]||0)+(p.durasi||1);}});
+  // Build quota table
+  let quotaHtml='<div class="table-wrap"><table><thead><tr><th>Nama</th><th>Dept</th><th>Masa Kerja</th><th>Jatah/Tahun</th><th>Terpakai</th><th>Sisa</th></tr></thead><tbody>';
+  const karyList=[];karySnap.forEach(d=>karyList.push({id:d.id,...d.data()}));
+  karyList.forEach(k=>{
+    const quota=hitungJatahCuti(k);
+    const used=cutiUsed[k.id]||cutiUsed[k.nama]||0;
+    const sisa=Math.max(0,quota-used);
+    const masaKerja=hitungMasaKerja(k.tanggalMasuk);
+    const color=sisa<=2?'var(--danger)':sisa<=5?'var(--warning)':'var(--success)';
+    quotaHtml+=`<tr><td class="fw-700">${escHtml(k.nama)}</td><td>${escHtml(k.departemen||'-')}</td><td>${masaKerja}</td><td>${quota} hari</td><td>${used} hari</td><td style="color:${color};font-weight:700">${sisa} hari</td></tr>`;
+  });
+  quotaHtml+='</tbody></table></div>';
+  document.getElementById('cutiQuotaList').innerHTML=quotaHtml;
+  // Render cuti list with sisa info
+  let h='';
+  if(cutiSnap.empty)h='<tr><td colspan="7" class="text-center">Belum ada</td></tr>';
+  else{
+    const items=[];cutiSnap.forEach(d=>items.push({id:d.id,...d.data()}));
+    items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+    items.forEach(p=>{
+      const badge=p.status==='approved'?'badge-success':p.status==='rejected'?'badge-danger':'badge-warning';
+      const uid=p.userId||p.nama;
+      const kary=karyList.find(k=>k.id===uid||k.nama===p.nama);
+      const quota=kary?hitungJatahCuti(kary):12;
+      const used=cutiUsed[uid]||0;
+      const sisa=Math.max(0,quota-used);
+      h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.jenis)}</td><td>${formatDate(p.mulai)}-${formatDate(p.selesai)}</td><td>${p.durasi||1}h</td><td><span class="badge badge-${sisa<=2?'danger':sisa<=5?'warning':'success'}">${sisa}/${quota}</span></td><td><span class="badge ${badge}">${p.status}</span></td><td>${p.status==='pending'&&hasAccess(3)?`<button class="btn btn-xs btn-success" onclick="approveCuti('${p.id}','approved')">✅</button> <button class="btn btn-xs btn-danger" onclick="approveCuti('${p.id}','rejected')">❌</button>`:''} <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_cuti','${p.id}','cuti')">🗑️</button></td></tr>`;
+    });
+  }
+  document.getElementById('tblCuti').innerHTML=h;
+}
+
+// Hitung jatah cuti berdasarkan masa kerja, status, dan ketentuan
+function hitungJatahCuti(karyawan){
+  // UU Cipta Kerja: minimal 12 hari/tahun setelah 1 tahun kerja
+  // < 1 tahun: proporsional (1 hari per bulan kerja)
+  // Karyawan tetap: 12 hari
+  // Kontrak: proporsional
+  // Probation: 0
+  if(!karyawan.tanggalMasuk) return 12;
+  const masuk=new Date(karyawan.tanggalMasuk);
+  const now=new Date();
+  const bulanKerja=Math.floor((now-masuk)/(30*24*60*60*1000));
+  const tahunKerja=Math.floor(bulanKerja/12);
+
+  if(karyawan.status==='probation') return 0;
+  if(bulanKerja<12) return Math.min(12,bulanKerja); // Proporsional
+  // Setelah 1 tahun: 12 hari (standar UU)
+  // Bonus: +1 hari per 2 tahun kerja (kebijakan perusahaan, max 18)
+  const bonus=Math.min(3,Math.floor(tahunKerja/2));
+  return Math.min(18,12+bonus);
+}
+
+function hitungMasaKerja(tanggalMasuk){
+  if(!tanggalMasuk) return '-';
+  const masuk=new Date(tanggalMasuk);
+  const now=new Date();
+  const bulan=Math.floor((now-masuk)/(30*24*60*60*1000));
+  const tahun=Math.floor(bulan/12);
+  const sisaBulan=bulan%12;
+  if(tahun>0) return `${tahun} thn ${sisaBulan} bln`;
+  return `${bulan} bulan`;
+}
 function modalCuti(){openModal(`<div class="modal-title">Pengajuan Cuti/Izin/WFH</div><div class="grid-2"><div class="form-group"><label>Nama</label><input class="form-control" id="ctNama" value="${currentUser.nama}"></div><div class="form-group"><label>Jenis</label><select class="form-control" id="ctJenis"><option>Cuti Tahunan</option><option>Cuti Sakit</option><option>Izin Pribadi</option><option>WFH</option><option>Cuti Melahirkan</option></select></div></div><div class="grid-2"><div class="form-group"><label>Mulai</label><input class="form-control" type="date" id="ctMulai" value="${todayStr()}"></div><div class="form-group"><label>Selesai</label><input class="form-control" type="date" id="ctSelesai" value="${todayStr()}"></div></div><div class="form-group"><label>Keterangan</label><textarea class="form-control" id="ctKet"></textarea></div><button class="btn btn-primary" onclick="simpanCuti()">Ajukan</button>`);}
 async function simpanCuti(){
   const mulai=document.getElementById('ctMulai').value,selesai=document.getElementById('ctSelesai').value;
@@ -739,51 +811,117 @@ async function hapusSelectedGaji(){const ids=[];document.querySelectorAll('.gaji
 async function hapusSemuaGaji(){if(!confirm('⚠️ HAPUS SEMUA slip gaji periode ini?'))return;if(!confirm('Konfirmasi: Yakin hapus SEMUA?'))return;const bulan=document.getElementById('filterBulanGaji')?.value||monthStr();const snap=await db.collection('hrd_penggajian').where('periode','==',bulan).get();const batch=db.batch();snap.forEach(d=>batch.delete(d.ref));await batch.commit();toast(`${snap.size} slip dihapus`,'success');loadGaji();}
 
 async function generateAllGaji(){
-  if(!confirm('Generate slip gaji untuk SEMUA karyawan aktif periode ini?\n\nSlip yang sudah ada akan di-UPDATE dengan data terbaru (insentif, kasbon, reimburse, tunjangan).'))return;
+  if(!confirm('Generate slip gaji untuk SEMUA karyawan aktif periode ini?\n\nPerhitungan: Tgl 20 bulan lalu s/d Tgl 20 bulan ini.\nTerintegrasi: Kehadiran, Lembur, Cuti, Tunjangan, PPH21.'))return;
   try{
   const bulan=document.getElementById('filterBulanGaji')?.value||monthStr();
+  const[year,month]=bulan.split('-').map(Number);
+  // Periode gaji: tgl 20 bulan lalu s/d tgl 20 bulan ini
+  const prevMonth=month===1?12:month-1;
+  const prevYear=month===1?year-1:year;
+  const periodeStart=`${prevYear}-${String(prevMonth).padStart(2,'0')}-20`;
+  const periodeEnd=`${year}-${String(month).padStart(2,'0')}-20`;
+
   const kSnap=await db.collection('hrd_karyawan').where('status','==','aktif').get();
   if(kSnap.empty){toast('Tidak ada karyawan aktif','warning');return;}
-  // Delete existing slips for this period first (to re-generate fresh)
+  // Delete existing slips for this period
   const existSnap=await db.collection('hrd_penggajian').where('periode','==',bulan).get();
   if(!existSnap.empty){const delBatch=db.batch();existSnap.forEach(d=>delBatch.delete(d.ref));await delBatch.commit();}
   // Load all related data
-  const reimbSnap=await db.collection('hrd_reimbursement').where('status','==','approved').get();
-  const kasbonSnap=await db.collection('hrd_kasbon').get();
-  const tunjSnap=await db.collection('hrd_tunjangan').get();
-  const kpiSnap=await db.collection('hrd_kpi').get();
-  const insentifSnap=await db.collection('hrd_insentif').get();
-  // Build maps
+  const[absenSnap,reimbSnap,kasbonSnap,tunjSnap,kpiSnap,insentifSnap,cutiSnap,overtimeSnap]=await Promise.all([
+    db.collection('hrd_absensi').where('tanggal','>=',periodeStart).where('tanggal','<=',periodeEnd).get(),
+    db.collection('hrd_reimbursement').where('status','==','approved').get(),
+    db.collection('hrd_kasbon').get(),
+    db.collection('hrd_tunjangan').get(),
+    db.collection('hrd_kpi').get(),
+    db.collection('hrd_insentif').get(),
+    db.collection('hrd_cuti').where('status','==','approved').get(),
+    db.collection('hrd_overtime').where('status','==','approved').get()
+  ]);
+  // Build attendance map: userId -> {hadir, izin, cuti, lembur_jam}
+  const absenMap={};
+  absenSnap.forEach(d=>{const p=d.data();const uid=p.userId;if(!absenMap[uid])absenMap[uid]={hadir:0,lembur:0};if(p.tipe==='masuk')absenMap[uid].hadir++;if(p.tipe==='pulang'&&p.lembur&&p.lemburJam)absenMap[uid].lembur+=p.lemburJam;});
+  // Cuti map: userId -> jumlah hari cuti dalam periode
+  const cutiMap={};
+  cutiSnap.forEach(d=>{const c=d.data();const uid=c.userId;if(!uid)return;const start=new Date(c.mulai);const end=new Date(c.selesai);let days=0;for(let dt=new Date(start);dt<=end;dt.setDate(dt.getDate()+1)){const ds=dt.toISOString().split('T')[0];if(ds>=periodeStart&&ds<=periodeEnd)days++;}if(!cutiMap[uid])cutiMap[uid]=0;cutiMap[uid]+=days;});
+  // Overtime map
+  const otMap={};
+  overtimeSnap.forEach(d=>{const o=d.data();if(o.tanggal>=periodeStart&&o.tanggal<=periodeEnd){const uid=o.userId||o.nama;if(!otMap[uid])otMap[uid]=0;otMap[uid]+=(o.durasi||0);}});
+  // Build other maps
   const reimbMap={},kasbonMap={},kpiMap={},insentifMap={};
   reimbSnap.forEach(d=>{const r=d.data();const n=(r.nama||'').toLowerCase();reimbMap[n]=(reimbMap[n]||0)+(r.jumlah||0);});
   kasbonSnap.forEach(d=>{const r=d.data();if(r.status==='aktif'){const n=(r.nama||'').toLowerCase();const angsuran=Math.ceil((r.jumlah||0)/(r.cicilan||1));kasbonMap[n]=(kasbonMap[n]||0)+angsuran;}});
   kpiSnap.forEach(d=>{const r=d.data();const n=(r.nama||'').toLowerCase();if(!kpiMap[n]||r.skor>kpiMap[n])kpiMap[n]=r.skor||0;});
   insentifSnap.forEach(d=>{const r=d.data();const n=(r.nama||'').toLowerCase();insentifMap[n]=(insentifMap[n]||0)+(r.nominal||0);});
-  // Tunjangan (apply to all or specific)
   const tunjList=[];tunjSnap.forEach(d=>tunjList.push(d.data()));
+
+  // Hitung hari kerja dalam periode (exclude weekend)
+  let hariKerja=0;
+  for(let dt=new Date(periodeStart);dt<=new Date(periodeEnd);dt.setDate(dt.getDate()+1)){
+    const day=dt.getDay();if(day!==0&&day!==6)hariKerja++;
+  }
+
   let count=0;
   for(const doc of kSnap.docs){
-    const k=doc.data();const namaLow=(k.nama||'').toLowerCase();
+    const k=doc.data();const namaLow=(k.nama||'').toLowerCase();const uid=doc.id;
     const gaji=k.gajiPokok||0;
+    const gajiPerHari=Math.round(gaji/hariKerja);
+
+    // Kehadiran
+    const kehadiran=absenMap[uid]?.hadir||0;
+    const cutiHari=cutiMap[uid]||0;
+    const hariEfektif=Math.min(kehadiran+cutiHari,hariKerja); // Cuti dihitung hadir
+    const tidakHadir=Math.max(0,hariKerja-hariEfektif);
+    const potonganAbsen=tidakHadir*gajiPerHari;
+
+    // Lembur: 1.5x gaji per jam untuk 1 jam pertama, 2x setelahnya (UU Cipta Kerja)
+    const lemburJam=(absenMap[uid]?.lembur||0)+(otMap[uid]||0);
+    const gajiPerJam=Math.round(gaji/(hariKerja*8)); // 8 jam per hari
+    let lemburNominal=0;
+    if(lemburJam>0){
+      const jam1=Math.min(lemburJam,1);
+      const jamSisa=Math.max(0,lemburJam-1);
+      lemburNominal=Math.round(jam1*gajiPerJam*1.5+jamSisa*gajiPerJam*2);
+    }
+
     // Tunjangan
     let tunj=0;tunjList.forEach(t=>{const p=(t.penerima||'Semua').toLowerCase();if(p==='semua'||p.includes(namaLow))tunj+=t.nominal||0;});
-    // Insentif - from hrd_insentif collection (both KPI and Target Siswa)
+    // Tunjangan cuti (1x gaji pokok per tahun, dibagi 12)
+    const tunjCuti=Math.round(gaji/12);
+
+    // Insentif
     const insentif=insentifMap[namaLow]||0;
-    // Reimbursement & Loan (angsuran per bulan)
+    // Reimbursement & Loan
     const reimb=reimbMap[namaLow]||0;const loan=kasbonMap[namaLow]||0;
-    // BPJS
-    const bpjsKes=Math.round(gaji*0.01);const bpjsTK=Math.round(gaji*0.02);
-    // PPH21 Progressive
-    const bruto=gaji+tunj+insentif+reimb;const penghasilanNetto=Math.max(0,(gaji+tunj-bpjsKes-bpjsTK)*12);
-    let pphT=0;if(penghasilanNetto<=60000000)pphT=penghasilanNetto*0.05;else if(penghasilanNetto<=250000000)pphT=3000000+(penghasilanNetto-60000000)*0.15;else pphT=3000000+28500000+(penghasilanNetto-250000000)*0.25;
+    // BPJS (sesuai ketentuan pemerintah)
+    const bpjsKes=Math.round(gaji*0.01); // 1% karyawan
+    const bpjsTK=Math.round(gaji*0.02);  // 2% karyawan (JHT)
+    // PPH21 Progressive (UU HPP 2022)
+    const bruto=gaji+tunj+tunjCuti+insentif+reimb+lemburNominal-potonganAbsen;
+    const penghasilanNetto=Math.max(0,(gaji+tunj+tunjCuti-bpjsKes-bpjsTK)*12-54000000); // PTKP TK/0 = 54jt
+    let pphT=0;
+    if(penghasilanNetto<=60000000)pphT=penghasilanNetto*0.05;
+    else if(penghasilanNetto<=250000000)pphT=3000000+(penghasilanNetto-60000000)*0.15;
+    else if(penghasilanNetto<=500000000)pphT=3000000+28500000+(penghasilanNetto-250000000)*0.25;
+    else pphT=3000000+28500000+62500000+(penghasilanNetto-500000000)*0.30;
     const pph21=Math.max(0,Math.round(pphT/12));
-    // THP = Bruto - Semua Potongan
-    const totalPotongan=bpjsKes+bpjsTK+loan+pph21;
-    const thp=bruto-totalPotongan;
-    await db.collection('hrd_penggajian').add({nama:k.nama,periode:bulan,gajiPokok:gaji,tunjangan:tunj,insentif,bonus:0,reimbursement:reimb,lembur:0,bpjsKesehatan:bpjsKes,bpjsTK,potongan:0,kasbon:loan,pph21,totalBersih:thp,kpiScore:kpiMap[namaLow]||0,createdAt:new Date().toISOString()});
+    // THP
+    const totalPotongan=bpjsKes+bpjsTK+loan+pph21+potonganAbsen;
+    const thp=bruto-bpjsKes-bpjsTK-loan-pph21;
+
+    await db.collection('hrd_penggajian').add({
+      nama:k.nama,karyawanId:uid,periode:bulan,periodeStart,periodeEnd,
+      gajiPokok:gaji,tunjangan:tunj,tunjCuti,insentif,bonus:0,
+      reimbursement:reimb,lembur:lemburNominal,lemburJam,
+      bpjsKesehatan:bpjsKes,bpjsTK,potongan:potonganAbsen,kasbon:loan,pph21,
+      totalBersih:thp,
+      // Detail kehadiran
+      hariKerja,kehadiran,cutiHari,tidakHadir,
+      kpiScore:kpiMap[namaLow]||0,
+      createdAt:new Date().toISOString()
+    });
     count++;
   }
-  toast(`${count} slip gaji di-generate (terintegrasi tunjangan, insentif, reimburse, loan, PPH)`,'success');loadGaji();
+  toast(`${count} slip gaji di-generate.\nPeriode: ${periodeStart} s/d ${periodeEnd}\nTerintegrasi: Kehadiran, Lembur, Cuti, PPH21 (UU HPP)`,'success');loadGaji();
   }catch(e){console.error('Generate gaji error:',e);toast('Error: '+e.message,'error');}
 }
 function modalGaji(){loadKaryawanDropdownGaji();}
@@ -1208,7 +1346,7 @@ async function rsvpInvite(inviteId, meetingId, status) {
 async function renderChat() {
   const main = document.getElementById('mainContent');
   main.innerHTML = `
-    <div class="page-title"><span>💬 Obrolan</span><div class="flex gap-8"><button class="btn btn-primary btn-sm" onclick="modalNewChat()">+ Chat Personal</button><button class="btn btn-info btn-sm" onclick="modalGroupChat()">👥 Group Departemen</button></div></div>
+    <div class="page-title"><span>💬 Obrolan</span><div class="flex gap-8"><button class="btn btn-primary btn-sm" onclick="modalNewChat()">+ Chat Personal</button><button class="btn btn-info btn-sm" onclick="modalGroupChat()">👥 Group Departemen</button><button class="btn btn-danger btn-sm" onclick="hapusSemuaChat()">🗑️ Hapus Semua</button></div></div>
     <div class="grid-2">
       <div class="card">
         <div class="card-title mb-8">📤 Percakapan</div>
@@ -1219,6 +1357,30 @@ async function renderChat() {
       </div>
     </div>`;
   loadChatThreads();
+}
+
+async function hapusSemuaChat(){
+  if(!confirm('Hapus semua percakapan Anda? Ini tidak bisa dibatalkan.'))return;
+  const snap=await db.collection('hrd_chat_threads').where('participants','array-contains',currentUser.id).get();
+  const batch=db.batch();
+  for(const d of snap.docs){
+    // Delete messages in thread
+    const msgSnap=await db.collection('hrd_chat_messages').where('threadId','==',d.id).get();
+    msgSnap.forEach(m=>batch.delete(m.ref));
+    batch.delete(d.ref);
+  }
+  await batch.commit();
+  toast('Semua chat dihapus','success');loadChatThreads();
+}
+async function hapusChatThread(threadId){
+  if(!confirm('Hapus percakapan ini?'))return;
+  const msgSnap=await db.collection('hrd_chat_messages').where('threadId','==',threadId).get();
+  const batch=db.batch();
+  msgSnap.forEach(m=>batch.delete(m.ref));
+  batch.delete(db.collection('hrd_chat_threads').doc(threadId));
+  await batch.commit();
+  toast('Percakapan dihapus','success');loadChatThreads();
+  document.getElementById('chatArea').innerHTML='<div class="empty-state"><div class="icon">💬</div><p>Pilih percakapan</p></div>';
 }
 
 async function loadChatThreads() {
@@ -1242,10 +1404,13 @@ async function loadChatThreads() {
     sorted.forEach(t => {
       const otherName = t.fromUser === currentUser.id ? t.toName : t.fromName;
       const unread = t.fromUser !== currentUser.id && t.unreadBy === currentUser.id;
-      html += `<div class="inbox-item ${unread?'unread':''}" onclick="openChatThread('${t.id}')">
-        <div class="inbox-from">💬 ${escHtml(otherName)}</div>
-        <div class="inbox-subject text-xs">${escHtml((t.lastMessage||'').substring(0,50))}</div>
-        <div class="inbox-time">${formatDateTime(t.lastMessageAt)}</div>
+      html += `<div class="inbox-item ${unread?'unread':''}" style="position:relative">
+        <div onclick="openChatThread('${t.id}')" style="cursor:pointer">
+          <div class="inbox-from">💬 ${escHtml(otherName)}</div>
+          <div class="inbox-subject text-xs">${escHtml((t.lastMessage||'').substring(0,50))}</div>
+          <div class="inbox-time">${formatDateTime(t.lastMessageAt)}</div>
+        </div>
+        <button class="btn btn-xs btn-danger" onclick="hapusChatThread('${t.id}')" style="position:absolute;top:8px;right:8px" title="Hapus">🗑️</button>
       </div>`;
     });
   }
@@ -1459,7 +1624,7 @@ async function kirimBroadcast(){
 // ── NOTIFIKASI ────────────────────────────────────────────────
 async function renderNotifikasi(){
   const main=document.getElementById('mainContent');
-  main.innerHTML=`<div class="page-title"><span>🔔 Notifikasi</span><button class="btn btn-sm btn-outline" onclick="markAllRead()">Tandai Semua Dibaca</button></div><div class="card" id="notifList">Loading...</div>`;
+  main.innerHTML=`<div class="page-title"><span>🔔 Notifikasi</span><div class="flex gap-8"><button class="btn btn-sm btn-outline" onclick="markAllRead()">✅ Tandai Semua Dibaca</button><button class="btn btn-sm btn-danger" onclick="hapusSemuaNotif()">🗑️ Hapus Semua</button></div></div><div class="card" id="notifList">Loading...</div>`;
   try{
     const[snap1,snap2]=await Promise.all([
       db.collection('hrd_notifikasi').where('targetUser','==',currentUser.id).get(),
@@ -1471,14 +1636,27 @@ async function renderNotifikasi(){
     allNotifs.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
     let h='';
     if(!allNotifs.length)h='<div class="empty-state"><div class="icon">🔔</div><p>Tidak ada notifikasi</p></div>';
-    else allNotifs.slice(0,30).forEach(p=>{
+    else allNotifs.slice(0,50).forEach(p=>{
       const linkPage=p.link||detectNotifLink(p.title);
-      h+=`<div style="padding:12px;border-bottom:1px solid var(--border);cursor:pointer;${p.read?'opacity:.6':'background:#f0f4ff;border-left:3px solid var(--primary)'}" onclick="openNotif('${p.id}','${linkPage}')"><div class="flex" style="justify-content:space-between"><div class="fw-700 text-sm">${escHtml(p.title)}</div><div class="text-xs" style="color:#999">${formatDateTime(p.createdAt)}</div></div><div class="text-sm mt-8">${escHtml(p.message)}</div>${!p.read?`<button class="btn btn-xs btn-outline mt-8" onclick="event.stopPropagation();markRead('${p.id}')">Tandai Dibaca</button>`:''}</div>`;
+      h+=`<div style="padding:12px;border-bottom:1px solid var(--border);${p.read?'opacity:.6':'background:#f0f4ff;border-left:3px solid var(--primary)'}"><div class="flex" style="justify-content:space-between;align-items:flex-start"><div style="flex:1;cursor:pointer" onclick="openNotif('${p.id}','${linkPage}')"><div class="fw-700 text-sm">${escHtml(p.title)}</div><div class="text-sm mt-4">${escHtml(p.message)}</div><div class="text-xs mt-4" style="color:#999">${formatDateTime(p.createdAt)}</div></div><div class="flex gap-4" style="flex-shrink:0">${!p.read?`<button class="btn btn-xs btn-outline" onclick="markRead('${p.id}')" title="Tandai Dibaca">✅</button>`:''}<button class="btn btn-xs btn-danger" onclick="hapusNotif('${p.id}')" title="Hapus">🗑️</button></div></div></div>`;
     });
     document.getElementById('notifList').innerHTML=h;
   }catch(e){document.getElementById('notifList').innerHTML='<div class="empty-state"><div class="icon">🔔</div><p>Tidak ada notifikasi</p></div>';}
 }
 async function markRead(id){await db.collection('hrd_notifikasi').doc(id).update({read:true});renderNotifikasi();}
+async function hapusNotif(id){await db.collection('hrd_notifikasi').doc(id).delete();toast('Notifikasi dihapus','success');renderNotifikasi();}
+async function hapusSemuaNotif(){
+  if(!confirm('Hapus semua notifikasi?'))return;
+  const[s1,s2]=await Promise.all([
+    db.collection('hrd_notifikasi').where('targetUser','==',currentUser.id).get(),
+    db.collection('hrd_notifikasi').where('targetUser','==',currentUser.role).get()
+  ]);
+  const batch=db.batch();const seen=new Set();
+  s1.forEach(d=>{if(!seen.has(d.id)){seen.add(d.id);batch.delete(d.ref);}});
+  s2.forEach(d=>{if(!seen.has(d.id)){seen.add(d.id);batch.delete(d.ref);}});
+  await batch.commit();
+  toast('Semua notifikasi dihapus','success');renderNotifikasi();
+}
 
 async function openNotif(id,link){
   await db.collection('hrd_notifikasi').doc(id).update({read:true});
@@ -2084,7 +2262,33 @@ function renderPortalAbsensi(){
   window._portalAbsensiMode=true;
   navigateTo('absensi');
 }
-async function renderPortalCuti(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>🏖️ Cuti Saya</span><button class="btn btn-primary btn-sm" onclick="modalCuti()">+ Ajukan</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Jenis</th><th>Tanggal</th><th>Durasi</th><th>Status</th></tr></thead><tbody id="tblPortalCuti"></tbody></table></div></div>`;const snap=await db.collection('hrd_cuti').where('userId','==',currentUser.id).get();let h='';if(snap.empty)h='<tr><td colspan="4" class="text-center">Belum ada</td></tr>';else snap.forEach(d=>{const p=d.data();h+=`<tr><td>${escHtml(p.jenis)}</td><td>${formatDate(p.mulai)}-${formatDate(p.selesai)}</td><td>${p.durasi}h</td><td><span class="badge badge-${p.status==='approved'?'success':p.status==='rejected'?'danger':'warning'}">${p.status}</span></td></tr>`;});document.getElementById('tblPortalCuti').innerHTML=h;}
+async function renderPortalCuti(){
+  const main=document.getElementById('mainContent');
+  // Get karyawan data for quota calculation
+  const kSnap=await db.collection('hrd_karyawan').where('nama','==',currentUser.nama).limit(1).get();
+  const kData=kSnap.empty?{tanggalMasuk:'',status:'aktif'}:kSnap.docs[0].data();
+  const jatah=hitungJatahCuti(kData);
+  const snap=await db.collection('hrd_cuti').where('userId','==',currentUser.id).get();
+  let used=0;
+  snap.forEach(d=>{const p=d.data();if(p.status==='approved'&&p.jenis==='Cuti Tahunan')used+=(p.durasi||1);});
+  const sisa=Math.max(0,jatah-used);
+  const masaKerja=hitungMasaKerja(kData.tanggalMasuk);
+
+  main.innerHTML=`<div class="page-title"><span>🏖️ Cuti Saya</span><button class="btn btn-primary btn-sm" onclick="modalCuti()">+ Ajukan</button></div>
+    <div class="stats-grid mb-16">
+      <div class="stat-card" style="border-left-color:var(--primary)"><div class="stat-value" style="color:var(--primary)">${jatah}</div><div class="stat-label">Jatah Cuti/Tahun</div></div>
+      <div class="stat-card" style="border-left-color:var(--warning)"><div class="stat-value" style="color:var(--warning)">${used}</div><div class="stat-label">Terpakai</div></div>
+      <div class="stat-card" style="border-left-color:${sisa<=2?'var(--danger)':'var(--success)'}"><div class="stat-value" style="color:${sisa<=2?'var(--danger)':'var(--success)'}">${sisa}</div><div class="stat-label">Sisa Cuti</div></div>
+      <div class="stat-card" style="border-left-color:#795548"><div class="stat-value" style="color:#795548;font-size:.9rem">${masaKerja}</div><div class="stat-label">Masa Kerja</div></div>
+    </div>
+    <div class="card mb-8" style="background:#f0f4ff;border-left:4px solid var(--info);padding:12px">
+      <div class="text-xs" style="line-height:1.6"><b>Ketentuan Cuti:</b><br>• Cuti tahunan: ${jatah} hari (berdasarkan masa kerja ${masaKerja})<br>• Minimal 1 tahun kerja untuk jatah penuh 12 hari<br>• Bonus +1 hari per 2 tahun kerja (max 18 hari)<br>• Cuti sakit & melahirkan tidak mengurangi jatah cuti tahunan</div>
+    </div>
+    <div class="card"><div class="table-wrap"><table><thead><tr><th>Jenis</th><th>Tanggal</th><th>Durasi</th><th>Status</th></tr></thead><tbody id="tblPortalCuti"></tbody></table></div></div>`;
+  let h='';if(snap.empty)h='<tr><td colspan="4" class="text-center">Belum ada</td></tr>';
+  else{const items=[];snap.forEach(d=>items.push({id:d.id,...d.data()}));items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));items.forEach(p=>{h+=`<tr><td>${escHtml(p.jenis)}</td><td>${formatDate(p.mulai)}-${formatDate(p.selesai)}</td><td>${p.durasi||1} hari</td><td><span class="badge badge-${p.status==='approved'?'success':p.status==='rejected'?'danger':'warning'}">${p.status}</span></td></tr>`;});}
+  document.getElementById('tblPortalCuti').innerHTML=h;
+}
 async function renderPortalGaji(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>💰 Slip Gaji Saya</span></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Periode</th><th>Gaji Pokok</th><th>Total</th><th>Aksi</th></tr></thead><tbody id="tblPortalGaji"></tbody></table></div></div>`;const snap=await db.collection('hrd_penggajian').where('nama','==',currentUser.nama).get();let h='';if(snap.empty)h='<tr><td colspan="4" class="text-center">Belum ada</td></tr>';else snap.forEach(d=>{const p=d.data();h+=`<tr><td>${p.periode}</td><td>${formatCurrency(p.gajiPokok)}</td><td class="fw-700">${formatCurrency(p.totalBersih)}</td><td><button class="btn btn-xs btn-info" onclick="lihatSlip('${d.id}')">📄</button></td></tr>`;});document.getElementById('tblPortalGaji').innerHTML=h;}
 function renderPortalJobdesk(){
   const main=document.getElementById('mainContent');

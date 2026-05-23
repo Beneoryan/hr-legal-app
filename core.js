@@ -67,6 +67,7 @@ async function doLogin(username, password) {
   if (data.status === 'nonaktif') throw new Error('Akun dinonaktifkan');
   currentUser = { id: doc.id, ...data };
   localStorage.setItem('hrd_session', JSON.stringify(currentUser));
+  // Langsung ke beranda
   currentPage = currentUser.role === 'karyawan' ? 'portal' : 'dashboard';
   renderApp();
 }
@@ -109,6 +110,7 @@ function renderApp() {
   </div>
   <div class="header">
     <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+    <div class="home-btn" onclick="navigateTo('${isKaryawan?'portal':'dashboard'}')" title="Beranda" style="cursor:pointer;font-size:1.3rem;margin-right:8px">🏠</div>
     <div class="title">HRD & Legal IJEF Corp</div>
     <div class="notif-badge" onclick="navigateTo('notifikasi')" title="Notifikasi">🔔<span class="count" id="notifCount" style="display:none">0</span></div>
     <div class="user-info">
@@ -127,7 +129,14 @@ function renderApp() {
 
 function buildNavItems(isKaryawan) {
   if (isKaryawan) {
-    return navGroup('Portal Saya',[['portal','🏠','Beranda'],['portal-absensi','📍','Absensi'],['portal-cuti','🏖️','Cuti & Izin'],['portal-gaji','💰','Slip Gaji'],['portal-reimburse','🧾','Reimburse'],['portal-kasbon','💳','Kasbon & Loan'],['portal-jobdesk','📋','Jobdesk'],['portal-disc','🧠','DISC Test'],['portal-kpi','📈','KPI Saya'],['portal-struktur','🌳','Struktur Org'],['portal-libur','📅','Hari Libur'],['portal-peraturan','📜','Peraturan'],['portal-pengumuman','📢','Pengumuman'],['portal-broadcast','📡','Broadcast'],['portal-meeting','📅','Meeting'],['portal-invite','✉️','Undangan'],['inbox','📥','Inbox Meeting'],['chat','💬','Obrolan'],['portal-setting','⚙️','Setting Akun']]);
+    let nav='';
+    nav+=navGroup('Utama',[['portal','🏠','Beranda'],['portal-absensi','📍','Absensi'],['portal-cuti','🏖️','Cuti & Izin']]);
+    nav+=navGroup('Keuangan',[['portal-gaji','💰','Slip Gaji'],['portal-reimburse','🧾','Reimburse'],['portal-kasbon','💳','Kasbon & Loan']]);
+    nav+=navGroup('Pekerjaan',[['portal-jobdesk','📋','Jobdesk'],['portal-disc','🧠','DISC Test'],['portal-kpi','📈','KPI Saya']]);
+    nav+=navGroup('Organisasi',[['portal-struktur','🌳','Struktur Org'],['portal-libur','📅','Hari Libur'],['portal-peraturan','📜','Peraturan']]);
+    nav+=navGroup('Komunikasi',[['portal-pengumuman','📢','Pengumuman'],['portal-broadcast','📡','Broadcast'],['portal-meeting','📅','Meeting'],['portal-invite','✉️','Undangan'],['inbox','📥','Inbox'],['chat','💬','Obrolan']]);
+    nav+=navGroup('Pengaturan',[['portal-setting','⚙️','Setting Akun']]);
+    return nav;
   }
   let nav='';
   nav+=navGroup('Utama',[['dashboard','📊','Dashboard'],['approval-center','✅','Approval Center'],['notifikasi','🔔','Notifikasi'],['pengumuman','📢','Pengumuman']]);
@@ -285,37 +294,50 @@ function listenNotifications(){
 
 // ── NOTIFICATION SOUND — Loud & Clear ─────────────────────────
 let _notifSoundCooldown=false;
-function playNotificationSound(){
-  if(_notifSoundCooldown)return; // Prevent spam
-  _notifSoundCooldown=true;
-  setTimeout(()=>{_notifSoundCooldown=false;},2000);
-  try{
+let _notifAudioCtx=null;
+function getAudioContext(){
+  if(!_notifAudioCtx||_notifAudioCtx.state==='closed'){
     const AudioCtx=window.AudioContext||window.webkitAudioContext;
-    const ctx=new AudioCtx();
-    // Play a loud, clear 3-tone notification chime
-    const playTone=(freq,startTime,duration)=>{
+    _notifAudioCtx=new AudioCtx();
+  }
+  if(_notifAudioCtx.state==='suspended') _notifAudioCtx.resume();
+  return _notifAudioCtx;
+}
+function playNotificationSound(){
+  if(_notifSoundCooldown)return;
+  _notifSoundCooldown=true;
+  setTimeout(()=>{_notifSoundCooldown=false;},3000);
+  try{
+    const ctx=getAudioContext();
+    const playTone=(freq,startTime,duration,vol)=>{
       const osc=ctx.createOscillator();
       const gain=ctx.createGain();
       osc.connect(gain);
       gain.connect(ctx.destination);
-      osc.type='sine';
+      osc.type='square'; // square wave = louder & more piercing
       osc.frequency.setValueAtTime(freq,ctx.currentTime+startTime);
-      gain.gain.setValueAtTime(0.8,ctx.currentTime+startTime);
+      gain.gain.setValueAtTime(vol||1.0,ctx.currentTime+startTime);
+      gain.gain.setValueAtTime(vol||1.0,ctx.currentTime+startTime+duration*0.7);
       gain.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+startTime+duration);
       osc.start(ctx.currentTime+startTime);
       osc.stop(ctx.currentTime+startTime+duration);
     };
-    // 3-tone chime: C5, E5, G5 (bright & attention-grabbing)
-    playTone(523,0,0.15);
-    playTone(659,0.15,0.15);
-    playTone(784,0.3,0.3);
-    // Second round (repeat for emphasis)
-    playTone(523,0.7,0.15);
-    playTone(659,0.85,0.15);
-    playTone(784,1.0,0.3);
-    setTimeout(()=>ctx.close(),2000);
+    // Loud 3-tone chime x3 (very attention-grabbing)
+    playTone(880,0,0.12,1.0);      // A5
+    playTone(1109,0.12,0.12,1.0);  // C#6
+    playTone(1319,0.24,0.25,1.0);  // E6
+    // Repeat louder
+    playTone(880,0.55,0.12,1.0);
+    playTone(1109,0.67,0.12,1.0);
+    playTone(1319,0.79,0.25,1.0);
+    // Third time
+    playTone(1319,1.1,0.12,1.0);
+    playTone(1568,1.22,0.3,1.0);   // G6 - highest
   }catch(e){console.warn('Notification sound failed:',e);}
 }
+// Activate audio context on first user interaction (required by browsers)
+document.addEventListener('click',function _initAudio(){getAudioContext();document.removeEventListener('click',_initAudio);},{once:true});
+document.addEventListener('touchstart',function _initAudio2(){getAudioContext();document.removeEventListener('touchstart',_initAudio2);},{once:true});
 
 async function updateNotifBadge(){
   const[s1,s2]=await Promise.all([
