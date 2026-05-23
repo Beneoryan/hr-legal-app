@@ -128,6 +128,15 @@ function renderApp() {
   setupRealtimeSync();
   // Load company branding (logo)
   if(typeof loadCompanyBranding==='function') loadCompanyBranding();
+  // Refresh user data from Firestore (get latest profilePic etc)
+  db.collection('hrd_users').doc(currentUser.id).get().then(doc=>{
+    if(!doc.exists)return;const d=doc.data();
+    let changed=false;
+    if(d.profilePic&&d.profilePic!==currentUser.profilePic){currentUser.profilePic=d.profilePic;changed=true;}
+    if(d.departemen&&d.departemen!==currentUser.departemen){currentUser.departemen=d.departemen;changed=true;}
+    if(d.posisi&&d.posisi!==currentUser.posisi){currentUser.posisi=d.posisi;changed=true;}
+    if(changed){localStorage.setItem('hrd_session',JSON.stringify(currentUser));const av=document.querySelector('.header .avatar');if(av&&currentUser.profilePic)av.innerHTML=`<img src="${currentUser.profilePic}" style="width:100%;height:100%;border-radius:50%;object-fit:cover">`;}
+  }).catch(()=>{});
   // Auto-load national holidays if not yet populated
   autoLoadHariLiburNasional().catch(()=>{});
 }
