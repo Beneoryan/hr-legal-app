@@ -3562,5 +3562,37 @@ async function renderPortalKasbon(){const main=document.getElementById('mainCont
 async function renderPortalKPI(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>📈 KPI Saya</span></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Periode</th><th>Skor</th><th>Grade</th><th>Penilai</th><th>Catatan</th></tr></thead><tbody id="tblMyKPI"></tbody></table></div></div>`;const snap=await db.collection('hrd_kpi').get();const items=[];snap.forEach(d=>{const r=d.data();if((r.nama||'').toLowerCase()===currentUser.nama.toLowerCase())items.push(r);});items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));let h='';if(!items.length)h='<tr><td colspan="5" class="text-center">Belum ada penilaian</td></tr>';else items.forEach(p=>{const grade=p.skor>=90?'A':p.skor>=80?'B':p.skor>=70?'C':p.skor>=60?'D':'E';h+=`<tr><td>${escHtml(p.periode||'-')}</td><td><span class="badge badge-${p.skor>=80?'success':p.skor>=60?'warning':'danger'}">${p.skor}/100</span></td><td class="fw-700">${grade}</td><td>${escHtml(p.penilai||'-')}</td><td style="font-size:.78rem">${escHtml(p.catatan||'-')}</td></tr>`;});document.getElementById('tblMyKPI').innerHTML=h;}
 
 // ── PORTAL: SETTING AKUN ──────────────────────────────────────
-function renderPortalSetting(){const u=currentUser;const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>⚙️ Setting Akun</span></div><div class="card"><h4 class="color-primary mb-16">👤 Data Pribadi</h4><div class="grid-2"><div class="form-group"><label>Nama</label><input class="form-control" id="psNama" value="${escHtml(u.nama||'')}"></div><div class="form-group"><label>Username</label><input class="form-control" id="psUser" value="${escHtml(u.id||'')}"></div><div class="form-group"><label>Email</label><input class="form-control" id="psEmail" value="${escHtml(u.email||'')}"></div><div class="form-group"><label>Telepon</label><input class="form-control" id="psTelp" value="${escHtml(u.telepon||'')}"></div><div class="form-group"><label>Password Baru</label><input class="form-control" type="password" id="psPass" placeholder="Kosongkan jika tidak diubah"></div><div class="form-group"><label>Departemen</label><input class="form-control" value="${escHtml(u.departemen||'-')}" readonly></div></div><button class="btn btn-primary" onclick="simpanPortalSetting()">💾 Simpan Perubahan</button></div>`;}
-async function simpanPortalSetting(){const data={nama:document.getElementById('psNama').value,email:document.getElementById('psEmail').value,telepon:document.getElementById('psTelp').value,updatedAt:new Date().toISOString()};const newPass=document.getElementById('psPass').value;if(newPass)data.password=newPass;const newUser=document.getElementById('psUser').value.trim();if(newUser&&newUser!==currentUser.id){await db.collection('hrd_users').doc(newUser).set({...currentUser,...data,username:newUser});await db.collection('hrd_users').doc(currentUser.id).delete();currentUser={...currentUser,...data,id:newUser};localStorage.setItem('hrd_session',JSON.stringify(currentUser));}else{await db.collection('hrd_users').doc(currentUser.id).update(data);currentUser={...currentUser,...data};localStorage.setItem('hrd_session',JSON.stringify(currentUser));}toast('Akun diperbarui','success');}
+function renderPortalSetting(){const u=currentUser;const main=document.getElementById('mainContent');const avatar=u.profilePic||'';main.innerHTML=`<div class="page-title"><span>⚙️ Setting Akun</span></div><div class="card"><h4 class="color-primary mb-16">👤 Data Pribadi</h4>
+  <div style="display:flex;align-items:center;gap:20px;margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--border)">
+    <div id="psAvatarPreview" style="width:80px;height:80px;border-radius:50%;border:3px solid var(--accent);overflow:hidden;display:flex;align-items:center;justify-content:center;background:#f5f5f5;font-size:2rem;font-weight:700;color:var(--primary);cursor:pointer" onclick="document.getElementById('psAvatarFile').click()">${avatar?`<img src="${avatar}" style="width:100%;height:100%;object-fit:cover">`:`${u.nama?.charAt(0)||'?'}`}</div>
+    <div>
+      <input type="file" id="psAvatarFile" accept="image/png,image/jpeg,image/webp" style="display:none" onchange="previewProfilePic(this)">
+      <button class="btn btn-sm btn-primary" onclick="document.getElementById('psAvatarFile').click()">📷 Upload Foto Profil</button>
+      <div class="text-xs mt-4" style="color:#999">Klik foto atau tombol untuk upload. Format: JPG/PNG.</div>
+    </div>
+  </div>
+  <div class="grid-2"><div class="form-group"><label>Nama</label><input class="form-control" id="psNama" value="${escHtml(u.nama||'')}"></div><div class="form-group"><label>Username</label><input class="form-control" id="psUser" value="${escHtml(u.id||'')}"></div><div class="form-group"><label>Email</label><input class="form-control" id="psEmail" value="${escHtml(u.email||'')}"></div><div class="form-group"><label>Telepon</label><input class="form-control" id="psTelp" value="${escHtml(u.telepon||'')}"></div><div class="form-group"><label>Password Baru</label><input class="form-control" type="password" id="psPass" placeholder="Kosongkan jika tidak diubah"></div><div class="form-group"><label>Departemen</label><input class="form-control" value="${escHtml(u.departemen||'-')}" readonly></div></div><button class="btn btn-primary" onclick="simpanPortalSetting()">💾 Simpan Perubahan</button></div>`;}
+
+function previewProfilePic(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      // Crop to square center and resize to 128x128
+      const canvas=document.createElement('canvas');
+      canvas.width=128;canvas.height=128;
+      const ctx=canvas.getContext('2d');
+      const size=Math.min(img.width,img.height);
+      const sx=(img.width-size)/2,sy=(img.height-size)/2;
+      ctx.beginPath();ctx.arc(64,64,64,0,Math.PI*2);ctx.clip();
+      ctx.drawImage(img,sx,sy,size,size,0,0,128,128);
+      window._profilePic=canvas.toDataURL('image/jpeg',0.8);
+      document.getElementById('psAvatarPreview').innerHTML=`<img src="${window._profilePic}" style="width:100%;height:100%;object-fit:cover">`;
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function simpanPortalSetting(){const data={nama:document.getElementById('psNama').value,email:document.getElementById('psEmail').value,telepon:document.getElementById('psTelp').value,updatedAt:new Date().toISOString()};if(window._profilePic)data.profilePic=window._profilePic;const newPass=document.getElementById('psPass').value;if(newPass)data.password=newPass;const newUser=document.getElementById('psUser').value.trim();if(newUser&&newUser!==currentUser.id){await db.collection('hrd_users').doc(newUser).set({...currentUser,...data,username:newUser});await db.collection('hrd_users').doc(currentUser.id).delete();currentUser={...currentUser,...data,id:newUser};localStorage.setItem('hrd_session',JSON.stringify(currentUser));}else{await db.collection('hrd_users').doc(currentUser.id).update(data);currentUser={...currentUser,...data};localStorage.setItem('hrd_session',JSON.stringify(currentUser));}window._profilePic=null;toast('Akun diperbarui','success');renderApp();}

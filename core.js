@@ -117,7 +117,7 @@ function renderApp() {
     <div class="title">${isKaryawan?'IMS Karyawan':'IMS (IJEF Management System)'}</div>
     <div class="notif-badge" onclick="navigateTo('notifikasi')" title="Notifikasi">🔔<span class="count" id="notifCount" style="display:none">0</span></div>
     <div class="user-info">
-      <div class="avatar">${currentUser.nama.charAt(0)}</div>
+      <div class="avatar">${currentUser.profilePic?`<img src="${currentUser.profilePic}" style="width:100%;height:100%;border-radius:50%;object-fit:cover">`:currentUser.nama.charAt(0)}</div>
       <span>${currentUser.nama}</span>
       <button class="btn btn-xs" style="background:rgba(255,255,255,.15);color:#fff" onclick="doLogout()">Keluar</button>
     </div>
@@ -159,9 +159,19 @@ function buildNavItems(isKaryawan) {
 }
 
 function navGroup(title, items) {
-  let html=`<div class="nav-group"><div class="nav-group-title">${title}</div>`;
+  const hasActive=items.some(([page])=>currentPage===page);
+  let html=`<div class="nav-group"><div class="nav-group-title" onclick="toggleNavGroup(this)"><span>${title}</span><span class="nav-arrow${hasActive?' open':''}">▾</span></div><div class="nav-group-items"${hasActive?'':' style="display:none"'}>`;
   items.forEach(([page,icon,label])=>{html+=`<div class="nav-item${currentPage===page?' active':''}" onclick="navigateTo('${page}')"><span class="icon">${icon}</span><span>${label}</span></div>`;});
-  return html+'</div>';
+  return html+'</div></div>';
+}
+
+function toggleNavGroup(el){
+  const items=el.nextElementSibling;
+  const arrow=el.querySelector('.nav-arrow');
+  if(!items)return;
+  const isHidden=items.style.display==='none';
+  items.style.display=isHidden?'block':'none';
+  if(arrow)arrow.classList.toggle('open',isHidden);
 }
 
 function navigateTo(page) {
