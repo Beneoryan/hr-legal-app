@@ -1208,7 +1208,7 @@ async function rsvpInvite(inviteId, meetingId, status) {
 async function renderChat() {
   const main = document.getElementById('mainContent');
   main.innerHTML = `
-    <div class="page-title"><span>💬 Obrolan</span><button class="btn btn-primary btn-sm" onclick="modalNewChat()">+ Mulai Obrolan</button></div>
+    <div class="page-title"><span>💬 Obrolan</span><div class="flex gap-8"><button class="btn btn-primary btn-sm" onclick="modalNewChat()">+ Chat Personal</button><button class="btn btn-info btn-sm" onclick="modalGroupChat()">👥 Group Departemen</button></div></div>
     <div class="grid-2">
       <div class="card">
         <div class="card-title mb-8">📤 Percakapan</div>
@@ -1325,6 +1325,30 @@ async function startNewChat() {
   toast('Pesan terkirim', 'success');
   loadChatThreads();
   openChatThread(threadId);
+}
+
+async function modalGroupChat(){
+  const users=await getAllUsers();const depts=new Set();users.forEach(u=>depts.add(u.departemen||''));
+  let deptOpts='';depts.forEach(d=>{if(d)deptOpts+=`<option value="${escHtml(d)}">${escHtml(d)}</option>`;});
+  openModal(`<div class="modal-title">👥 Obrolan Group Departemen</div>
+    <div class="form-group"><label>Pilih Departemen</label><select class="form-control" id="grpDept">${deptOpts}</select></div>
+    <div class="form-group"><label>Pesan</label><textarea class="form-control" id="grpMsg" placeholder="Ketik pesan untuk group..."></textarea></div>
+    <button class="btn btn-primary" onclick="sendGroupChat()">📤 Kirim ke Group</button>`);
+}
+async function sendGroupChat(){
+  const dept=document.getElementById('grpDept').value;const msg=document.getElementById('grpMsg').value.trim();
+  if(!msg)return toast('Tulis pesan','warning');
+  const users=await getAllUsers();const targets=users.filter(u=>(u.departemen||'')===dept);
+  // Send as broadcast-style to each user in dept
+  for(const u of targets){
+    if(u.id===currentUser.id)continue;
+    let threadId=null;const snap=await db.collection('hrd_chat_threads').where('participants','array-contains',currentUser.id).get();
+    snap.forEach(d=>{const data=d.data();if(data.participants&&data.participants.includes(u.id))threadId=d.id;});
+    if(!threadId){const ref=await db.collection('hrd_chat_threads').add({fromUser:currentUser.id,fromName:currentUser.nama,toUser:u.id,toName:u.nama,participants:[currentUser.id,u.id],lastMessage:msg,lastMessageAt:new Date().toISOString(),createdAt:new Date().toISOString()});threadId=ref.id;}
+    await db.collection('hrd_chat_messages').add({threadId,fromUser:currentUser.id,fromName:currentUser.nama,message:`[Group ${dept}] ${msg}`,createdAt:new Date().toISOString()});
+    await db.collection('hrd_chat_threads').doc(threadId).update({lastMessage:`[Group ${dept}] ${msg}`,lastMessageAt:new Date().toISOString()});
+  }
+  closeModalDirect();toast(`Pesan terkirim ke ${targets.length-1} anggota ${dept}`,'success');loadChatThreads();
 }
 
 function openChatThread(threadId) {
