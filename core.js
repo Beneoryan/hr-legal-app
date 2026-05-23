@@ -15,7 +15,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-const ROLES = { admin:5, bod:4, head:3, manager:3, leader:2, staff:1 };
+const ROLES = { admin:6, bod:5, head:4, manager:3, leader:2, staff:1 };
 
 const DEFAULT_ACCOUNTS = [
   { username:'admin', password:'admin123', role:'admin', nama:'Administrator', departemen:'Management' },
@@ -156,24 +156,22 @@ function buildNavItems(isPortalUser) {
   // ADMIN / BOD / HEAD / MANAGER dashboard
   let nav='';
   nav+=navGroup('🏠 Utama',[['dashboard','📊','Dashboard'],['approval-center','✅','Approval Center'],['notifikasi','🔔','Notifikasi'],['pengumuman','📢','Pengumuman']]);
-  // BOD & Admin: full access
-  if(hasAccess(4)){
-    nav+=navGroup('🏢 Perusahaan',[['departemen','🏢','Departemen'],['posisi','💼','Posisi'],['cabang','🏛️','Cabang']]);
-  }
+  nav+=navGroup('🏢 Perusahaan',[['departemen','🏢','Departemen'],['posisi','💼','Posisi'],['cabang','🏛️','Cabang']]);
   nav+=navGroup('👥 Karyawan',[['karyawan','👥','Data Karyawan'],['struktur-org','🌳','Struktur Org'],['jobdesk-mgmt','📋','Kelola Jobdesk'],['onboarding','🚀','Onboarding'],['offboarding','📦','Offboarding']]);
-  if(hasAccess(4)){
-    nav+=navGroup('🔍 Rekrutmen',[['lowongan','📝','Lowongan'],['pipeline','🔄','Pipeline Kanban'],['kandidat','🧑‍💼','Kandidat']]);
-  }
+  // Manager+ gets Rekrutmen
+  if(hasAccess(3)) nav+=navGroup('🔍 Rekrutmen',[['lowongan','📝','Lowongan'],['pipeline','🔄','Pipeline Kanban'],['kandidat','🧑‍💼','Kandidat']]);
   nav+=navGroup('📍 Kehadiran',[['absensi','📍','Absensi IJEF'],['cuti','🏖️','Cuti/Izin/WFH'],['overtime','⏰','Overtime'],['hari-libur','📅','Hari Libur'],['penalty','⚠️','Penalty Point']]);
   nav+=navGroup('💰 Keuangan',[['penggajian','💰','Penggajian'],['insentif','🏆','Insentif'],['reimbursement','🧾','Reimbursement'],['kasbon','💳','Kasbon & Loan'],['tunjangan','🎁','Tunjangan']]);
   nav+=navGroup('📈 Kinerja',[['kpi','📈','KPI & Penilaian'],['pelatihan','🎓','Pelatihan'],['disc-test','🧠','DISC Test']]);
-  if(hasAccess(4)){
-    nav+=navGroup('📄 Legal & Aset',[['kontrak','📄','Kontrak'],['asset','💻','Asset'],['peraturan','📜','Peraturan'],['surat','✉️','Generator Surat']]);
-  }
+  // Manager+ gets Legal & Aset
+  if(hasAccess(3)) nav+=navGroup('📄 Legal & Aset',[['kontrak','📄','Kontrak'],['asset','💻','Asset'],['peraturan','📜','Peraturan'],['surat','✉️','Generator Surat']]);
   nav+=navGroup('💬 Komunikasi',[['meeting','📅','Meeting & Invite'],['chat','💬','Obrolan Divisi'],['broadcast','📡','Broadcast'],['inbox','📥','Inbox Saya']]);
-  if(hasAccess(5)){
-    nav+=navGroup('🔗 Portal',[['portal-share','🔗','Download Aplikasi']]);
+  // Manager+ gets QR & PWA, Admin gets full settings
+  if(hasAccess(3)) nav+=navGroup('🔗 Portal',[['portal-share','🔗','Download Aplikasi']]);
+  if(hasAccess(6)){
     nav+=navGroup('⚙️ Pengaturan',[['akun','👤','Manajemen Akun'],['approval-mgmt','⚙️','Approval Mgmt'],['qr-share','📱','QR & PWA']]);
+  } else if(hasAccess(3)){
+    nav+=navGroup('⚙️ Pengaturan',[['qr-share','📱','QR & PWA']]);
   }
   return nav;
 }
