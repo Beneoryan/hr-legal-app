@@ -111,7 +111,7 @@ function renderApp() {
   <div class="header">
     <button class="menu-btn" onclick="toggleSidebar()">☰</button>
     <div class="home-btn" onclick="navigateTo('${isKaryawan?'portal':'dashboard'}')" title="Beranda" style="cursor:pointer;font-size:1.3rem;margin-right:8px">🏠</div>
-    <div class="title">HRD & Legal IJEF Corp</div>
+    <div class="title">${isKaryawan?'Portal Karyawan IJEF':'HRD & Legal IJEF Corp'}</div>
     <div class="notif-badge" onclick="navigateTo('notifikasi')" title="Notifikasi">🔔<span class="count" id="notifCount" style="display:none">0</span></div>
     <div class="user-info">
       <div class="avatar">${currentUser.nama.charAt(0)}</div>

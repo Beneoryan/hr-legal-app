@@ -1408,22 +1408,23 @@ async function createAndJoinMeeting(mode){
 function joinOnlineMeeting(roomId,mode){
   const jitsiDomain='meet.jit.si';
   const displayName=encodeURIComponent(currentUser.nama);
-  let url=`https://${jitsiDomain}/${roomId}#userInfo.displayName="${displayName}"`;
+  let url=`https://${jitsiDomain}/${roomId}#userInfo.displayName=%22${displayName}%22`;
   if(mode==='audio')url+=`&config.startWithVideoMuted=true`;
 
   // Open in modal (embedded) or new tab based on device
   const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   if(isMobile){
-    // Mobile: open in new tab (Jitsi works better full-screen on mobile)
     window.open(url,'_blank');
     toast('Meeting dibuka di tab baru','info');
   }else{
-    // Desktop: show in embedded iframe
+    // Store URL globally so buttons can access it
+    window._currentMeetingUrl=url;
+    window._currentMeetingRoom=roomId;
     openModal(`<div class="modal-title">🎥 Meeting Online</div>
       <div style="margin-bottom:8px" class="flex gap-8">
-        <button class="btn btn-sm btn-info" onclick="window.open('${url}','_blank')">↗️ Buka di Tab Baru</button>
-        <button class="btn btn-sm btn-outline" onclick="copyMeetingLink('${roomId}')">📋 Salin Link</button>
-        <button class="btn btn-sm btn-warning" onclick="shareMeetingWA('${roomId}','${encodeURIComponent(document.getElementById('omJudul')?.value||'Meeting')}')">💬 Share WA</button>
+        <button class="btn btn-sm btn-info" onclick="window.open(window._currentMeetingUrl,'_blank')">↗️ Buka di Tab Baru</button>
+        <button class="btn btn-sm btn-outline" onclick="copyMeetingLink(window._currentMeetingRoom)">📋 Salin Link</button>
+        <button class="btn btn-sm btn-warning" onclick="shareMeetingWA(window._currentMeetingRoom,'Meeting')">💬 Share WA</button>
       </div>
       <div style="border-radius:12px;overflow:hidden;border:2px solid var(--primary)">
         <iframe src="${url}" style="width:100%;height:500px;border:none" allow="camera;microphone;display-capture;autoplay;clipboard-write"></iframe>
