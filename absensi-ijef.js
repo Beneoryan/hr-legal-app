@@ -9,14 +9,17 @@ let dinasStream = null, dinasPhoto = null, dinasGPS = null;
 // ── MAIN RENDER ───────────────────────────────────────────────
 function renderAbsensiIJEF() {
   const main = document.getElementById('mainContent');
+  const isPortal=window._portalAbsensiMode||currentUser.role==='karyawan';
+  const showImport=hasAccess(3);
   main.innerHTML = `<div class="page-title"><span>📍 Absensi IJEF</span></div>
     <div class="tabs" id="absenTabs">
       <div class="tab active" onclick="showAbsenTab('clock')">⏰ Clock In/Out</div>
       <div class="tab" onclick="showAbsenTab('dinas')">🚗 Dinas Luar</div>
       <div class="tab" onclick="showAbsenTab('rekap')">📊 Rekap</div>
-      <div class="tab" onclick="showAbsenTab('import')">📥 Import</div>
+      ${showImport?'<div class="tab" onclick="showAbsenTab(\'import\')">📥 Import</div>':''}
       ${hasAccess(3)?'<div class="tab" onclick="showAbsenTab(\'setting\')">⚙️ Setting</div>':''}
     </div><div id="absenContent"></div>`;
+  window._portalAbsensiMode=isPortal;
   showAbsenTab('clock');
 }
 
@@ -874,6 +877,9 @@ async function loadRekapGrid(){
   const sett = settDoc.exists ? settDoc.data() : {};
   const flex = sett.flexTime || { enabled: true, durasiKerja: 8, durasiIstirahat: 1 };
   const users=[];usersSnap.forEach(d=>users.push({id:d.id,...d.data()}));
+  // Portal mode: only show current user (unless GM/admin)
+  const isPortalMode=window._portalAbsensiMode&&!hasAccess(2);
+  const filteredUsers=isPortalMode?users.filter(u=>u.nama?.toLowerCase()===currentUser.nama?.toLowerCase()||u.id===currentUser.id):users;
   const absenMap={};
   const jamKerjaMap={};
   const lemburMap={};
@@ -884,7 +890,7 @@ async function loadRekapGrid(){
   h+='<th>Total</th><th>Lembur</th></tr></thead><tbody>';
   let totalH=0,totalT=0,totalD=0,totalK=0,totalL=0,totalLembur=0,totalLemburJam=0;
 
-  users.forEach(u=>{
+  filteredUsers.forEach(u=>{
     h+=`<tr><td class="text-sm fw-700">${escHtml(u.nama)}</td>`;
     let ut=0;
     let userLemburJam=0;

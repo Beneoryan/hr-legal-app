@@ -15,7 +15,7 @@ async function renderDashboard() {
     <div class="stat-card"><div class="stat-icon">📢</div><div class="stat-value">${pengumuman.size}</div><div class="stat-label">Pengumuman</div></div>`;
   let aHtml='<div class="card"><div class="card-title">📢 Pengumuman Terbaru</div>';
   if(pengumuman.empty)aHtml+='<p class="text-sm" style="color:#999;margin-top:8px">Belum ada</p>';
-  else pengumuman.forEach(d=>{const p=d.data();aHtml+=`<div style="padding:8px 0;border-bottom:1px solid var(--border)"><div class="fw-700 text-sm">${escHtml(p.judul)}</div><div class="text-xs" style="color:#999">${formatDate(p.createdAt)}</div></div>`;});
+  else pengumuman.forEach(d=>{const p=d.data();aHtml+=`<div style="padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="viewPengumuman('${d.id}')"><div class="fw-700 text-sm">${escHtml(p.judul)}</div><div class="text-xs" style="color:#999">${formatDate(p.createdAt)}</div></div>`;});
   aHtml+='</div>';
   document.getElementById('dashWidgets').innerHTML=aHtml+'<div class="card"><div class="card-title">⚡ Aksi Cepat</div><div class="flex flex-wrap gap-8 mt-8"><button class="btn btn-primary btn-sm" onclick="navigateTo(\'absensi\')">📍 Absensi</button><button class="btn btn-info btn-sm" onclick="navigateTo(\'cuti\')">🏖️ Cuti</button><button class="btn btn-success btn-sm" onclick="navigateTo(\'karyawan\')">👥 Karyawan</button><button class="btn btn-warning btn-sm" onclick="navigateTo(\'approval-center\')">✅ Approval</button></div></div>';
 }
@@ -1328,9 +1328,12 @@ async function startNewChat() {
 }
 
 async function modalGroupChat(){
-  const users=await getAllUsers();const depts=new Set();users.forEach(u=>depts.add(u.departemen||''));
-  let deptOpts='';depts.forEach(d=>{if(d)deptOpts+=`<option value="${escHtml(d)}">${escHtml(d)}</option>`;});
+  const kSnap=await db.collection('hrd_karyawan').where('status','==','aktif').get();
+  const depts=new Set();kSnap.forEach(d=>depts.add(d.data().departemen||''));
+  let deptOpts='<option value="superadmin">🔧 Superadmin (Komplain & Kendala Sistem)</option>';
+  depts.forEach(d=>{if(d)deptOpts+=`<option value="${escHtml(d)}">🏢 ${escHtml(d)}</option>`;});
   openModal(`<div class="modal-title">👥 Obrolan Group Departemen</div>
+    <div style="background:#e3f2fd;border-radius:8px;padding:10px;margin-bottom:14px;font-size:.82rem;border-left:4px solid var(--info)">Kirim pesan ke semua anggota departemen. Pilih "Superadmin" untuk komplain/kendala sistem.</div>
     <div class="form-group"><label>Pilih Departemen</label><select class="form-control" id="grpDept">${deptOpts}</select></div>
     <div class="form-group"><label>Pesan</label><textarea class="form-control" id="grpMsg" placeholder="Ketik pesan untuk group..."></textarea></div>
     <button class="btn btn-primary" onclick="sendGroupChat()">📤 Kirim ke Group</button>`);
@@ -1338,17 +1341,26 @@ async function modalGroupChat(){
 async function sendGroupChat(){
   const dept=document.getElementById('grpDept').value;const msg=document.getElementById('grpMsg').value.trim();
   if(!msg)return toast('Tulis pesan','warning');
-  const users=await getAllUsers();const targets=users.filter(u=>(u.departemen||'')===dept);
-  // Send as broadcast-style to each user in dept
-  for(const u of targets){
-    if(u.id===currentUser.id)continue;
-    let threadId=null;const snap=await db.collection('hrd_chat_threads').where('participants','array-contains',currentUser.id).get();
-    snap.forEach(d=>{const data=d.data();if(data.participants&&data.participants.includes(u.id))threadId=d.id;});
-    if(!threadId){const ref=await db.collection('hrd_chat_threads').add({fromUser:currentUser.id,fromName:currentUser.nama,toUser:u.id,toName:u.nama,participants:[currentUser.id,u.id],lastMessage:msg,lastMessageAt:new Date().toISOString(),createdAt:new Date().toISOString()});threadId=ref.id;}
-    await db.collection('hrd_chat_messages').add({threadId,fromUser:currentUser.id,fromName:currentUser.nama,message:`[Group ${dept}] ${msg}`,createdAt:new Date().toISOString()});
-    await db.collection('hrd_chat_threads').doc(threadId).update({lastMessage:`[Group ${dept}] ${msg}`,lastMessageAt:new Date().toISOString()});
+  let targets=[];
+  if(dept==='superadmin'){
+    const usersSnap=await db.collection('hrd_users').get();
+    usersSnap.forEach(d=>{const u=d.data();if(u.role==='superadmin'||u.role==='admin')targets.push({id:d.id,nama:u.nama});});
+  }else{
+    const kSnap=await db.collection('hrd_karyawan').where('departemen','==',dept).get();
+    kSnap.forEach(d=>{const k=d.data();targets.push({id:d.id,nama:k.nama});});
   }
-  closeModalDirect();toast(`Pesan terkirim ke ${targets.length-1} anggota ${dept}`,'success');loadChatThreads();
+  const label=dept==='superadmin'?'Superadmin':dept;
+  for(const u of targets){
+    if(u.nama?.toLowerCase()===currentUser.nama?.toLowerCase())continue;
+    // Find or create thread
+    const userId=u.id||u.nama;
+    let threadId=null;const snap=await db.collection('hrd_chat_threads').where('participants','array-contains',currentUser.id).get();
+    snap.forEach(d=>{const data=d.data();if(data.participants&&(data.participants.includes(userId)||data.toName===u.nama))threadId=d.id;});
+    if(!threadId){const ref=await db.collection('hrd_chat_threads').add({fromUser:currentUser.id,fromName:currentUser.nama,toUser:userId,toName:u.nama,participants:[currentUser.id,userId],lastMessage:`[Group ${label}] ${msg}`,lastMessageAt:new Date().toISOString(),createdAt:new Date().toISOString()});threadId=ref.id;}
+    else{await db.collection('hrd_chat_threads').doc(threadId).update({lastMessage:`[Group ${label}] ${msg}`,lastMessageAt:new Date().toISOString()});}
+    await db.collection('hrd_chat_messages').add({threadId,fromUser:currentUser.id,fromName:currentUser.nama,message:`[Group ${label}] ${msg}`,createdAt:new Date().toISOString()});
+  }
+  closeModalDirect();toast(`Pesan terkirim ke ${targets.length} anggota ${label}`,'success');loadChatThreads();
 }
 
 function openChatThread(threadId) {
@@ -1822,9 +1834,13 @@ async function renderPortal(){const main=document.getElementById('mainContent');
   document.getElementById('pAbsen').textContent=absenSnap.size+' hari';
   document.getElementById('pCuti').textContent=Math.max(0,12-cutiSnap.size)+' hari';
   document.getElementById('pInbox').textContent=inboxSnap.size;
-  let pgH='';if(pgSnap.empty)pgH='<p class="text-sm" style="color:#999">Belum ada</p>';else pgSnap.forEach(d=>{const p=d.data();pgH+=`<div style="padding:8px 0;border-bottom:1px solid var(--border)"><div class="fw-700 text-sm">${escHtml(p.judul)}</div><div class="text-xs" style="color:#999">${formatDate(p.createdAt)}</div></div>`;});document.getElementById('portalAnnounce').innerHTML=pgH;
+  let pgH='';if(pgSnap.empty)pgH='<p class="text-sm" style="color:#999">Belum ada</p>';else pgSnap.forEach(d=>{const p=d.data();pgH+=`<div style="padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="viewPengumuman('${d.id}')"><div class="fw-700 text-sm">${escHtml(p.judul)}</div><div class="text-xs" style="color:#999">${formatDate(p.createdAt)}</div></div>`;});document.getElementById('portalAnnounce').innerHTML=pgH;
 }
-function renderPortalAbsensi(){navigateTo('absensi');}
+function renderPortalAbsensi(){
+  // For karyawan: use the same absensi page but portal-mode flag
+  window._portalAbsensiMode=true;
+  navigateTo('absensi');
+}
 async function renderPortalCuti(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>🏖️ Cuti Saya</span><button class="btn btn-primary btn-sm" onclick="modalCuti()">+ Ajukan</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Jenis</th><th>Tanggal</th><th>Durasi</th><th>Status</th></tr></thead><tbody id="tblPortalCuti"></tbody></table></div></div>`;const snap=await db.collection('hrd_cuti').where('userId','==',currentUser.id).get();let h='';if(snap.empty)h='<tr><td colspan="4" class="text-center">Belum ada</td></tr>';else snap.forEach(d=>{const p=d.data();h+=`<tr><td>${escHtml(p.jenis)}</td><td>${formatDate(p.mulai)}-${formatDate(p.selesai)}</td><td>${p.durasi}h</td><td><span class="badge badge-${p.status==='approved'?'success':p.status==='rejected'?'danger':'warning'}">${p.status}</span></td></tr>`;});document.getElementById('tblPortalCuti').innerHTML=h;}
 async function renderPortalGaji(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>💰 Slip Gaji Saya</span></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Periode</th><th>Gaji Pokok</th><th>Total</th><th>Aksi</th></tr></thead><tbody id="tblPortalGaji"></tbody></table></div></div>`;const snap=await db.collection('hrd_penggajian').where('nama','==',currentUser.nama).get();let h='';if(snap.empty)h='<tr><td colspan="4" class="text-center">Belum ada</td></tr>';else snap.forEach(d=>{const p=d.data();h+=`<tr><td>${p.periode}</td><td>${formatCurrency(p.gajiPokok)}</td><td class="fw-700">${formatCurrency(p.totalBersih)}</td><td><button class="btn btn-xs btn-info" onclick="lihatSlip('${d.id}')">📄</button></td></tr>`;});document.getElementById('tblPortalGaji').innerHTML=h;}
 function renderPortalJobdesk(){
