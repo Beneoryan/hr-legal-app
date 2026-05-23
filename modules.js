@@ -711,31 +711,48 @@ async function renderPenggajian(){const main=document.getElementById('mainConten
 async function loadGaji(){const bulan=document.getElementById('filterBulanGaji')?.value||monthStr();const snap=await db.collection('hrd_penggajian').where('periode','==',bulan).get();let h='',totBruto=0,totNet=0,totPPH=0,count=0;if(snap.empty)h='<tr><td colspan="10" class="text-center">Belum ada slip</td></tr>';else snap.forEach(d=>{const p=d.data();totBruto+=p.gajiPokok||0;totNet+=p.totalBersih||0;totPPH+=p.pph21||0;count++;h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatCurrency(p.gajiPokok)}</td><td>${formatCurrency(p.tunjangan)}</td><td>${formatCurrency(p.insentif||0)}</td><td>${formatCurrency(p.reimbursement||0)}</td><td>${formatCurrency(p.potongan)}</td><td>${formatCurrency(p.kasbon||0)}</td><td>${formatCurrency(p.pph21)}</td><td class="fw-700">${formatCurrency(p.totalBersih)}</td><td><button class="btn btn-xs btn-info" onclick="lihatSlip('${d.id}')">📄</button> <button class="btn btn-xs btn-warning" onclick="editGaji('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_penggajian','${d.id}','penggajian')">🗑️</button></td></tr>`;});document.getElementById('tblGaji').innerHTML=h;document.getElementById('gajiSummary').innerHTML=`<div class="stat-card"><div class="stat-value">${count}</div><div class="stat-label">Karyawan</div></div><div class="stat-card"><div class="stat-value">${formatCurrency(totBruto)}</div><div class="stat-label">Total Gaji Pokok</div></div><div class="stat-card"><div class="stat-value">${formatCurrency(totNet)}</div><div class="stat-label">Total THP</div></div><div class="stat-card"><div class="stat-value">${formatCurrency(totPPH)}</div><div class="stat-label">Total PPH21</div></div>`;}
 
 async function generateAllGaji(){
-  if(!confirm('Generate slip gaji untuk SEMUA karyawan aktif periode ini?'))return;
+  if(!confirm('Generate slip gaji untuk SEMUA karyawan aktif periode ini?\n\nAkan otomatis menghitung:\n• Gaji Pokok\n• Tunjangan (dari data tunjangan)\n• Insentif (dari KPI)\n• Reimbursement (yang approved)\n• BPJS Kes & TK\n• Kasbon/Loan\n• PPH21 Progresif'))return;
   const bulan=document.getElementById('filterBulanGaji')?.value||monthStr();
   const kSnap=await db.collection('hrd_karyawan').where('status','==','aktif').get();
   const existSnap=await db.collection('hrd_penggajian').where('periode','==',bulan).get();
   const existing=new Set();existSnap.forEach(d=>existing.add(d.data().nama?.toLowerCase()));
-  // Get reimbursements & kasbon for this period
+  // Load all related data
   const reimbSnap=await db.collection('hrd_reimbursement').where('status','==','approved').get();
   const kasbonSnap=await db.collection('hrd_kasbon').get();
-  const reimbMap={},kasbonMap={};
+  const tunjSnap=await db.collection('hrd_tunjangan').get();
+  const kpiSnap=await db.collection('hrd_kpi').get();
+  // Build maps
+  const reimbMap={},kasbonMap={},kpiMap={};
   reimbSnap.forEach(d=>{const r=d.data();const n=(r.nama||'').toLowerCase();reimbMap[n]=(reimbMap[n]||0)+(r.jumlah||0);});
   kasbonSnap.forEach(d=>{const r=d.data();if(r.status==='aktif'||r.status==='approved'){const n=(r.nama||'').toLowerCase();kasbonMap[n]=(kasbonMap[n]||0)+(r.angsuran||r.jumlah||0);}});
+  kpiSnap.forEach(d=>{const r=d.data();const n=(r.nama||'').toLowerCase();if(!kpiMap[n]||r.skor>kpiMap[n])kpiMap[n]=r.skor||0;});
+  // Tunjangan (apply to all or specific)
+  const tunjList=[];tunjSnap.forEach(d=>tunjList.push(d.data()));
   let count=0;
   for(const doc of kSnap.docs){
-    const k=doc.data();if(existing.has(k.nama?.toLowerCase()))continue;
-    const gaji=k.gajiPokok||0;const bpjsKes=Math.round(gaji*0.01);const bpjsTK=Math.round(gaji*0.02);
-    const reimb=reimbMap[k.nama?.toLowerCase()]||0;
-    const loan=kasbonMap[k.nama?.toLowerCase()]||0;
-    const bruto=gaji+reimb;const totalPot=bpjsKes+bpjsTK+loan;
-    const tahunan=(bruto-bpjsKes-bpjsTK)*12;let pphT=0;
-    if(tahunan<=60000000)pphT=tahunan*0.05;else if(tahunan<=250000000)pphT=3000000+(tahunan-60000000)*0.15;else pphT=3000000+28500000+(tahunan-250000000)*0.25;
-    const pph21=Math.round(pphT/12);const thp=bruto-totalPot-pph21;
-    await db.collection('hrd_penggajian').add({nama:k.nama,periode:bulan,gajiPokok:gaji,tunjangan:0,insentif:0,reimbursement:reimb,bonus:0,lembur:0,bpjsKesehatan:bpjsKes,bpjsTK,potongan:0,kasbon:loan,pph21,totalBersih:thp,createdAt:new Date().toISOString()});
+    const k=doc.data();const namaLow=k.nama?.toLowerCase();if(existing.has(namaLow))continue;
+    const gaji=k.gajiPokok||0;
+    // Tunjangan
+    let tunj=0;tunjList.forEach(t=>{const p=(t.penerima||'Semua').toLowerCase();if(p==='semua'||p.includes(namaLow))tunj+=t.nominal||0;});
+    // Insentif from KPI
+    const kpiScore=kpiMap[namaLow]||0;let insentifPct=0;
+    if(kpiScore>=90)insentifPct=0.15;else if(kpiScore>=80)insentifPct=0.10;else if(kpiScore>=70)insentifPct=0.05;
+    const insentif=Math.round(gaji*insentifPct);
+    // Reimbursement & Loan
+    const reimb=reimbMap[namaLow]||0;const loan=kasbonMap[namaLow]||0;
+    // BPJS
+    const bpjsKes=Math.round(gaji*0.01);const bpjsTK=Math.round(gaji*0.02);
+    // PPH21 Progressive
+    const bruto=gaji+tunj+insentif+reimb;const penghasilanNetto=(gaji+tunj-bpjsKes-bpjsTK)*12;
+    let pphT=0;if(penghasilanNetto<=60000000)pphT=penghasilanNetto*0.05;else if(penghasilanNetto<=250000000)pphT=3000000+(penghasilanNetto-60000000)*0.15;else pphT=3000000+28500000+(penghasilanNetto-250000000)*0.25;
+    const pph21=Math.max(0,Math.round(pphT/12));
+    // THP = Bruto - Semua Potongan
+    const totalPotongan=bpjsKes+bpjsTK+loan+pph21;
+    const thp=bruto-totalPotongan;
+    await db.collection('hrd_penggajian').add({nama:k.nama,periode:bulan,gajiPokok:gaji,tunjangan:tunj,insentif,bonus:0,reimbursement:reimb,lembur:0,bpjsKesehatan:bpjsKes,bpjsTK,potongan:0,kasbon:loan,pph21,totalBersih:thp,kpiScore,createdAt:new Date().toISOString()});
     count++;
   }
-  toast(`${count} slip gaji di-generate`,'success');loadGaji();
+  toast(`${count} slip gaji di-generate (terintegrasi tunjangan, insentif, reimburse, loan, PPH)`,'success');loadGaji();
 }
 function modalGaji(){openModal(`<div class="modal-title">Generate Slip Gaji</div><div class="grid-2"><div class="form-group"><label>Karyawan</label><input class="form-control" id="gjNama" onblur="autoFillGajiFromKaryawan()"></div><div class="form-group"><label>Periode</label><input class="form-control" type="month" id="gjPeriode" value="${monthStr()}"></div></div>
     <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:8px"><div class="fw-700 text-sm mb-8 color-primary">💰 Pendapatan</div><div class="grid-2"><div class="form-group"><label>Gaji Pokok</label><input class="form-control" type="number" id="gjPokok" value="0" oninput="hitungGaji()"></div><div class="form-group"><label>Tunj. Jabatan</label><input class="form-control" type="number" id="gjTunjJabatan" value="0" oninput="hitungGaji()"></div><div class="form-group"><label>Tunj. Transport</label><input class="form-control" type="number" id="gjTunjTransport" value="0" oninput="hitungGaji()"></div><div class="form-group"><label>Tunj. Makan</label><input class="form-control" type="number" id="gjTunjMakan" value="0" oninput="hitungGaji()"></div><div class="form-group"><label>Tunj. Komunikasi</label><input class="form-control" type="number" id="gjTunjKom" value="0" oninput="hitungGaji()"></div><div class="form-group"><label>Lembur</label><input class="form-control" type="number" id="gjLembur" value="0" oninput="hitungGaji()"></div></div></div>
@@ -754,19 +771,33 @@ function hitungGaji(){const pokok=Number(document.getElementById('gjPokok').valu
   document.getElementById('gjBruto').value=formatCurrency(bruto);document.getElementById('gjTotPot').value=formatCurrency(totalPotongan);document.getElementById('gjPPH').value=formatCurrency(pph21);document.getElementById('gjTotal').value=formatCurrency(total);
   window._gajiCalc={pph21,total,bruto,totalTunjangan,totalPotongan,insentif,reimburse};}
 async function autoFillGajiFromKaryawan(){const nama=document.getElementById('gjNama').value.trim();if(!nama)return;
-  const snap=await db.collection('hrd_karyawan').where('nama','==',nama).limit(1).get();
-  if(snap.empty){/* try case-insensitive */const all=await db.collection('hrd_karyawan').get();let found=null;all.forEach(d=>{if(d.data().nama?.toLowerCase()===nama.toLowerCase())found=d.data();});if(!found)return toast('Karyawan tidak ditemukan','warning');var k=found;}else{var k=snap.docs[0].data();}
+  // Find karyawan
+  let k=null;const snap=await db.collection('hrd_karyawan').where('nama','==',nama).limit(1).get();
+  if(!snap.empty){k=snap.docs[0].data();}else{const all=await db.collection('hrd_karyawan').get();all.forEach(d=>{if(d.data().nama?.toLowerCase()===nama.toLowerCase())k=d.data();});if(!k)return toast('Karyawan tidak ditemukan','warning');}
   const gaji=k.gajiPokok||0;document.getElementById('gjPokok').value=gaji;
-  document.getElementById('gjBPJSKes').value=Math.round(gaji*0.01);document.getElementById('gjBPJSTK').value=Math.round(gaji*0.02);
-  // Auto-load reimbursement
-  const reimbSnap=await db.collection('hrd_reimbursement').where('nama','==',k.nama).where('status','==','approved').get();
-  let totalReimb=0;reimbSnap.forEach(d=>totalReimb+=d.data().jumlah||0);
+  document.getElementById('gjBPJSKes').value=Math.round(gaji*0.01);
+  document.getElementById('gjBPJSTK').value=Math.round(gaji*0.02);
+  // Auto-load tunjangan from hrd_tunjangan
+  const tunjSnap=await db.collection('hrd_tunjangan').get();let tunjTotal=0;
+  tunjSnap.forEach(d=>{const t=d.data();const penerima=(t.penerima||'Semua').toLowerCase();if(penerima==='semua'||penerima.includes(nama.toLowerCase()))tunjTotal+=t.nominal||0;});
+  document.getElementById('gjTunjLain').value=tunjTotal;
+  // Auto-load reimbursement (approved)
+  const reimbSnap=await db.collection('hrd_reimbursement').where('status','==','approved').get();
+  let totalReimb=0;reimbSnap.forEach(d=>{const r=d.data();if((r.nama||'').toLowerCase()===nama.toLowerCase())totalReimb+=r.jumlah||0;});
   document.getElementById('gjReimburse').value=totalReimb;
-  // Auto-load kasbon
+  // Auto-load kasbon/loan (aktif)
   const kasbonSnap=await db.collection('hrd_kasbon').get();let totalLoan=0;
-  kasbonSnap.forEach(d=>{const r=d.data();if((r.nama||'').toLowerCase()===nama.toLowerCase()&&(r.status==='aktif'||r.status==='approved'))totalLoan+=r.angsuran||0;});
+  kasbonSnap.forEach(d=>{const r=d.data();if((r.nama||'').toLowerCase()===nama.toLowerCase()&&(r.status==='aktif'||r.status==='approved'))totalLoan+=r.angsuran||r.jumlah||0;});
   document.getElementById('gjKasbon').value=totalLoan;
-  hitungGaji();toast('Data gaji, reimburse & loan dimuat','success');}
+  // Auto-calculate insentif based on KPI score
+  const kpiSnap=await db.collection('hrd_kpi').get();let kpiScore=0,kpiFound=false;
+  kpiSnap.forEach(d=>{const r=d.data();if((r.nama||'').toLowerCase()===nama.toLowerCase()){kpiScore=r.skor||0;kpiFound=true;}});
+  if(kpiFound&&kpiScore>0){
+    // Insentif formula: KPI >= 90 = 15% gaji, >= 80 = 10%, >= 70 = 5%, < 70 = 0
+    let insentifPct=0;if(kpiScore>=90)insentifPct=0.15;else if(kpiScore>=80)insentifPct=0.10;else if(kpiScore>=70)insentifPct=0.05;
+    document.getElementById('gjInsentif').value=Math.round(gaji*insentifPct);
+  }
+  hitungGaji();toast(`Data dimuat: Gaji ${formatCurrency(gaji)}, Tunj ${formatCurrency(tunjTotal)}, Reimb ${formatCurrency(totalReimb)}, Loan ${formatCurrency(totalLoan)}`,'success');}
 async function simpanGaji(){const tJab=Number(document.getElementById('gjTunjJabatan').value)||0;const tTrans=Number(document.getElementById('gjTunjTransport').value)||0;const tMakan=Number(document.getElementById('gjTunjMakan').value)||0;const tKom=Number(document.getElementById('gjTunjKom').value)||0;const lembur=Number(document.getElementById('gjLembur').value)||0;const insentif=Number(document.getElementById('gjInsentif').value)||0;const bonus=Number(document.getElementById('gjBonus').value)||0;const tLain=Number(document.getElementById('gjTunjLain').value)||0;const reimburse=Number(document.getElementById('gjReimburse').value)||0;const data={nama:document.getElementById('gjNama').value,periode:document.getElementById('gjPeriode').value,gajiPokok:Number(document.getElementById('gjPokok').value)||0,tunjangan:tJab+tTrans+tMakan+tKom+lembur+tLain,tunjJabatan:tJab,tunjTransport:tTrans,tunjMakan:tMakan,tunjKomunikasi:tKom,lembur,insentif,bonus,tunjLain:tLain,reimbursement:reimburse,bpjsKesehatan:Number(document.getElementById('gjBPJSKes').value)||0,bpjsTK:Number(document.getElementById('gjBPJSTK').value)||0,potongan:Number(document.getElementById('gjPotongan').value)||0,kasbon:Number(document.getElementById('gjKasbon').value)||0,pph21:window._gajiCalc?.pph21||0,totalBersih:window._gajiCalc?.total||0,createdAt:new Date().toISOString()};if(!data.nama)return toast('Nama wajib','warning');await db.collection('hrd_penggajian').add(data);closeModalDirect();toast('Slip disimpan','success');renderPenggajian();}
 function modalImportPenggajian(){openModal(`<div class="modal-title">📥 Import Data Penggajian</div>
     <div class="tabs mb-16"><div class="tab active" onclick="switchImportTab('gaji','file')">📄 Upload CSV</div><div class="tab" onclick="switchImportTab('gaji','api')">🔗 API Google Sheets</div></div>
