@@ -249,39 +249,71 @@ function parseCsvRows(text){const lines=text.replace(/\r\n/g,'\n').replace(/\r/g
 async function renderStrukturOrg(){
   const main=document.getElementById('mainContent');
   main.innerHTML=`<div class="page-title"><span>🌳 Struktur Organisasi</span></div><div class="card" id="orgChart" style="overflow-x:auto;padding:30px 20px"></div>`;
-  const css=`<style>.oc{text-align:center;min-width:900px}.oc-t{font-size:1.2rem;font-weight:700;color:#1a237e}.oc-s{font-size:.8rem;color:#666;margin-bottom:20px}.oc-vl{width:2px;background:#3949ab;margin:0 auto}.oc-hl{height:2px;background:#3949ab;margin:0 auto}.oc-nd{border:2px solid #3949ab;border-radius:8px;padding:8px 14px;display:inline-block;text-align:center;background:#e8eaf6;min-width:120px}.oc-nd .nm{font-weight:700;font-size:.75rem;color:#1a237e}.oc-nd .ps{font-size:.62rem;color:#555;margin-top:2px;text-transform:uppercase}.oc-nd.fdr::before{content:"★";color:#ff6f00;font-size:.6rem;display:block}.oc-st{border:1.5px solid #bbb;border-radius:6px;padding:6px 10px;display:inline-block;text-align:center;background:#fff;min-width:100px}.oc-st .nm{font-weight:600;font-size:.68rem;color:#333}.oc-st .ps{font-size:.58rem;color:#888;margin-top:1px}.oc-row{display:flex;justify-content:center;align-items:flex-start;gap:10px;flex-wrap:wrap}.oc-col{display:flex;flex-direction:column;align-items:center}.oc-lbl{font-size:.62rem;color:#3949ab;font-weight:700;margin:4px 0;text-transform:uppercase}</style>`;
-  const h=css+`<div class="oc"><div class="oc-t">STRUKTUR ORGANISASI</div><div class="oc-s">LPK IJEF CORP</div>
-  <div class="oc-row"><div class="oc-nd fdr"><div class="nm">MISRIANA</div><div class="ps">Founder</div></div><div class="oc-nd fdr"><div class="nm">MAHPUDIN</div><div class="ps">Founder</div></div><div class="oc-nd fdr"><div class="nm">BUDI CAHYO</div><div class="ps">Founder</div></div></div>
-  <div class="oc-vl" style="height:24px"></div>
-  <div class="oc-row"><div class="oc-nd"><div class="nm">MUHAMMAD AGUS RYANDA</div><div class="ps">General Manager</div></div></div>
-  <div class="oc-vl" style="height:24px"></div>
-  <div class="oc-hl" style="width:500px"></div>
-  <div class="oc-row" style="gap:80px;align-items:flex-start">
-    <div class="oc-col">
-      <div class="oc-vl" style="height:16px"></div>
-      <div class="oc-nd"><div class="nm">AGUS PURIYANTO</div><div class="ps">Head of Academic</div></div>
-      <div class="oc-lbl">ACADEMIC</div>
-      <div class="oc-vl" style="height:12px"></div>
-      <div class="oc-row" style="gap:8px">
-        <div class="oc-st"><div class="nm">Salma Nurhaliza</div><div class="ps">Admin Documents</div></div>
-        <div class="oc-st"><div class="nm">Muhammad Ihsan Hilmi</div><div class="ps">Curriculum Leader</div></div>
-        <div class="oc-col"><div class="oc-st"><div class="nm">Winnie Delfina Welliam</div><div class="ps">Student Leader</div></div><div class="oc-vl" style="height:10px"></div><div class="oc-st" style="border-color:#7b1fa2"><div class="nm">Galih Resmayandi</div><div class="ps">Japan Instructor</div></div></div>
-      </div>
-    </div>
-    <div class="oc-col">
-      <div class="oc-vl" style="height:16px"></div>
-      <div class="oc-nd"><div class="nm">IRSAN JANWAR WIBAWA</div><div class="ps">Head of Office</div></div>
-      <div class="oc-lbl">OFFICE</div>
-      <div class="oc-vl" style="height:12px"></div>
-      <div class="oc-row" style="gap:8px">
-        <div class="oc-st"><div class="nm">Mira Tania</div><div class="ps">Admin Documents</div></div>
-        <div class="oc-col"><div class="oc-st"><div class="nm">Maharani Ali Putri</div><div class="ps">HR & Legal</div></div><div class="oc-vl" style="height:10px"></div><div class="oc-st" style="border-color:#7b1fa2"><div class="nm">Rafa Dame Siregar</div><div class="ps">Asisten HR & Legal</div></div></div>
-        <div class="oc-st"><div class="nm">Siti Sofuroh</div><div class="ps">Finance</div></div>
-        <div class="oc-st"><div class="nm">Nanda Yoga Maulana</div><div class="ps">General Affairs</div></div>
-      </div>
-    </div>
-  </div></div>`;
-  document.getElementById('orgChart').innerHTML=h;
+  document.getElementById('orgChart').innerHTML=`<style>
+.org{text-align:center;min-width:950px;font-family:'Segoe UI',sans-serif}
+.org h2{font-size:1.2rem;font-weight:700;color:#1a237e;margin:0}.org .sub{font-size:.8rem;color:#666;margin-bottom:20px}
+.org .box{border:2px solid #3949ab;border-radius:8px;padding:8px 16px;display:inline-block;text-align:center;background:#e8eaf6;min-width:130px}
+.org .box .n{font-weight:700;font-size:.76rem;color:#1a237e}.org .box .p{font-size:.63rem;color:#555;margin-top:2px;text-transform:uppercase}
+.org .box.f::before{content:"★";color:#ff6f00;font-size:.55rem;display:block;margin-bottom:2px}
+.org .sbox{border:1.5px solid #90a4ae;border-radius:6px;padding:6px 10px;display:inline-block;text-align:center;background:#fff;min-width:100px}
+.org .sbox .n{font-weight:600;font-size:.68rem;color:#333}.org .sbox .p{font-size:.58rem;color:#888;margin-top:1px}
+.org .sbox.sub-unit{border-color:#7b1fa2}
+.org .vline{width:2px;background:#3949ab;margin:0 auto}
+.org .hline{height:2px;background:#3949ab}
+.org .row{display:flex;justify-content:center;align-items:flex-start;gap:12px;flex-wrap:nowrap}
+.org .col{display:flex;flex-direction:column;align-items:center}
+.org .lbl{font-size:.63rem;color:#3949ab;font-weight:700;margin:6px 0 4px;text-transform:uppercase;letter-spacing:1px}
+.org .connector{position:relative;display:flex;justify-content:center}
+.org .branch{display:flex;justify-content:center;position:relative}
+.org .branch::before{content:'';position:absolute;top:0;left:25%;right:25%;height:2px;background:#3949ab}
+.org .branch-wide::before{left:10%;right:10%}
+</style>
+<div class="org">
+<h2>STRUKTUR ORGANISASI</h2><div class="sub">LPK IJEF CORP</div>
+
+<div class="row"><div class="box f"><div class="n">MISRIANA</div><div class="p">Founder</div></div><div class="box f"><div class="n">MAHPUDIN</div><div class="p">Founder</div></div><div class="box f"><div class="n">BUDI CAHYO</div><div class="p">Founder</div></div></div>
+<div class="vline" style="height:30px"></div>
+
+<div class="row"><div class="box"><div class="n">MUHAMMAD AGUS RYANDA</div><div class="p">General Manager</div></div></div>
+<div class="vline" style="height:30px"></div>
+
+<div style="display:flex;justify-content:center;align-items:stretch">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center">
+<div class="hline" style="width:100%;max-width:500px;position:relative"><div style="position:absolute;left:50%;top:-1px;width:2px;height:2px;background:#3949ab"></div></div>
+</div>
+</div>
+
+<div class="row" style="gap:100px;margin-top:0">
+<div class="col">
+<div class="vline" style="height:20px"></div>
+<div class="box"><div class="n">AGUS PURIYANTO</div><div class="p">Head of Academic</div></div>
+<div class="lbl">ACADEMIC</div>
+<div class="vline" style="height:16px"></div>
+<div style="position:relative;padding-top:2px">
+<div class="hline" style="width:340px;margin:0 auto"></div>
+<div class="row" style="margin-top:0;gap:6px;padding-top:12px">
+<div class="col"><div class="vline" style="height:10px"></div><div class="sbox"><div class="n">Salma Nurhaliza</div><div class="p">Admin Documents</div></div></div>
+<div class="col"><div class="vline" style="height:10px"></div><div class="sbox"><div class="n">Muhammad Ihsan Hilmi</div><div class="p">Curriculum Leader</div></div></div>
+<div class="col"><div class="vline" style="height:10px"></div><div class="sbox"><div class="n">Winnie Delfina Welliam</div><div class="p">Student Leader</div></div><div class="vline" style="height:12px"></div><div class="sbox sub-unit"><div class="n">Galih Resmayandi</div><div class="p">Japan Instructor</div></div></div>
+</div></div>
+</div>
+
+<div class="col">
+<div class="vline" style="height:20px"></div>
+<div class="box"><div class="n">IRSAN JANWAR WIBAWA</div><div class="p">Head of Office</div></div>
+<div class="lbl">OFFICE</div>
+<div class="vline" style="height:16px"></div>
+<div style="position:relative;padding-top:2px">
+<div class="hline" style="width:440px;margin:0 auto"></div>
+<div class="row" style="margin-top:0;gap:6px;padding-top:12px">
+<div class="col"><div class="vline" style="height:10px"></div><div class="sbox"><div class="n">Mira Tania</div><div class="p">Admin Documents</div></div></div>
+<div class="col"><div class="vline" style="height:10px"></div><div class="sbox"><div class="n">Maharani Ali Putri</div><div class="p">HR & Legal</div></div><div class="vline" style="height:12px"></div><div class="sbox sub-unit"><div class="n">Rafa Dame Siregar</div><div class="p">Asisten HR & Legal</div></div></div>
+<div class="col"><div class="vline" style="height:10px"></div><div class="sbox"><div class="n">Siti Sofuroh</div><div class="p">Finance</div></div></div>
+<div class="col"><div class="vline" style="height:10px"></div><div class="sbox"><div class="n">Nanda Yoga Maulana</div><div class="p">General Affairs</div></div></div>
+</div></div>
+</div>
+</div>
+</div>`;
 }
 
 // ── ONBOARDING ────────────────────────────────────────────────
