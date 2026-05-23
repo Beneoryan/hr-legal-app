@@ -1123,7 +1123,8 @@ async function loadMeetingTab(tab) {
       html+='<div class="table-wrap"><table><thead><tr><th>Judul</th><th>Pembuat</th><th>Tanggal</th><th>Peserta</th><th>Status</th><th>Aksi</th></tr></thead><tbody>';
       items.forEach(m=>{
         const isActive=m.status==='active';
-        html+=`<tr><td class="fw-700">${escHtml(m.judul||'Meeting Online')}</td><td>${escHtml(m.createdByName||'-')}</td><td>${formatDateTime(m.createdAt)}</td><td>${(m.pesertaNames||[]).length+1} orang</td><td><span class="badge badge-${isActive?'success':'default'}">${isActive?'🟢 Aktif':'Selesai'}</span></td><td><button class="btn btn-xs btn-info" onclick="viewOnlineMeeting('${m.id}')">👁️</button> <button class="btn btn-xs btn-success" onclick="joinOnlineMeeting('${m.roomId}')">🎥</button> <button class="btn btn-xs btn-primary" onclick="editOnlineMeeting('${m.id}')">✏️</button> <button class="btn btn-xs btn-warning" onclick="modalNotulensiOnline('${m.id}')">📝</button> <button class="btn btn-xs btn-danger" onclick="hapusOnlineMeeting('${m.id}')">🗑️</button></td></tr>`;
+        const canManage=m.createdBy===currentUser.id||hasAccess(4);
+        html+=`<tr><td class="fw-700">${escHtml(m.judul||'Meeting Online')}</td><td>${escHtml(m.createdByName||'-')}</td><td>${formatDateTime(m.createdAt)}</td><td>${(m.pesertaNames||[]).length+1} orang</td><td><span class="badge badge-${isActive?'success':'default'}">${isActive?'🟢 Aktif':'Selesai'}</span></td><td><button class="btn btn-xs btn-info" onclick="viewOnlineMeeting('${m.id}')">👁️</button> <button class="btn btn-xs btn-success" onclick="joinOnlineMeeting('${m.roomId}')">🎥</button>${canManage?` <button class="btn btn-xs btn-primary" onclick="editOnlineMeeting('${m.id}')">✏️</button> <button class="btn btn-xs btn-warning" onclick="modalNotulensiOnline('${m.id}')">📝</button> <button class="btn btn-xs btn-danger" onclick="hapusOnlineMeeting('${m.id}')">🗑️</button>`:''}</td></tr>`;
       });
       html+='</tbody></table></div>';
     }
@@ -2280,13 +2281,24 @@ function updateAppIcon(logoDataUrl){
 
 // Load company logo on app start for branding
 function loadCompanyBranding(){
+  // First try localStorage (fast)
   const logo=localStorage.getItem('ims_company_logo');
   if(logo){
     updateAppIcon(logo);
-    // Update sidebar logo
     const logoEl=document.querySelector('.logo');
-    if(logoEl)logoEl.innerHTML=`<img src="${logo}" style="width:28px;height:28px;border-radius:4px;object-fit:contain;margin-right:8px"><span>IMS</span>`;
+    if(logoEl)logoEl.innerHTML=`<img src="${logo}" style="width:28px;height:28px;border-radius:50%;object-fit:contain;margin-right:8px"><span>IMS</span>`;
   }
+  // Then sync from Firestore (for all users including karyawan)
+  db.collection('hrd_settings').doc('perusahaan').get().then(doc=>{
+    if(!doc.exists)return;
+    const d=doc.data();
+    if(d.logo){
+      localStorage.setItem('ims_company_logo',d.logo);
+      updateAppIcon(d.logo);
+      const logoEl=document.querySelector('.logo');
+      if(logoEl)logoEl.innerHTML=`<img src="${d.logo}" style="width:28px;height:28px;border-radius:50%;object-fit:contain;margin-right:8px"><span>IMS</span>`;
+    }
+  }).catch(()=>{});
 }
 function modalAkun(id){if(id)db.collection('hrd_users').doc(id).get().then(d=>showAkunForm(id,d.data()||{}));else showAkunForm(null,{});}
 async function showAkunForm(id,p){
