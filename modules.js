@@ -1604,9 +1604,68 @@ async function approveItem(col,id,status){
 }
 
 // ── APPROVAL MANAGEMENT ───────────────────────────────────────
-async function renderApprovalMgmt(){if(!hasAccess(4))return document.getElementById('mainContent').innerHTML='<div class="card"><p>Akses ditolak.</p></div>';const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>⚙️ Approval Management</span><button class="btn btn-primary btn-sm" onclick="modalApprovalFlow()">+ Tambah Flow</button></div><div class="card"><p class="text-sm mb-16">Konfigurasi alur approval multi-step.</p><div class="table-wrap"><table><thead><tr><th>Jenis</th><th>Steps</th><th>Aksi</th></tr></thead><tbody id="tblApprFlow"></tbody></table></div></div>`;const snap=await db.collection('hrd_approval_flow').get();let h='';if(snap.empty)h='<tr><td colspan="3" class="text-center">Belum ada flow</td></tr>';else snap.forEach(d=>{const p=d.data();h+=`<tr><td class="fw-700">${escHtml(p.jenis)}</td><td>${(p.steps||[]).map(s=>s.role).join(' → ')}</td><td><button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_approval_flow','${d.id}','approval-mgmt')">🗑️</button></td></tr>`;});document.getElementById('tblApprFlow').innerHTML=h;}
-function modalApprovalFlow(){openModal(`<div class="modal-title">Tambah Approval Flow</div><div class="form-group"><label>Jenis</label><select class="form-control" id="afJenis"><option value="cuti">Cuti</option><option value="overtime">Overtime</option><option value="reimbursement">Reimbursement</option><option value="kasbon">Kasbon</option></select></div><div class="form-group"><label>Steps (role, koma)</label><input class="form-control" id="afSteps" placeholder="manager, hr, admin"></div><button class="btn btn-primary" onclick="simpanApprovalFlow()">Simpan</button>`);}
-async function simpanApprovalFlow(){const steps=document.getElementById('afSteps').value.split(',').map(s=>({role:s.trim()})).filter(s=>s.role);await db.collection('hrd_approval_flow').add({jenis:document.getElementById('afJenis').value,steps,createdAt:new Date().toISOString()});closeModalDirect();toast('Flow disimpan','success');renderApprovalMgmt();}
+async function renderApprovalMgmt(){if(!hasAccess(4))return document.getElementById('mainContent').innerHTML='<div class="card"><p>Akses ditolak.</p></div>';const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>⚙️ Approval Management</span><button class="btn btn-primary btn-sm" onclick="modalApprovalFlow()">+ Tambah Flow</button></div><div class="card"><p class="text-sm mb-16">Konfigurasi alur approval multi-step. Tentukan jenis pengajuan, siapa yang mengajukan, dan siapa yang approve.</p><div class="table-wrap"><table><thead><tr><th>Jenis</th><th>Pengaju</th><th>Approver Steps</th><th>Aksi</th></tr></thead><tbody id="tblApprFlow"></tbody></table></div></div>`;const snap=await db.collection('hrd_approval_flow').get();let h='';if(snap.empty)h='<tr><td colspan="4" class="text-center">Belum ada flow</td></tr>';else snap.forEach(d=>{const p=d.data();h+=`<tr><td class="fw-700">${escHtml(p.jenis)}</td><td>${escHtml(p.pengaju||'Semua')}</td><td>${(p.steps||[]).map(s=>`<span class="badge badge-primary">${escHtml(s.nama||s.role)}</span>`).join(' → ')}</td><td><button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_approval_flow','${d.id}','approval-mgmt')">🗑️</button></td></tr>`;});document.getElementById('tblApprFlow').innerHTML=h;}
+async function modalApprovalFlow(){
+  const kSnap=await db.collection('hrd_karyawan').where('status','==','aktif').get();
+  let karyOpts='<option value="Semua">Semua Karyawan</option>';
+  let approverOpts='';
+  const depts=new Set();
+  kSnap.forEach(d=>{const k=d.data();karyOpts+=`<option value="${escHtml(k.nama)}">${escHtml(k.nama)} — ${escHtml(k.departemen||'')} (${escHtml(k.posisi||'')})</option>`;depts.add(k.departemen||'');
+    const pos=(k.posisi||'').toUpperCase();if(pos.includes('HEAD')||pos.includes('MANAGER')||pos.includes('GENERAL')||pos.includes('FOUNDER'))approverOpts+=`<option value="${escHtml(k.nama)}">${escHtml(k.nama)} — ${escHtml(k.posisi||'')} (${escHtml(k.departemen||'')})</option>`;});
+  let deptOpts='';depts.forEach(d=>{if(d)deptOpts+=`<option>${escHtml(d)}</option>`;});
+  openModal(`<div class="modal-title">Tambah Approval Flow</div>
+    <div class="form-group"><label>Jenis Pengajuan</label><select class="form-control" id="afJenis"><option value="cuti">Cuti / Izin</option><option value="overtime">Overtime / Lembur</option><option value="reimbursement">Reimbursement</option><option value="kasbon">Kasbon & Loan</option><option value="insentif">Insentif</option><option value="penggajian">Penggajian</option><option value="onboarding">Onboarding</option><option value="offboarding">Offboarding</option><option value="kontrak">Perpanjangan Kontrak</option><option value="pelatihan">Pelatihan</option></select></div>
+    <div class="form-group"><label>Departemen</label><select class="form-control" id="afDept"><option value="">Semua Departemen</option>${deptOpts}</select></div>
+    <div class="form-group"><label>Siapa yang Mengajukan</label><select class="form-control" id="afPengaju">${karyOpts}</select></div>
+    <div class="form-group"><label>Approver Step 1</label><select class="form-control" id="afStep1"><option value="">-- Pilih --</option>${approverOpts}<option value="hr">HR (Role)</option><option value="admin">Admin (Role)</option><option value="superadmin">Super Admin (Role)</option></select></div>
+    <div class="form-group"><label>Approver Step 2 (opsional)</label><select class="form-control" id="afStep2"><option value="">-- Tidak ada --</option>${approverOpts}<option value="hr">HR (Role)</option><option value="admin">Admin (Role)</option><option value="superadmin">Super Admin (Role)</option></select></div>
+    <div class="form-group"><label>Approver Step 3 (opsional)</label><select class="form-control" id="afStep3"><option value="">-- Tidak ada --</option>${approverOpts}<option value="hr">HR (Role)</option><option value="admin">Admin (Role)</option><option value="superadmin">Super Admin (Role)</option></select></div>
+    <button class="btn btn-primary" onclick="simpanApprovalFlow()">Simpan</button>`,true);}
+async function simpanApprovalFlow(){const steps=[];const s1=document.getElementById('afStep1').value;const s2=document.getElementById('afStep2').value;const s3=document.getElementById('afStep3').value;if(s1)steps.push({role:s1,nama:s1});if(s2)steps.push({role:s2,nama:s2});if(s3)steps.push({role:s3,nama:s3});if(!steps.length)return toast('Minimal 1 approver','warning');await db.collection('hrd_approval_flow').add({jenis:document.getElementById('afJenis').value,departemen:document.getElementById('afDept').value,pengaju:document.getElementById('afPengaju').value,steps,createdAt:new Date().toISOString()});closeModalDirect();toast('Flow disimpan','success');renderApprovalMgmt();}
+
+// ── INSENTIF MODULE ───────────────────────────────────────────
+async function renderInsentif(){
+  const main=document.getElementById('mainContent');
+  main.innerHTML=`<div class="page-title"><span>🏆 Insentif Kinerja</span><button class="btn btn-primary btn-sm" onclick="modalInsentif()">+ Tambah Insentif</button></div>
+  <div class="card"><div style="background:#fff3e0;border-radius:8px;padding:12px;margin-bottom:16px;border-left:4px solid var(--warning)"><p class="text-sm" style="line-height:1.6"><b>Formula Insentif:</b><br>• KPI ≥ 90 (Grade A) = <b>15%</b> dari Gaji Pokok<br>• KPI ≥ 80 (Grade B) = <b>10%</b> dari Gaji Pokok<br>• KPI ≥ 70 (Grade C) = <b>5%</b> dari Gaji Pokok<br>• KPI < 70 = <b>0%</b> (Tidak dapat insentif)<br><br>Insentif otomatis terintegrasi ke slip gaji saat Generate.</p></div>
+  <div class="flex gap-8 mb-16"><button class="btn btn-success btn-sm" onclick="generateInsentifFromKPI()">⚡ Generate dari KPI</button><button class="btn btn-danger btn-sm" onclick="hapusSemuaInsentif()">🗑️ Hapus Semua</button></div>
+  <div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Dept</th><th>Gaji Pokok</th><th>KPI Score</th><th>Grade</th><th>% Insentif</th><th>Nominal</th><th>Periode</th><th>Aksi</th></tr></thead><tbody id="tblInsentif"></tbody></table></div></div>`;
+  const snap=await db.collection('hrd_insentif').get();const items=[];snap.forEach(d=>items.push({id:d.id,...d.data()}));items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+  let h='';if(!items.length)h='<tr><td colspan="9" class="text-center">Belum ada data insentif</td></tr>';
+  else items.forEach(p=>{const grade=p.kpiScore>=90?'A':p.kpiScore>=80?'B':p.kpiScore>=70?'C':'D';h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.departemen||'-')}</td><td>${formatCurrency(p.gajiPokok||0)}</td><td>${p.kpiScore||0}</td><td><span class="badge badge-${grade==='A'?'success':grade==='B'?'info':grade==='C'?'warning':'danger'}">${grade}</span></td><td>${p.persen||0}%</td><td class="fw-700">${formatCurrency(p.nominal||0)}</td><td>${escHtml(p.periode||'-')}</td><td><button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_insentif','${p.id}','insentif')">🗑️</button></td></tr>`;});
+  document.getElementById('tblInsentif').innerHTML=h;
+}
+
+async function modalInsentif(){
+  const kSnap=await db.collection('hrd_karyawan').where('status','==','aktif').get();
+  let opts='<option value="">-- Pilih --</option>';kSnap.forEach(d=>{const k=d.data();opts+=`<option value="${escHtml(k.nama)}" data-gaji="${k.gajiPokok||0}" data-dept="${escHtml(k.departemen||'')}">${escHtml(k.nama)} — ${escHtml(k.departemen||'')} (${formatCurrency(k.gajiPokok||0)})</option>`;});
+  openModal(`<div class="modal-title">Tambah Insentif Manual</div>
+    <div class="form-group"><label>Karyawan</label><select class="form-control" id="insKary" onchange="onInsKaryChange()">${opts}</select></div>
+    <div class="grid-2"><div class="form-group"><label>KPI Score</label><input class="form-control" type="number" id="insKPI" value="0" oninput="calcInsentif()"></div><div class="form-group"><label>Periode</label><input class="form-control" id="insPeriode" value="${monthStr()}"></div></div>
+    <div class="grid-2"><div class="form-group"><label>% Insentif (auto)</label><input class="form-control" id="insPersen" readonly></div><div class="form-group"><label>Nominal (auto)</label><input class="form-control" id="insNominal" readonly style="font-weight:700"></div></div>
+    <button class="btn btn-primary" onclick="simpanInsentif()">Simpan</button>`);
+}
+function onInsKaryChange(){const sel=document.getElementById('insKary');const opt=sel.options[sel.selectedIndex];window._insGaji=Number(opt?.dataset?.gaji)||0;window._insDept=opt?.dataset?.dept||'';calcInsentif();}
+function calcInsentif(){const kpi=Number(document.getElementById('insKPI').value)||0;let pct=0;if(kpi>=90)pct=15;else if(kpi>=80)pct=10;else if(kpi>=70)pct=5;const nominal=Math.round((window._insGaji||0)*pct/100);document.getElementById('insPersen').value=pct+'%';document.getElementById('insNominal').value=formatCurrency(nominal);window._insCalc={pct,nominal};}
+async function simpanInsentif(){const nama=document.getElementById('insKary').value;if(!nama)return toast('Pilih karyawan','warning');await db.collection('hrd_insentif').add({nama,departemen:window._insDept||'',gajiPokok:window._insGaji||0,kpiScore:Number(document.getElementById('insKPI').value)||0,persen:window._insCalc?.pct||0,nominal:window._insCalc?.nominal||0,periode:document.getElementById('insPeriode').value,createdAt:new Date().toISOString()});closeModalDirect();toast('Insentif disimpan','success');renderInsentif();}
+
+async function generateInsentifFromKPI(){
+  if(!confirm('Generate insentif untuk semua karyawan berdasarkan data KPI terbaru?'))return;
+  const kSnap=await db.collection('hrd_karyawan').where('status','==','aktif').get();
+  const kpiSnap=await db.collection('hrd_kpi').get();
+  const kpiMap={};kpiSnap.forEach(d=>{const r=d.data();const n=(r.nama||'').toLowerCase();if(!kpiMap[n]||r.skor>kpiMap[n])kpiMap[n]=r.skor||0;});
+  let count=0;
+  for(const doc of kSnap.docs){
+    const k=doc.data();const kpi=kpiMap[(k.nama||'').toLowerCase()]||0;
+    let pct=0;if(kpi>=90)pct=15;else if(kpi>=80)pct=10;else if(kpi>=70)pct=5;
+    if(pct===0)continue;
+    const nominal=Math.round((k.gajiPokok||0)*pct/100);
+    await db.collection('hrd_insentif').add({nama:k.nama,departemen:k.departemen||'',gajiPokok:k.gajiPokok||0,kpiScore:kpi,persen:pct,nominal,periode:monthStr(),createdAt:new Date().toISOString()});
+    count++;
+  }
+  toast(`${count} insentif di-generate dari KPI`,'success');renderInsentif();
+}
+async function hapusSemuaInsentif(){if(!confirm('Hapus semua data insentif?'))return;const snap=await db.collection('hrd_insentif').get();const batch=db.batch();snap.forEach(d=>batch.delete(d.ref));await batch.commit();toast('Semua insentif dihapus','success');renderInsentif();}
 
 // ── QR & PWA & DOWNLOAD APP ───────────────────────────────────
 function renderQRShare(){
