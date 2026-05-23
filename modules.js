@@ -2470,48 +2470,29 @@ async function simpanAkun(id){
 async function renderApprovalCenter(){
   const main=document.getElementById('mainContent');
   main.innerHTML=`<div class="page-title"><span>✅ Approval Center</span></div><div class="card" id="approvalList">Loading...</div>`;
-  // Load approval flows to determine what this user can approve
-  const flowSnap=await db.collection('hrd_approval_flow').get();
-  const myApprovalNames=new Set();
-  flowSnap.forEach(d=>{
-    const f=d.data();
-    (f.steps||[]).forEach(s=>{
-      if(s.nama?.toLowerCase()===currentUser.nama?.toLowerCase()||s.role===currentUser.role)myApprovalNames.add((f.pengaju||'').toLowerCase());
-    });
-  });
-  // Load pending items
-  const collections=[{col:'hrd_cuti',label:'CUTI'},{col:'hrd_overtime',label:'OVERTIME'},{col:'hrd_reimbursement',label:'REIMBURSE'},{col:'hrd_kasbon',label:'KASBON'}];
+  const collections=['hrd_cuti','hrd_overtime','hrd_reimbursement','hrd_kasbon'];
   let items=[];
-  for(const{col,label}of collections){
+  for(const col of collections){
     const snap=await db.collection(col).where('status','==','pending').get();
-    snap.forEach(d=>{
-      const data={id:d.id,collection:col,typeLabel:label,...d.data()};
-      // Check if current user is authorized to approve this person
-      const canApprove=hasAccess(4)||myApprovalNames.has('semua')||myApprovalNames.has((data.nama||'').toLowerCase());
-      if(canApprove)items.push(data);
-    });
+    snap.forEach(d=>items.push({id:d.id,collection:col,...d.data()}));
   }
   items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
   let h='';
-  if(!items.length) h='<div class="empty-state"><div class="icon">✅</div><p>Tidak ada pengajuan yang perlu Anda approve</p></div>';
+  if(!items.length) h='<div class="empty-state"><div class="icon">✅</div><p>Tidak ada pengajuan pending</p></div>';
   else items.forEach(item=>{
+    const typeLabel=item.collection.replace('hrd_','').toUpperCase();
     const detail=item.jenis||item.kategori||'';
     const jumlah=item.jumlah?` — ${formatCurrency(item.jumlah)}`:'';
     const durasi=item.durasi?` (${item.durasi} hari)`:'';
-    // Find approval flow for this person
-    let flowInfo='';
-    flowSnap.forEach(d=>{const f=d.data();if(f.pengaju?.toLowerCase()===item.nama?.toLowerCase()&&f.jenis?.toLowerCase().includes(item.typeLabel.toLowerCase().substring(0,4))){flowInfo=(f.steps||[]).map(s=>s.nama).join(' → ');}});
     h+=`<div style="padding:14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
       <div style="flex:1">
-        <div><span class="badge badge-info">${item.typeLabel}</span> <span class="fw-700">${escHtml(item.nama)}</span></div>
+        <div><span class="badge badge-info">${typeLabel}</span> <span class="fw-700">${escHtml(item.nama)}</span></div>
         <div class="text-sm" style="color:#555;margin-top:4px">${escHtml(detail)}${durasi}${jumlah}</div>
-        <div class="text-xs" style="color:#999;margin-top:2px">${formatDateTime(item.createdAt)}</div>
-        ${flowInfo?`<div class="text-xs mt-4" style="color:var(--accent)">Flow: ${escHtml(flowInfo)}</div>`:''}
+        <div class="text-xs" style="color:#999;margin-top:2px">${formatDateTime(item.createdAt)}${item.atasan?` • Atasan: ${escHtml(item.atasan)}`:''}</div>
       </div>
       <div class="flex gap-8">
-        <button class="btn btn-xs btn-primary" onclick="viewApprovalDetail('${item.collection}','${item.id}')">👁️</button>
-        <button class="btn btn-xs btn-success" onclick="approveItem('${item.collection}','${item.id}','approved')">✅</button>
-        <button class="btn btn-xs btn-danger" onclick="approveItem('${item.collection}','${item.id}','rejected')">❌</button>
+        <button class="btn btn-xs btn-primary" onclick="viewApprovalDetail('${item.collection}','${item.id}')">👁️ View</button>
+        ${hasAccess(2)?`<button class="btn btn-xs btn-success" onclick="approveItem('${item.collection}','${item.id}','approved')">✅</button><button class="btn btn-xs btn-danger" onclick="approveItem('${item.collection}','${item.id}','rejected')">❌</button>`:''}
       </div>
     </div>`;
   });
@@ -2538,18 +2519,17 @@ function viewApprovalDetail(col,id){
     html+=`</div>`;
     if(p.keterangan)html+=`<div class="mb-16"><b>Keterangan:</b><div class="text-sm mt-8" style="background:#f8f9ff;padding:10px;border-radius:6px;white-space:pre-wrap">${escHtml(p.keterangan)}</div></div>`;
     if(p.alasan)html+=`<div class="mb-16"><b>Alasan:</b><div class="text-sm mt-8" style="background:#f8f9ff;padding:10px;border-radius:6px">${escHtml(p.alasan)}</div></div>`;
-    if(p.approvedBy)html+=`<div class="mb-16"><b>Diproses oleh:</b> ${escHtml(p.approvedBy)} (${formatDateTime(p.approvedAt)})</div>`;
-    html+=`<div class="flex gap-8 mt-16"><button class="btn btn-success" onclick="approveItem('${col}','${id}','approved')">✅ Approve</button><button class="btn btn-danger" onclick="approveItem('${col}','${id}','rejected')">❌ Reject</button></div>`;
+    html+=`<div class="flex gap-8 mt-16">${hasAccess(2)?`<button class="btn btn-success" onclick="approveItem('${col}','${id}','approved')">✅ Approve</button><button class="btn btn-danger" onclick="approveItem('${col}','${id}','rejected')">❌ Reject</button>`:''}</div>`;
     openModal(html,true);
   });
 }
 
 async function approveItem(col,id,status){
-  await db.collection(col).doc(id).update({status,approvedBy:currentUser.nama,approvedAt:new Date().toISOString(),approvedByRole:currentUser.role});
+  await db.collection(col).doc(id).update({status,approvedBy:currentUser.nama,approvedAt:new Date().toISOString()});
   // Notify the requester
   const doc=await db.collection(col).doc(id).get();
   const data=doc.data();
-  if(data.userId)await sendNotification(data.userId,`${status==='approved'?'✅ Disetujui':'❌ Ditolak'}`,`Pengajuan ${data.jenis||data.kategori||col.replace('hrd_','')} Anda telah ${status} oleh ${currentUser.nama} (${currentUser.role})`);
+  if(data.userId)await sendNotification(data.userId,`${status==='approved'?'✅ Disetujui':'❌ Ditolak'}`,`Pengajuan ${data.jenis||data.kategori||col.replace('hrd_','')} Anda telah ${status} oleh ${currentUser.nama}`);
   closeModalDirect();
   toast(status==='approved'?'Disetujui':'Ditolak','success');
   renderApprovalCenter();
@@ -2569,13 +2549,13 @@ async function generateAllApprovalFlows(){
   // Jenis pengajuan
   const jenisArr=['Cuti/Izin','Overtime','Reimbursement','Kasbon','Insentif','Pelatihan','Perpanjangan Kontrak'];
   // For each staff/leader, create approval flow based on atasan hierarchy
-  const staffAndLeaders=karyawan.filter(k=>{const pos=(k.posisi||'').toLowerCase();return!pos.includes('founder')&&!pos.includes('general manager');});
+  const staffAndLeaders=karyawan.filter(k=>{const pos=(k.posisi||'').toLowerCase();return!pos.includes('founder');});
   let count=0;
   for(const k of staffAndLeaders){
     // Build approval chain: atasan → atasan's atasan → admin
     const steps=[];
     // Step 1: Direct atasan
-    if(k.atasan){
+    if(k.atasan&&k.atasan.toLowerCase()!=='founder'){
       const atasan=karyawan.find(a=>a.nama?.toLowerCase()===k.atasan?.toLowerCase());
       if(atasan)steps.push({nama:atasan.nama,role:atasan.posisi||'',userId:atasan.id});
     }
@@ -2588,9 +2568,14 @@ async function generateAllApprovalFlows(){
         if(head&&head.nama!==steps[0].nama)steps.push({nama:head.nama,role:head.posisi||'',userId:head.id});
       }
     }
-    // Step 3: GM (for important items)
+    // Step 3: GM (for important items) — skip if the person IS the GM
     const gm=karyawan.find(a=>(a.posisi||'').toLowerCase().includes('general manager'));
-    if(gm&&!steps.find(s=>s.nama===gm.nama))steps.push({nama:gm.nama,role:'General Manager',userId:gm.id});
+    if(gm&&gm.nama!==k.nama&&!steps.find(s=>s.nama===gm.nama))steps.push({nama:gm.nama,role:'General Manager',userId:gm.id});
+    // For GM: approver is Founder/BOD
+    if((k.posisi||'').toLowerCase().includes('general manager')){
+      const founder=karyawan.find(a=>(a.posisi||'').toLowerCase().includes('founder'));
+      if(founder)steps.push({nama:founder.nama,role:'Founder/BOD',userId:founder.id});
+    }
     // If no steps found, default to admin
     if(!steps.length)steps.push({nama:'Admin',role:'admin'});
     // Create flow for each jenis
@@ -2603,30 +2588,6 @@ async function generateAllApprovalFlows(){
     }
   }
   toast(`${count} approval flow di-generate untuk ${staffAndLeaders.length} karyawan`,'success');
-  // Sync roles to user accounts based on grade jabatan
-  try{
-    const usersSnap=await db.collection('hrd_users').get();
-    for(const userDoc of usersSnap.docs){
-      const u=userDoc.data();
-      // Find matching karyawan
-      const match=karyawan.find(k=>k.nama?.toLowerCase()===u.nama?.toLowerCase());
-      if(!match)continue;
-      const grade=(match.gradeJabatan||match.posisi||'').toUpperCase();
-      let newRole='staff';
-      if(grade.includes('FOUNDER')||grade.includes('BOD'))newRole='bod';
-      else if(grade.includes('SENIOR HEAD')||grade.includes('GENERAL MANAGER'))newRole='bod';
-      else if(grade.includes('HEAD'))newRole='head';
-      else if(grade.includes('MANAGER'))newRole='manager';
-      else if(grade.includes('LEADER'))newRole='leader';
-      else newRole='staff';
-      // Don't downgrade admin
-      if(u.role==='admin')continue;
-      if(u.role!==newRole){
-        await db.collection('hrd_users').doc(userDoc.id).update({role:newRole,posisi:match.posisi||'',departemen:match.departemen||''});
-      }
-    }
-    toast('Role user disinkronkan berdasarkan grade jabatan','success');
-  }catch(e){console.warn('Role sync error:',e);}
   renderApprovalMgmt();
 }
 
