@@ -2483,15 +2483,31 @@ async function simpanAkun(id){
 async function renderApprovalCenter(){
   const main=document.getElementById('mainContent');
   main.innerHTML=`<div class="page-title"><span>✅ Approval Center</span></div><div class="card" id="approvalList">Loading...</div>`;
+  // Get current user's department
+  const myDept=(currentUser.departemen||'').toLowerCase();
+  const isAdmin=hasAccess(5); // BOD & Admin see all
+  const isGM=(currentUser.posisi||'').toLowerCase().includes('general manager');
+  
   const collections=['hrd_cuti','hrd_overtime','hrd_reimbursement','hrd_kasbon'];
   let items=[];
   for(const col of collections){
     const snap=await db.collection(col).where('status','==','pending').get();
-    snap.forEach(d=>items.push({id:d.id,collection:col,...d.data()}));
+    snap.forEach(d=>{
+      const data={id:d.id,collection:col,...d.data()};
+      // Department filtering: only show items from same department
+      // Admin, BOD, GM can see all departments
+      if(isAdmin||isGM){
+        items.push(data);
+      }else{
+        // Head/Manager/Leader only see their own department
+        const itemDept=(data.departemen||'').toLowerCase();
+        if(!itemDept||itemDept===myDept)items.push(data);
+      }
+    });
   }
   items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
   let h='';
-  if(!items.length) h='<div class="empty-state"><div class="icon">✅</div><p>Tidak ada pengajuan pending</p></div>';
+  if(!items.length) h='<div class="empty-state"><div class="icon">✅</div><p>Tidak ada pengajuan pending di departemen Anda</p></div>';
   else items.forEach(item=>{
     const typeLabel=item.collection.replace('hrd_','').toUpperCase();
     const detail=item.jenis||item.kategori||'';
@@ -2499,13 +2515,14 @@ async function renderApprovalCenter(){
     const durasi=item.durasi?` (${item.durasi} hari)`:'';
     h+=`<div style="padding:14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
       <div style="flex:1">
-        <div><span class="badge badge-info">${typeLabel}</span> <span class="fw-700">${escHtml(item.nama)}</span></div>
+        <div><span class="badge badge-info">${typeLabel}</span> <span class="fw-700">${escHtml(item.nama)}</span>${item.departemen?` <span class="text-xs" style="color:#999">(${escHtml(item.departemen)})</span>`:''}</div>
         <div class="text-sm" style="color:#555;margin-top:4px">${escHtml(detail)}${durasi}${jumlah}</div>
-        <div class="text-xs" style="color:#999;margin-top:2px">${formatDateTime(item.createdAt)}${item.atasan?` • Atasan: ${escHtml(item.atasan)}`:''}</div>
+        <div class="text-xs" style="color:#999;margin-top:2px">${formatDateTime(item.createdAt)}</div>
       </div>
       <div class="flex gap-8">
-        <button class="btn btn-xs btn-primary" onclick="viewApprovalDetail('${item.collection}','${item.id}')">👁️ View</button>
-        ${hasAccess(2)?`<button class="btn btn-xs btn-success" onclick="approveItem('${item.collection}','${item.id}','approved')">✅</button><button class="btn btn-xs btn-danger" onclick="approveItem('${item.collection}','${item.id}','rejected')">❌</button>`:''}
+        <button class="btn btn-xs btn-primary" onclick="viewApprovalDetail('${item.collection}','${item.id}')">👁️</button>
+        <button class="btn btn-xs btn-success" onclick="approveItem('${item.collection}','${item.id}','approved')">✅</button>
+        <button class="btn btn-xs btn-danger" onclick="approveItem('${item.collection}','${item.id}','rejected')">❌</button>
       </div>
     </div>`;
   });
