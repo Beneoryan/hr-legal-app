@@ -127,7 +127,7 @@ function renderApp() {
 
 function buildNavItems(isKaryawan) {
   if (isKaryawan) {
-    return navGroup('Portal Saya',[['portal','🏠','Beranda'],['portal-absensi','📍','Absensi'],['portal-cuti','🏖️','Cuti & Izin'],['portal-gaji','💰','Slip Gaji'],['portal-reimburse','🧾','Reimburse'],['portal-kasbon','💳','Kasbon & Loan'],['portal-jobdesk','📋','Jobdesk'],['portal-disc','🧠','DISC Test'],['portal-kpi','📈','KPI Saya'],['portal-struktur','🌳','Struktur Org'],['portal-libur','📅','Hari Libur'],['portal-peraturan','📜','Peraturan'],['inbox','📥','Inbox Meeting'],['chat','💬','Obrolan'],['portal-setting','⚙️','Setting Akun']]);
+    return navGroup('Portal Saya',[['portal','🏠','Beranda'],['portal-absensi','📍','Absensi'],['portal-cuti','🏖️','Cuti & Izin'],['portal-gaji','💰','Slip Gaji'],['portal-reimburse','🧾','Reimburse'],['portal-kasbon','💳','Kasbon & Loan'],['portal-jobdesk','📋','Jobdesk'],['portal-disc','🧠','DISC Test'],['portal-kpi','📈','KPI Saya'],['portal-struktur','🌳','Struktur Org'],['portal-libur','📅','Hari Libur'],['portal-peraturan','📜','Peraturan'],['portal-pengumuman','📢','Pengumuman'],['portal-broadcast','📡','Broadcast'],['portal-meeting','📅','Meeting'],['portal-invite','✉️','Undangan'],['inbox','📥','Inbox Meeting'],['chat','💬','Obrolan'],['portal-setting','⚙️','Setting Akun']]);
   }
   let nav='';
   nav+=navGroup('Utama',[['dashboard','📊','Dashboard'],['approval-center','✅','Approval Center'],['notifikasi','🔔','Notifikasi'],['pengumuman','📢','Pengumuman']]);
@@ -172,6 +172,8 @@ function navigateTo(page) {
     'portal-gaji':renderPortalGaji,'portal-jobdesk':renderPortalJobdesk,'portal-peraturan':renderPortalPeraturan,
     'portal-disc':renderPortalDisc,'portal-reimburse':renderPortalReimburse,'portal-kasbon':renderPortalKasbon,
     'portal-kpi':renderPortalKPI,'portal-struktur':renderStrukturOrg,'portal-libur':renderHariLibur,
+    'portal-pengumuman':renderPortalPengumuman,'portal-broadcast':renderPortalBroadcast,
+    'portal-meeting':renderPortalMeeting,'portal-invite':renderPortalInvite,
     'portal-setting':renderPortalSetting,'portal-share':renderPortalShare,
   };
   const fn=routes[page];
@@ -243,6 +245,42 @@ function listenNotifications(){
     });
   });
   unsubscribers.push(unsub4);
+  // Listen for new pengumuman
+  const unsub5=db.collection('hrd_pengumuman').onSnapshot(snap=>{
+    snap.docChanges().forEach(change=>{
+      if(change.type==='added'&&change.doc.data().createdAt){
+        const created=new Date(change.doc.data().createdAt);
+        const now=new Date();
+        if((now-created)<30000) playNotificationSound();
+      }
+    });
+  });
+  unsubscribers.push(unsub5);
+  // Listen for new meeting
+  const unsub6=db.collection('hrd_meeting').onSnapshot(snap=>{
+    snap.docChanges().forEach(change=>{
+      if(change.type==='added'&&change.doc.data().createdAt){
+        const created=new Date(change.doc.data().createdAt);
+        const now=new Date();
+        if((now-created)<30000) playNotificationSound();
+      }
+    });
+  });
+  unsubscribers.push(unsub6);
+  // Listen for chat messages
+  const unsub7=db.collection('hrd_chat').onSnapshot(snap=>{
+    snap.docChanges().forEach(change=>{
+      if(change.type==='added'&&change.doc.data().createdAt){
+        const d=change.doc.data();
+        if(d.userId!==currentUser.id){
+          const created=new Date(d.createdAt);
+          const now=new Date();
+          if((now-created)<15000) playNotificationSound();
+        }
+      }
+    });
+  });
+  unsubscribers.push(unsub7);
 }
 
 // ── NOTIFICATION SOUND — Loud & Clear ─────────────────────────
