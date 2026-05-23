@@ -15,14 +15,10 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-const ROLES = { superadmin:5, admin:4, hr:3, legal:3, manager:2, karyawan:1 };
+const ROLES = { admin:5, bod:4, head:3, manager:3, leader:2, staff:1 };
 
 const DEFAULT_ACCOUNTS = [
-  { username:'superadmin', password:'super2026', role:'superadmin', nama:'Super Admin', departemen:'Management' },
-  { username:'admin', password:'admin123', role:'admin', nama:'Administrator', departemen:'IT' },
-  { username:'hr', password:'hr123', role:'hr', nama:'HR Manager', departemen:'HRD' },
-  { username:'legal', password:'legal123', role:'legal', nama:'Legal Officer', departemen:'Legal' },
-  { username:'benoegila', password:'ryanbenoe21', role:'karyawan', nama:'Ryan Benoe', departemen:'Operasional' },
+  { username:'admin', password:'admin123', role:'admin', nama:'Administrator', departemen:'Management' },
 ];
 
 let currentUser = null;
@@ -44,7 +40,7 @@ async function initApp() {
   }
   await seedDefaultAccounts();
   const saved = localStorage.getItem('hrd_session');
-  if (saved) { try { currentUser = JSON.parse(saved); currentPage = currentUser.role === 'karyawan' ? 'portal' : 'dashboard'; renderApp(); } catch(e) { renderLogin(); } }
+  if (saved) { try { currentUser = JSON.parse(saved); const adminRoles=['admin','bod','head','manager']; currentPage = adminRoles.includes(currentUser.role) ? 'dashboard' : 'portal'; renderApp(); } catch(e) { renderLogin(); } }
   else renderLogin();
 }
 
@@ -67,8 +63,9 @@ async function doLogin(username, password) {
   if (data.status === 'nonaktif') throw new Error('Akun dinonaktifkan');
   currentUser = { id: doc.id, ...data };
   localStorage.setItem('hrd_session', JSON.stringify(currentUser));
-  // Langsung ke beranda
-  currentPage = currentUser.role === 'karyawan' ? 'portal' : 'dashboard';
+  // Langsung ke beranda - admin/bod/head/manager get dashboard, leader/staff get portal
+  const adminRoles=['admin','bod','head','manager'];
+  currentPage = adminRoles.includes(currentUser.role) ? 'dashboard' : 'portal';
   renderApp();
 }
 
@@ -104,17 +101,18 @@ async function handleLogin() {
 }
 
 function renderApp() {
-  const isKaryawan = currentUser.role === 'karyawan';
+  const adminRoles=['admin','bod','head','manager'];
+  const isPortalUser = !adminRoles.includes(currentUser.role);
   document.getElementById('app').innerHTML = `
   <div class="sidebar" id="sidebar">
-    <div class="logo">🏛️ <span>IMS (IJEF Management System)</span></div>
-    <nav>${buildNavItems(isKaryawan)}</nav>
+    <div class="logo">🏛️ <span>IMS</span></div>
+    <nav>${buildNavItems(isPortalUser)}</nav>
     <div style="padding:16px 20px;border-top:1px solid rgba(255,255,255,.1)"><div style="font-size:.75rem;color:rgba(255,255,255,.5)">v5.0 — ${currentUser.nama}</div></div>
   </div>
   <div class="header">
     <button class="menu-btn" onclick="toggleSidebar()">☰</button>
-    <div class="home-btn" onclick="navigateTo('${isKaryawan?'portal':'dashboard'}')" title="Beranda" style="cursor:pointer;font-size:1.3rem;margin-right:8px">🏠</div>
-    <div class="title">${isKaryawan?'IMS Karyawan':'IMS (IJEF Management System)'}</div>
+    <div class="home-btn" onclick="navigateTo('${isPortalUser?'portal':'dashboard'}')" title="Beranda" style="cursor:pointer;font-size:1.3rem;margin-right:8px">🏠</div>
+    <div class="title">${isPortalUser?'IMS Karyawan':'IMS (IJEF Management System)'}</div>
     <div class="notif-badge" onclick="navigateTo('notifikasi')" title="Notifikasi">🔔<span class="count" id="notifCount" style="display:none">0</span></div>
     <div class="user-info">
       <div class="avatar">${currentUser.profilePic?`<img src="${currentUser.profilePic}" style="width:100%;height:100%;border-radius:50%;object-fit:cover">`:currentUser.nama.charAt(0)}</div>
@@ -141,29 +139,42 @@ function renderApp() {
   autoLoadHariLiburNasional().catch(()=>{});
 }
 
-function buildNavItems(isKaryawan) {
-  if (isKaryawan) {
+function buildNavItems(isPortalUser) {
+  if (isPortalUser) {
+    // STAFF & LEADER portal
     let nav='';
     nav+=navGroup('🏠 Utama',[['portal','🏠','Beranda'],['portal-absensi','📍','Absensi'],['portal-cuti','🏖️','Cuti & Izin'],['portal-overtime','⏰','Overtime']]);
     nav+=navGroup('💰 Keuangan',[['portal-gaji','💰','Slip Gaji'],['portal-reimburse','🧾','Reimburse'],['portal-kasbon','💳','Kasbon & Loan']]);
     nav+=navGroup('💼 Pekerjaan',[['portal-jobdesk','📋','Jobdesk'],['portal-disc','🧠','DISC Test'],['portal-kpi','📈','KPI Saya']]);
     nav+=navGroup('🏢 Organisasi',[['portal-struktur','🌳','Struktur Org'],['portal-libur','📅','Hari Libur'],['portal-peraturan','📜','Peraturan']]);
     nav+=navGroup('💬 Komunikasi',[['portal-pengumuman','📢','Pengumuman'],['portal-broadcast','📡','Broadcast'],['portal-meeting','📅','Meeting'],['portal-invite','✉️','Undangan'],['inbox','📥','Inbox'],['chat','💬','Obrolan']]);
+    // Leader gets approval access
+    if(currentUser.role==='leader') nav+=navGroup('✅ Approval',[['approval-center','✅','Approval Center']]);
     nav+=navGroup('⚙️ Pengaturan',[['portal-setting','⚙️','Setting Akun']]);
     return nav;
   }
+  // ADMIN / BOD / HEAD / MANAGER dashboard
   let nav='';
   nav+=navGroup('🏠 Utama',[['dashboard','📊','Dashboard'],['approval-center','✅','Approval Center'],['notifikasi','🔔','Notifikasi'],['pengumuman','📢','Pengumuman']]);
-  nav+=navGroup('🏢 Perusahaan',[['departemen','🏢','Departemen'],['posisi','💼','Posisi'],['cabang','🏛️','Cabang']]);
+  // BOD & Admin: full access
+  if(hasAccess(4)){
+    nav+=navGroup('🏢 Perusahaan',[['departemen','🏢','Departemen'],['posisi','💼','Posisi'],['cabang','🏛️','Cabang']]);
+  }
   nav+=navGroup('👥 Karyawan',[['karyawan','👥','Data Karyawan'],['struktur-org','🌳','Struktur Org'],['jobdesk-mgmt','📋','Kelola Jobdesk'],['onboarding','🚀','Onboarding'],['offboarding','📦','Offboarding']]);
-  nav+=navGroup('🔍 Rekrutmen',[['lowongan','📝','Lowongan'],['pipeline','🔄','Pipeline Kanban'],['kandidat','🧑‍💼','Kandidat']]);
+  if(hasAccess(4)){
+    nav+=navGroup('🔍 Rekrutmen',[['lowongan','📝','Lowongan'],['pipeline','🔄','Pipeline Kanban'],['kandidat','🧑‍💼','Kandidat']]);
+  }
   nav+=navGroup('📍 Kehadiran',[['absensi','📍','Absensi IJEF'],['cuti','🏖️','Cuti/Izin/WFH'],['overtime','⏰','Overtime'],['hari-libur','📅','Hari Libur'],['penalty','⚠️','Penalty Point']]);
   nav+=navGroup('💰 Keuangan',[['penggajian','💰','Penggajian'],['insentif','🏆','Insentif'],['reimbursement','🧾','Reimbursement'],['kasbon','💳','Kasbon & Loan'],['tunjangan','🎁','Tunjangan']]);
   nav+=navGroup('📈 Kinerja',[['kpi','📈','KPI & Penilaian'],['pelatihan','🎓','Pelatihan'],['disc-test','🧠','DISC Test']]);
-  nav+=navGroup('📄 Legal & Aset',[['kontrak','📄','Kontrak'],['asset','💻','Asset'],['peraturan','📜','Peraturan'],['surat','✉️','Generator Surat']]);
+  if(hasAccess(4)){
+    nav+=navGroup('📄 Legal & Aset',[['kontrak','📄','Kontrak'],['asset','💻','Asset'],['peraturan','📜','Peraturan'],['surat','✉️','Generator Surat']]);
+  }
   nav+=navGroup('💬 Komunikasi',[['meeting','📅','Meeting & Invite'],['chat','💬','Obrolan Divisi'],['broadcast','📡','Broadcast'],['inbox','📥','Inbox Saya']]);
-  nav+=navGroup('🔗 Portal',[['portal-share','🔗','Download Aplikasi']]);
-  nav+=navGroup('⚙️ Pengaturan',[['akun','👤','Manajemen Akun'],['approval-mgmt','⚙️','Approval Mgmt'],['qr-share','📱','QR & PWA']]);
+  if(hasAccess(5)){
+    nav+=navGroup('🔗 Portal',[['portal-share','🔗','Download Aplikasi']]);
+    nav+=navGroup('⚙️ Pengaturan',[['akun','👤','Manajemen Akun'],['approval-mgmt','⚙️','Approval Mgmt'],['qr-share','📱','QR & PWA']]);
+  }
   return nav;
 }
 
