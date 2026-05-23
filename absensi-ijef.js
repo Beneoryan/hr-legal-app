@@ -873,9 +873,17 @@ async function loadRekapGrid(){
   const bulan=document.getElementById('rekapBulan')?.value||monthStr();
   const days=getMonthDays(bulan);
   const startDate=bulan+'-01',endDate=bulan+'-'+String(days).padStart(2,'0');
-  const[usersSnap,absenSnap,settDoc]=await Promise.all([db.collection('hrd_karyawan').where('status','==','aktif').get(),db.collection('hrd_absensi').where('tanggal','>=',startDate).where('tanggal','<=',endDate).get(),db.collection('hrd_settings').doc('absensi').get()]);
+  const[usersSnap,absenSnap,settDoc,cutiSnap,overtimeSnap,hariLiburSnap]=await Promise.all([db.collection('hrd_karyawan').where('status','==','aktif').get(),db.collection('hrd_absensi').where('tanggal','>=',startDate).where('tanggal','<=',endDate).get(),db.collection('hrd_settings').doc('absensi').get(),db.collection('hrd_cuti').where('status','==','approved').get(),db.collection('hrd_overtime').get(),db.collection('hrd_hari_libur').where('tanggal','>=',startDate).where('tanggal','<=',endDate).get()]);
   const sett = settDoc.exists ? settDoc.data() : {};
   const flex = sett.flexTime || { enabled: true, durasiKerja: 8, durasiIstirahat: 1 };
+  // Build cuti map: userId -> {day: jenis}
+  const cutiMap={};
+  cutiSnap.forEach(d=>{const c=d.data();if(!c.mulai||!c.selesai)return;const uid=c.userId||c.nama;const start=new Date(c.mulai);const end=new Date(c.selesai);for(let dt=new Date(start);dt<=end;dt.setDate(dt.getDate()+1)){const ds=dt.toISOString().split('T')[0];if(ds>=startDate&&ds<=endDate){const day=dt.getDate();if(!cutiMap[uid])cutiMap[uid]={};cutiMap[uid][day]=c.jenis||'Cuti';}}});
+  // Build overtime map: userId -> {day: true}
+  const otMap={};
+  overtimeSnap.forEach(d=>{const o=d.data();if(o.tanggal&&o.tanggal>=startDate&&o.tanggal<=endDate&&o.status==='approved'){const uid=o.userId||o.nama;const day=parseInt(o.tanggal.split('-')[2]);if(!otMap[uid])otMap[uid]={};otMap[uid][day]=true;}});
+  // Build hari libur set
+  const liburSet=new Set();hariLiburSnap.forEach(d=>{const h=d.data();if(h.tanggal)liburSet.add(parseInt(h.tanggal.split('-')[2]));});
   const users=[];usersSnap.forEach(d=>users.push({id:d.id,...d.data()}));
   // Portal mode: only show current user (unless GM/admin)
   const isPortalMode=window._portalAbsensiMode&&!hasAccess(2);
@@ -898,8 +906,14 @@ async function loadRekapGrid(){
       const st=absenMap[u.id]?.[i];
       const jamKerja=jamKerjaMap[u.id]?.[i];
       const lemburJam=lemburMap[u.id]?.[i];
+      // Check cuti/izin first (by userId or nama)
+      const cutiStatus=cutiMap[u.id]?.[i]||cutiMap[u.nama]?.[i]||cutiMap[u.nama?.toLowerCase()]?.[i];
+      const isOT=otMap[u.id]?.[i]||otMap[u.nama]?.[i];
+      const isLibur=liburSet.has(i);
       let color='#eee',text='-',title='';
-      if(st==='lembur'){color='#7b1fa2';text='L';ut++;totalLembur++;if(lemburJam){userLemburJam+=lemburJam;totalLemburJam+=lemburJam;}}
+      if(isLibur){color='#9e9e9e';text='H';title=' title="Hari Libur"';}
+      else if(cutiStatus){color='#00bcd4';text='C';title=` title="${cutiStatus}"`;ut++;}
+      else if(st==='lembur'||isOT){color='#7b1fa2';text='L';ut++;totalLembur++;if(lemburJam){userLemburJam+=lemburJam;totalLemburJam+=lemburJam;}}
       else if(st==='tepat_waktu'||st==='hadir'){color='#4caf50';text='✓';ut++;totalH++;}
       else if(st==='terlambat'){color='#ff9800';text='T';ut++;totalT++;}
       else if(st==='dinas'){color='#2196f3';text='D';ut++;totalD++;}
@@ -927,6 +941,8 @@ async function loadRekapGrid(){
   if(flex.enabled) summaryHtml += `<span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#ff5722;border-radius:2px"></span> Kurang Jam</span>`;
   summaryHtml += `<span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#7b1fa2;border-radius:2px"></span> Lembur</span>
       <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#2196f3;border-radius:2px"></span> Dinas Luar</span>
+      <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#00bcd4;border-radius:2px"></span> Cuti/Izin</span>
+      <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#9e9e9e;border-radius:2px"></span> Hari Libur</span>
       <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#eee;border-radius:2px"></span> Tidak Hadir</span>
     </div>`;
   document.getElementById('rekapSummary').innerHTML=summaryHtml;
