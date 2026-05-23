@@ -2142,7 +2142,7 @@ async function renderAkun(){if(!hasAccess(4))return document.getElementById('mai
     </div>
     <div class="form-group"><label>Logo Perusahaan</label>
       <div style="display:flex;align-items:center;gap:16px;margin-top:8px">
-        <div id="cpLogoPreview" style="width:64px;height:64px;border-radius:8px;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;background:#f8f9ff"><span style="font-size:1.5rem">🏛️</span></div>
+        <div id="cpLogoPreview" style="width:64px;height:64px;border-radius:50%;border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;overflow:hidden;background:#f8f9ff"><span style="font-size:1.5rem">🏛️</span></div>
         <div>
           <input type="file" id="cpLogoFile" accept="image/png,image/jpeg,image/webp" style="display:none" onchange="previewCompanyLogo(this)">
           <button class="btn btn-primary btn-sm" onclick="document.getElementById('cpLogoFile').click()">📁 Upload Logo (JPG/PNG)</button>
@@ -2179,22 +2179,73 @@ function previewCompanyLogo(input){
   const file=input.files[0];if(!file)return;
   const reader=new FileReader();
   reader.onload=e=>{
-    // Resize to max 128x128 for storage efficiency
+    // Show crop modal
+    openModal(`<div class="modal-title">✂️ Crop Logo (Bulat)</div>
+      <p class="text-sm mb-16" style="color:#666">Geser dan zoom gambar untuk menyesuaikan area crop bulat.</p>
+      <div style="position:relative;width:280px;height:280px;margin:0 auto;border-radius:50%;overflow:hidden;border:3px solid var(--accent);background:#000">
+        <canvas id="cropCanvas" width="280" height="280" style="width:100%;height:100%;cursor:move"></canvas>
+      </div>
+      <div class="flex gap-8 mt-16" style="justify-content:center;align-items:center">
+        <span class="text-xs">Zoom:</span>
+        <input type="range" id="cropZoom" min="50" max="300" value="100" oninput="updateCropPreview()" style="flex:1;max-width:200px">
+      </div>
+      <div class="flex gap-8 mt-16" style="justify-content:center">
+        <button class="btn btn-primary" onclick="applyCrop()">✅ Gunakan Logo Ini</button>
+        <button class="btn btn-outline" onclick="closeModalDirect()">Batal</button>
+      </div>`,true);
+    // Setup crop
     const img=new Image();
     img.onload=()=>{
-      const canvas=document.createElement('canvas');
-      const size=128;
-      canvas.width=size;canvas.height=size;
-      const ctx=canvas.getContext('2d');
-      const scale=Math.min(size/img.width,size/img.height);
-      const w=img.width*scale,h=img.height*scale;
-      ctx.drawImage(img,(size-w)/2,(size-h)/2,w,h);
-      window._companyLogo=canvas.toDataURL('image/png',0.9);
-      document.getElementById('cpLogoPreview').innerHTML=`<img src="${window._companyLogo}" style="width:100%;height:100%;object-fit:contain">`;
+      window._cropImg=img;
+      window._cropOffsetX=0;
+      window._cropOffsetY=0;
+      window._cropZoom=100;
+      updateCropPreview();
+      // Drag to move
+      const canvas=document.getElementById('cropCanvas');
+      let dragging=false,startX=0,startY=0;
+      canvas.onmousedown=canvas.ontouchstart=(ev)=>{dragging=true;const e=ev.touches?ev.touches[0]:ev;startX=e.clientX-window._cropOffsetX;startY=e.clientY-window._cropOffsetY;ev.preventDefault();};
+      document.onmousemove=document.ontouchmove=(ev)=>{if(!dragging)return;const e=ev.touches?ev.touches[0]:ev;window._cropOffsetX=e.clientX-startX;window._cropOffsetY=e.clientY-startY;updateCropPreview();};
+      document.onmouseup=document.ontouchend=()=>{dragging=false;};
     };
     img.src=e.target.result;
   };
   reader.readAsDataURL(file);
+}
+
+function updateCropPreview(){
+  const canvas=document.getElementById('cropCanvas');if(!canvas||!window._cropImg)return;
+  const ctx=canvas.getContext('2d');
+  const img=window._cropImg;
+  const zoom=(document.getElementById('cropZoom')?.value||100)/100;
+  window._cropZoom=zoom;
+  ctx.clearRect(0,0,280,280);
+  // Draw image centered with offset and zoom
+  const scale=Math.max(280/img.width,280/img.height)*zoom;
+  const w=img.width*scale,h=img.height*scale;
+  const x=(280-w)/2+window._cropOffsetX;
+  const y=(280-h)/2+window._cropOffsetY;
+  // Clip to circle
+  ctx.save();
+  ctx.beginPath();ctx.arc(140,140,140,0,Math.PI*2);ctx.clip();
+  ctx.drawImage(img,x,y,w,h);
+  ctx.restore();
+  // Draw circle border
+  ctx.beginPath();ctx.arc(140,140,139,0,Math.PI*2);ctx.strokeStyle='rgba(198,40,40,0.5)';ctx.lineWidth=2;ctx.stroke();
+}
+
+function applyCrop(){
+  const canvas=document.getElementById('cropCanvas');if(!canvas)return;
+  // Export as circular PNG
+  const exportCanvas=document.createElement('canvas');
+  exportCanvas.width=128;exportCanvas.height=128;
+  const ctx=exportCanvas.getContext('2d');
+  ctx.beginPath();ctx.arc(64,64,64,0,Math.PI*2);ctx.clip();
+  ctx.drawImage(canvas,0,0,280,280,0,0,128,128);
+  window._companyLogo=exportCanvas.toDataURL('image/png',0.9);
+  document.getElementById('cpLogoPreview').innerHTML=`<img src="${window._companyLogo}" style="width:100%;height:100%;object-fit:contain;border-radius:50%">`;
+  closeModalDirect();
+  toast('Logo di-crop berhasil!','success');
 }
 
 async function simpanDataPerusahaan(){

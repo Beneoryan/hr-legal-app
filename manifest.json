@@ -5,18 +5,18 @@
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#1a237e",
-  "theme_color": "#1a237e",
+  "background_color": "#1a1a1a",
+  "theme_color": "#1a1a1a",
   "categories": ["business", "productivity"],
   "icons": [
     {
-      "src": "https://ui-avatars.com/api/?name=IMS&background=1a237e&color=fff&size=192&format=png",
+      "src": "https://ui-avatars.com/api/?name=IMS&background=1a1a1a&color=c62828&size=192&format=png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "https://ui-avatars.com/api/?name=IMS&background=1a237e&color=fff&size=512&format=png",
+      "src": "https://ui-avatars.com/api/?name=IMS&background=1a1a1a&color=c62828&size=512&format=png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

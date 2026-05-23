@@ -82,13 +82,16 @@ function doLogout() {
 function hasAccess(minLevel) { return (ROLES[currentUser?.role]||0) >= minLevel; }
 
 function renderLogin() {
+  const logo=localStorage.getItem('ims_company_logo');
+  const logoHtml=logo?`<img src="${logo}" style="width:72px;height:72px;border-radius:50%;margin:0 auto 12px;display:block;object-fit:contain">`:'';
   document.getElementById('app').innerHTML = `
   <div class="login-page"><div class="login-box">
-    <h2>🏛️ IJEF Corp</h2><p class="subtitle">HRD & Legal System v5.0</p>
+    ${logoHtml}
+    <h2 style="color:#c62828">IMS</h2><p class="subtitle">IJEF Management System</p>
     <div class="form-group"><label>Username</label><input type="text" class="form-control" id="loginUser" placeholder="Username" onkeydown="if(event.key==='Enter')document.getElementById('loginPass').focus()"></div>
     <div class="form-group"><label>Password</label><input type="password" class="form-control" id="loginPass" placeholder="Password" onkeydown="if(event.key==='Enter')handleLogin()"></div>
-    <button class="btn btn-primary" style="width:100%;padding:12px;font-size:.9rem;margin-top:8px" onclick="handleLogin()">Masuk</button>
-    <p style="text-align:center;margin-top:16px;font-size:.75rem;color:#999">© 2026 LPK IJEF Corp</p>
+    <button class="btn btn-primary" style="width:100%;padding:12px;font-size:.9rem;margin-top:8px;background:#1a1a1a;border:none" onclick="handleLogin()">Masuk</button>
+    <p style="text-align:center;margin-top:16px;font-size:.75rem;color:#999">© 2026 LPK IJEF Corp — International Japan Eco-Future</p>
   </div></div>`;
   setTimeout(()=>document.getElementById('loginUser')?.focus(),100);
 }
