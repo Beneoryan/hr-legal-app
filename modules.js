@@ -1099,20 +1099,41 @@ async function simpanAsset(id){const data={kode:document.getElementById('asKode'
 async function renderMeeting() {
   const main = document.getElementById('mainContent');
   main.innerHTML = `
-    <div class="page-title"><span>📅 Meeting & Invite</span><button class="btn btn-primary btn-sm" onclick="modalMeetingCreate()">+ Buat Meeting</button></div>
+    <div class="page-title"><span>📅 Meeting & Invite</span><div class="flex gap-8"><button class="btn btn-success btn-sm" onclick="startInstantMeeting()">🎥 Meeting Online Sekarang</button><button class="btn btn-primary btn-sm" onclick="modalMeetingCreate()">+ Buat Meeting</button></div></div>
     <div class="tabs">
       <div class="tab active" onclick="loadMeetingTab('saya')">📤 Meeting Saya (Dibuat)</div>
       <div class="tab" onclick="loadMeetingTab('semua')">📋 Semua Meeting</div>
+      <div class="tab" onclick="loadMeetingTab('online')">🎥 Meeting Online</div>
     </div>
     <div id="meetingContent">Loading...</div>`;
   loadMeetingTab('saya');
 }
 
 async function loadMeetingTab(tab) {
-  document.querySelectorAll('.tabs .tab').forEach((t,i)=>{t.classList.toggle('active',(tab==='saya'&&i===0)||(tab==='semua'&&i===1));});
+  document.querySelectorAll('.tabs .tab').forEach((t,i)=>{t.classList.toggle('active',(tab==='saya'&&i===0)||(tab==='semua'&&i===1)||(tab==='online'&&i===2));});
+  
+  if(tab==='online'){
+    // Show online meetings
+    const snap=await db.collection('hrd_online_meeting').get();
+    const items=[];snap.forEach(d=>items.push({id:d.id,...d.data()}));
+    items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+    let html='<div class="card">';
+    if(!items.length)html+='<div class="empty-state"><div class="icon">🎥</div><p>Belum ada meeting online. Klik "Meeting Online Sekarang" untuk memulai.</p></div>';
+    else{
+      html+='<div class="table-wrap"><table><thead><tr><th>Judul</th><th>Pembuat</th><th>Tanggal</th><th>Peserta</th><th>Status</th><th>Aksi</th></tr></thead><tbody>';
+      items.forEach(m=>{
+        const isActive=m.status==='active';
+        html+=`<tr><td class="fw-700">${escHtml(m.judul||'Meeting Online')}</td><td>${escHtml(m.createdByName||'-')}</td><td>${formatDateTime(m.createdAt)}</td><td>${(m.pesertaNames||[]).length+1} orang</td><td><span class="badge badge-${isActive?'success':'default'}">${isActive?'🟢 Aktif':'Selesai'}</span></td><td><button class="btn btn-xs btn-success" onclick="joinOnlineMeeting('${m.roomId}')">🎥 Join</button> ${m.createdBy===currentUser.id?`<button class="btn btn-xs btn-danger" onclick="endOnlineMeeting('${m.id}')">⏹️ End</button>`:''}</td></tr>`;
+      });
+      html+='</tbody></table></div>';
+    }
+    html+='</div>';
+    document.getElementById('meetingContent').innerHTML=html;
+    return;
+  }
+
   let snap;
   if (tab === 'saya') {
-    // Meeting yang dibuat oleh user ini (user head)
     snap = await db.collection('hrd_meeting').where('createdBy','==',currentUser.id).get();
   } else {
     snap = await db.collection('hrd_meeting').get();
@@ -1130,7 +1151,7 @@ async function loadMeetingTab(tab) {
         <td>${p.waktu||'-'}</td>
         <td><span class="badge badge-primary">${escHtml(p.createdByName||'-')}</span></td>
         <td>${(p.pesertaIds||[]).length} orang</td>
-        <td><button class="btn btn-xs btn-info" onclick="detailMeeting('${d.id}')">👁️</button> <button class="btn btn-xs btn-warning" onclick="modalNotulensi('${d.id}')">📝</button></td>
+        <td><button class="btn btn-xs btn-info" onclick="detailMeeting('${d.id}')">👁️</button> <button class="btn btn-xs btn-warning" onclick="modalNotulensi('${d.id}')">📝</button>${p.onlineRoomId?` <button class="btn btn-xs btn-success" onclick="joinOnlineMeeting('${p.onlineRoomId}')">🎥</button>`:''}</td>
       </tr>`;
     });
     html += '</tbody></table></div>';
@@ -1157,6 +1178,7 @@ async function modalMeetingCreate() {
       <div class="form-group"><label>Durasi (menit)</label><input class="form-control" type="number" id="mtDurasi" value="60"></div>
     </div>
     <div class="form-group"><label>Lokasi / Link</label><input class="form-control" id="mtLokasi"></div>
+    <div class="form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="mtOnline"> 🎥 Sertakan Meeting Online (Video Call)</label><div class="text-xs" style="color:#666;margin-top:4px">Otomatis generate room video call. Peserta bisa join langsung dari undangan.</div></div>
     <div class="form-group"><label>Agenda</label><textarea class="form-control" id="mtAgenda"></textarea></div>
     <div class="form-group"><label>📤 Undang Peserta (pilih per akun):</label>
       <div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:8px 12px;margin-top:4px">
@@ -1176,18 +1198,24 @@ async function simpanMeeting() {
   const pesertaNames = [];
   checkboxes.forEach(cb => { pesertaIds.push(cb.value); pesertaNames.push(cb.dataset.nama); });
 
+  // Generate online meeting room if checked
+  const isOnline = document.getElementById('mtOnline')?.checked;
+  const roomId = isOnline ? 'ijef-' + generateId() : '';
+
   const data = {
     judul,
     tanggal: document.getElementById('mtTgl').value,
     waktu: document.getElementById('mtWaktu').value,
     durasi: Number(document.getElementById('mtDurasi').value) || 60,
-    lokasi: document.getElementById('mtLokasi').value,
+    lokasi: document.getElementById('mtLokasi').value || (isOnline ? 'Online (Video Call)' : ''),
     agenda: document.getElementById('mtAgenda').value,
     pesertaIds,
     pesertaNames,
     rsvp: {},
     notulensi: '',
     status: 'terjadwal',
+    onlineRoomId: roomId,
+    isOnline: isOnline || false,
     createdBy: currentUser.id,
     createdByName: currentUser.nama,
     createdAt: new Date().toISOString()
@@ -1197,10 +1225,11 @@ async function simpanMeeting() {
 
   // Kirim undangan ke inbox masing-masing peserta
   if (pesertaIds.length > 0) {
+    const onlineInfo = isOnline ? ` 🎥 Video Call tersedia — Join dari undangan.` : '';
     await sendNotificationBulk(
       pesertaIds,
-      '📅 Undangan Meeting',
-      `${currentUser.nama} mengundang Anda ke meeting "${judul}" pada ${formatDate(data.tanggal)} ${data.waktu}`,
+      '📅 Undangan Meeting' + (isOnline ? ' (Online)' : ''),
+      `${currentUser.nama} mengundang Anda ke meeting "${judul}" pada ${formatDate(data.tanggal)} ${data.waktu}${onlineInfo}`,
       'inbox'
     );
     // Simpan invite per user di collection terpisah
@@ -1216,6 +1245,8 @@ async function simpanMeeting() {
         tanggal: data.tanggal,
         waktu: data.waktu,
         lokasi: data.lokasi,
+        onlineRoomId: roomId,
+        isOnline: isOnline || false,
         rsvpStatus: 'pending',
         read: false,
         createdAt: new Date().toISOString()
@@ -1265,6 +1296,121 @@ function modalNotulensi(id) {
 async function simpanNotulensi(id) {
   await db.collection('hrd_meeting').doc(id).update({notulensi:document.getElementById('notulIsi').value,status:'selesai'});
   closeModalDirect(); toast('Notulensi disimpan','success'); renderMeeting();
+}
+
+// ══════════════════════════════════════════════════════════════
+// ── MEETING ONLINE — Jitsi Meet Integration ───────────────────
+// ══════════════════════════════════════════════════════════════
+
+async function startInstantMeeting(){
+  const users=await getAllUsers();
+  let checkboxes='';
+  users.forEach(u=>{if(u.id!==currentUser.id)checkboxes+=`<label style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:.82rem;cursor:pointer"><input type="checkbox" class="omPeserta" value="${u.id}" data-nama="${escHtml(u.nama)}"> ${escHtml(u.nama)} <span class="text-xs" style="color:#999">(${escHtml(u.departemen||'-')})</span></label>`;});
+  openModal(`<div class="modal-title">🎥 Mulai Meeting Online Sekarang</div>
+    <p class="text-sm mb-16" style="color:#666">Buat room video call dan undang peserta. Peserta akan menerima notifikasi & bisa join langsung dari aplikasi.</p>
+    <div class="form-group"><label>Judul Meeting</label><input class="form-control" id="omJudul" placeholder="Contoh: Rapat Mingguan"></div>
+    <div class="form-group"><label>📤 Undang Peserta:</label>
+      <div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:8px 12px;margin-top:4px">
+        <label style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:.82rem;cursor:pointer;color:var(--primary);font-weight:700"><input type="checkbox" id="omSelectAll" onchange="document.querySelectorAll('.omPeserta').forEach(c=>c.checked=this.checked)"> Pilih Semua</label>
+        <hr style="margin:4px 0;border:none;border-top:1px solid var(--border)">
+        ${checkboxes}
+      </div>
+    </div>
+    <div class="flex gap-8 mt-16">
+      <button class="btn btn-success" onclick="createAndJoinMeeting()" style="flex:1;padding:14px;font-size:1rem">🎥 Mulai Video Call</button>
+      <button class="btn btn-info" onclick="createAndJoinMeeting('audio')" style="padding:14px">🎤 Voice Only</button>
+    </div>`,true);
+}
+
+async function createAndJoinMeeting(mode){
+  const judul=document.getElementById('omJudul').value||'Meeting Online';
+  const roomId='ijef-'+generateId();
+  // Collect peserta
+  const checkboxes=document.querySelectorAll('.omPeserta:checked');
+  const pesertaIds=[],pesertaNames=[];
+  checkboxes.forEach(cb=>{pesertaIds.push(cb.value);pesertaNames.push(cb.dataset.nama);});
+
+  // Save to Firestore
+  await db.collection('hrd_online_meeting').add({
+    judul,roomId,
+    createdBy:currentUser.id,createdByName:currentUser.nama,
+    pesertaIds,pesertaNames,
+    mode:mode||'video',
+    status:'active',
+    createdAt:new Date().toISOString()
+  });
+
+  // Send invite notifications to all peserta
+  if(pesertaIds.length>0){
+    await sendNotificationBulk(pesertaIds,'🎥 Meeting Online Dimulai',`${currentUser.nama} mengundang Anda ke meeting online "${judul}". Klik untuk join sekarang!`,'meeting');
+    // Save invite per user
+    const batch=db.batch();
+    pesertaIds.forEach(uid=>{
+      batch.set(db.collection('hrd_meeting_invites').doc(),{
+        meetingId:roomId,targetUser:uid,
+        fromUser:currentUser.id,fromName:currentUser.nama,
+        meetingTitle:judul,judul:`🎥 ${judul}`,
+        tanggal:todayStr(),waktu:new Date().toTimeString().slice(0,5),
+        lokasi:'Online Video Call',
+        onlineRoomId:roomId,isOnline:true,
+        status:'pending',read:false,
+        createdAt:new Date().toISOString()
+      });
+    });
+    await batch.commit();
+  }
+
+  closeModalDirect();
+  toast(`Meeting online dimulai! ${pesertaIds.length} undangan terkirim.`,'success');
+  // Join the meeting
+  joinOnlineMeeting(roomId,mode);
+}
+
+function joinOnlineMeeting(roomId,mode){
+  const jitsiDomain='meet.jit.si';
+  const displayName=encodeURIComponent(currentUser.nama);
+  let url=`https://${jitsiDomain}/${roomId}#userInfo.displayName="${displayName}"`;
+  if(mode==='audio')url+=`&config.startWithVideoMuted=true`;
+
+  // Open in modal (embedded) or new tab based on device
+  const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if(isMobile){
+    // Mobile: open in new tab (Jitsi works better full-screen on mobile)
+    window.open(url,'_blank');
+    toast('Meeting dibuka di tab baru','info');
+  }else{
+    // Desktop: show in embedded iframe
+    openModal(`<div class="modal-title">🎥 Meeting Online</div>
+      <div style="margin-bottom:8px" class="flex gap-8">
+        <button class="btn btn-sm btn-info" onclick="window.open('${url}','_blank')">↗️ Buka di Tab Baru</button>
+        <button class="btn btn-sm btn-outline" onclick="copyMeetingLink('${roomId}')">📋 Salin Link</button>
+        <button class="btn btn-sm btn-warning" onclick="shareMeetingWA('${roomId}','${encodeURIComponent(document.getElementById('omJudul')?.value||'Meeting')}')">💬 Share WA</button>
+      </div>
+      <div style="border-radius:12px;overflow:hidden;border:2px solid var(--primary)">
+        <iframe src="${url}" style="width:100%;height:500px;border:none" allow="camera;microphone;display-capture;autoplay;clipboard-write"></iframe>
+      </div>
+      <div class="text-xs mt-8" style="color:#999">💡 Tips: Klik "↗️ Buka di Tab Baru" untuk pengalaman full-screen. Fitur: Video Call, Voice Call, Screen Share, Chat.</div>`,true);
+  }
+}
+
+function copyMeetingLink(roomId){
+  const url=`https://meet.jit.si/${roomId}`;
+  navigator.clipboard.writeText(url).then(()=>toast('Link meeting disalin!','success')).catch(()=>{
+    const input=document.createElement('input');input.value=url;document.body.appendChild(input);input.select();document.execCommand('copy');document.body.removeChild(input);toast('Link disalin','success');
+  });
+}
+
+function shareMeetingWA(roomId,judul){
+  const url=`https://meet.jit.si/${roomId}`;
+  const text=`🎥 *Meeting Online — ${decodeURIComponent(judul)}*\n\nJoin sekarang:\n${url}\n\n— IJEF Corp HRD`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`,'_blank');
+}
+
+async function endOnlineMeeting(id){
+  if(!confirm('Akhiri meeting online ini?'))return;
+  await db.collection('hrd_online_meeting').doc(id).update({status:'ended',endedAt:new Date().toISOString()});
+  toast('Meeting diakhiri','success');
+  loadMeetingTab('online');
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -2190,7 +2336,7 @@ async function loadPortalInfoSections(){
     if(invCount)invCount.textContent=invSnap.size;
     let invH='';
     if(invSnap.empty)invH='<p class="text-sm" style="color:#999">Belum ada undangan</p>';
-    else{const items=[];invSnap.forEach(d=>items.push({id:d.id,...d.data()}));items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));items.forEach(p=>{invH+=`<div style="padding:10px 0;border-bottom:1px solid var(--border)"><div class="fw-700 text-sm">${escHtml(p.meetingTitle||p.judul||'Undangan Meeting')}</div><div class="text-xs" style="color:#999">📅 ${formatDate(p.tanggal||p.createdAt)} — Dari: ${escHtml(p.invitedBy||'')}</div><div class="text-xs mt-4">${p.status==='accepted'?'<span class="badge badge-success">Diterima</span>':p.status==='declined'?'<span class="badge badge-danger">Ditolak</span>':`<span class="badge badge-warning">Pending</span> <button class="btn btn-xs btn-success" onclick="respondInvite('${p.id}','accepted')">✅ Terima</button> <button class="btn btn-xs btn-danger" onclick="respondInvite('${p.id}','declined')">❌ Tolak</button>`}</div></div>`;});}
+    else{const items=[];invSnap.forEach(d=>items.push({id:d.id,...d.data()}));items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));items.forEach(p=>{invH+=`<div style="padding:10px 0;border-bottom:1px solid var(--border)"><div class="fw-700 text-sm">${escHtml(p.meetingTitle||p.judul||'Undangan Meeting')}</div><div class="text-xs" style="color:#999">📅 ${formatDate(p.tanggal||p.createdAt)} — Dari: ${escHtml(p.invitedBy||'')}</div><div class="text-xs mt-4">${p.status==='accepted'?'<span class="badge badge-success">Diterima</span>':p.status==='declined'?'<span class="badge badge-danger">Ditolak</span>':`<span class="badge badge-warning">Pending</span> <button class="btn btn-xs btn-success" onclick="respondInvite('${p.id}','accepted')">✅ Terima</button> <button class="btn btn-xs btn-danger" onclick="respondInvite('${p.id}','declined')">❌ Tolak</button>`}${p.onlineRoomId?` <button class="btn btn-xs btn-success" onclick="joinOnlineMeeting('${p.onlineRoomId}')">🎥 Join</button>`:''}</div></div>`;});}
     const invBody=document.getElementById('portalInviteBody');if(invBody)invBody.innerHTML=invH;
   }catch(e){console.error('loadPortalInfoSections error:',e);}
 }
