@@ -484,7 +484,7 @@ async function loadHariLiburView() {
   // Load holidays from Firestore
   const startDate = `${y}-${String(m+1).padStart(2,'0')}-01`;
   const endDate = `${y}-${String(m+1).padStart(2,'0')}-${String(new Date(y, m+1, 0).getDate()).padStart(2,'0')}`;
-  const snap = await db.collection('hrd_hari_libur').where('tanggal','>=',startDate).where('tanggal','<=',endDate).orderBy('tanggal').get();
+  const snap = await db.collection('hrd_hari_libur').where('tanggal','>=',startDate).where('tanggal','<=',endDate).get();
   const holidays = [];
   snap.forEach(d => holidays.push({ id: d.id, ...d.data() }));
 
@@ -917,7 +917,7 @@ function showPelForm(id,p){openModal(`<div class="modal-title">${id?'Edit':'Tamb
 async function simpanPelatihan(id){const data={judul:document.getElementById('pelJudul').value,jenis:document.getElementById('pelJenis').value,tanggal:document.getElementById('pelTgl').value,peserta:document.getElementById('pelPeserta').value.split(',').map(s=>s.trim()).filter(Boolean),status:document.getElementById('pelStatus').value,updatedAt:new Date().toISOString()};if(!data.judul)return toast('Judul wajib','warning');if(id)await db.collection('hrd_pelatihan').doc(id).update(data);else await db.collection('hrd_pelatihan').add({...data,createdAt:new Date().toISOString()});closeModalDirect();toast('Disimpan','success');renderPelatihan();}
 
 // ── KONTRAK ───────────────────────────────────────────────────
-async function renderKontrak(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>📄 Kontrak & Perjanjian</span><button class="btn btn-primary btn-sm" onclick="modalKontrak()">+ Tambah</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Judul</th><th>Pihak</th><th>Mulai</th><th>Berakhir</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="tblKontrak"></tbody></table></div></div>`;const snap=await db.collection('hrd_kontrak').orderBy('berakhir').get();const today=todayStr();let h='';if(snap.empty)h='<tr><td colspan="6" class="text-center">Belum ada</td></tr>';else snap.forEach(d=>{const p=d.data();const expired=p.berakhir<today;h+=`<tr><td class="fw-700">${escHtml(p.judul)}</td><td>${escHtml(p.pihak||'-')}</td><td>${formatDate(p.mulai)}</td><td>${formatDate(p.berakhir)}</td><td><span class="badge badge-${expired?'danger':'success'}">${expired?'Expired':'Aktif'}</span></td><td><button class="btn btn-xs btn-info" onclick="modalKontrak('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_kontrak','${d.id}','kontrak')">🗑️</button></td></tr>`;});document.getElementById('tblKontrak').innerHTML=h;}
+async function renderKontrak(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>📄 Kontrak & Perjanjian</span><button class="btn btn-primary btn-sm" onclick="modalKontrak()">+ Tambah</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Judul</th><th>Pihak</th><th>Mulai</th><th>Berakhir</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="tblKontrak"></tbody></table></div></div>`;const snap=await db.collection('hrd_kontrak').get();const today=todayStr();let h='';if(snap.empty)h='<tr><td colspan="6" class="text-center">Belum ada</td></tr>';else snap.forEach(d=>{const p=d.data();const expired=p.berakhir<today;h+=`<tr><td class="fw-700">${escHtml(p.judul)}</td><td>${escHtml(p.pihak||'-')}</td><td>${formatDate(p.mulai)}</td><td>${formatDate(p.berakhir)}</td><td><span class="badge badge-${expired?'danger':'success'}">${expired?'Expired':'Aktif'}</span></td><td><button class="btn btn-xs btn-info" onclick="modalKontrak('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_kontrak','${d.id}','kontrak')">🗑️</button></td></tr>`;});document.getElementById('tblKontrak').innerHTML=h;}
 function modalKontrak(id){if(id)db.collection('hrd_kontrak').doc(id).get().then(d=>showKontrakForm(id,d.data()||{}));else showKontrakForm(null,{});}
 function showKontrakForm(id,p){openModal(`<div class="modal-title">${id?'Edit':'Tambah'} Kontrak</div><div class="form-group"><label>Judul</label><input class="form-control" id="ktJudul" value="${escHtml(p.judul||'')}"></div><div class="grid-2"><div class="form-group"><label>Pihak</label><input class="form-control" id="ktPihak" value="${escHtml(p.pihak||'')}"></div><div class="form-group"><label>Jenis</label><select class="form-control" id="ktJenis"><option value="kerja" ${p.jenis==='kerja'?'selected':''}>Kontrak Kerja</option><option value="vendor" ${p.jenis==='vendor'?'selected':''}>Vendor</option><option value="nda" ${p.jenis==='nda'?'selected':''}>NDA</option></select></div></div><div class="grid-2"><div class="form-group"><label>Mulai</label><input class="form-control" type="date" id="ktMulai" value="${p.mulai||''}"></div><div class="form-group"><label>Berakhir</label><input class="form-control" type="date" id="ktAkhir" value="${p.berakhir||''}"></div></div><button class="btn btn-primary" onclick="simpanKontrak('${id||''}')">Simpan</button>`);}
 async function simpanKontrak(id){const data={judul:document.getElementById('ktJudul').value,pihak:document.getElementById('ktPihak').value,jenis:document.getElementById('ktJenis').value,mulai:document.getElementById('ktMulai').value,berakhir:document.getElementById('ktAkhir').value,updatedAt:new Date().toISOString()};if(!data.judul)return toast('Judul wajib','warning');if(id)await db.collection('hrd_kontrak').doc(id).update(data);else await db.collection('hrd_kontrak').add({...data,createdAt:new Date().toISOString()});closeModalDirect();toast('Disimpan','success');renderKontrak();}
@@ -1117,7 +1117,6 @@ async function renderInbox() {
   // Real-time listener untuk inbox user ini
   const unsub = db.collection('hrd_meeting_invites')
     .where('targetUser', '==', currentUser.id)
-    .orderBy('createdAt', 'desc')
     .onSnapshot(snap => {
       let html = '';
       if (snap.empty) {
@@ -1225,8 +1224,8 @@ async function renderChat() {
 async function loadChatThreads() {
   // Load semua thread dimana user ini terlibat (sebagai sender atau receiver)
   const [sentSnap, recvSnap] = await Promise.all([
-    db.collection('hrd_chat_threads').where('fromUser','==',currentUser.id).orderBy('lastMessageAt','desc').get(),
-    db.collection('hrd_chat_threads').where('toUser','==',currentUser.id).orderBy('lastMessageAt','desc').get()
+    db.collection('hrd_chat_threads').where('fromUser','==',currentUser.id).get(),
+    db.collection('hrd_chat_threads').where('toUser','==',currentUser.id).get()
   ]);
 
   const threads = new Map();
@@ -1349,7 +1348,7 @@ function openChatThread(threadId) {
   // Real-time messages
   const unsub = db.collection('hrd_chat_messages')
     .where('threadId', '==', threadId)
-    .orderBy('createdAt', 'asc')
+    
     .onSnapshot(snap => {
       let html = '';
       snap.forEach(d => {
