@@ -2536,17 +2536,100 @@ async function approveItem(col,id,status){
 }
 
 // ── APPROVAL MANAGEMENT ───────────────────────────────────────
-async function renderApprovalMgmt(){if(!hasAccess(6))return document.getElementById('mainContent').innerHTML='<div class="card"><p>Akses ditolak.</p></div>';const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>⚙️ Approval Management</span><button class="btn btn-primary btn-sm" onclick="modalApprovalFlow()">+ Tambah Flow</button></div><div class="card"><p class="text-sm mb-16">Konfigurasi alur approval multi-step. Tentukan jenis pengajuan, siapa yang mengajukan, dan siapa yang approve.</p><div class="table-wrap"><table><thead><tr><th>Jenis</th><th>Pengaju</th><th>Approver Steps</th><th>Aksi</th></tr></thead><tbody id="tblApprFlow"></tbody></table></div></div>`;const snap=await db.collection('hrd_approval_flow').get();let h='';if(snap.empty)h='<tr><td colspan="4" class="text-center">Belum ada flow</td></tr>';else snap.forEach(d=>{const p=d.data();h+=`<tr><td class="fw-700">${escHtml(p.jenis)}</td><td>${escHtml(p.pengaju||'Semua')}</td><td>${(p.steps||[]).map(s=>`<span class="badge badge-primary">${escHtml(s.nama||s.role)}</span>`).join(' → ')}</td><td><button class="btn btn-xs btn-info" onclick="viewApprovalFlow('${d.id}')">👁️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_approval_flow','${d.id}','approval-mgmt')">🗑️</button></td></tr>`;});document.getElementById('tblApprFlow').innerHTML=h;}
+async function renderApprovalMgmt(){if(!hasAccess(6))return document.getElementById('mainContent').innerHTML='<div class="card"><p>Akses ditolak.</p></div>';const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>⚙️ Approval Management</span><div class="flex gap-8"><button class="btn btn-success btn-sm" onclick="generateAllApprovalFlows()">⚡ Generate Semua</button><button class="btn btn-primary btn-sm" onclick="modalApprovalFlow()">+ Tambah Flow</button></div></div><div class="card"><p class="text-sm mb-16" style="color:#666">Konfigurasi alur approval multi-step berdasarkan struktur organisasi. Klik "Generate Semua" untuk otomatis membuat flow berdasarkan data karyawan.</p><div class="table-wrap"><table><thead><tr><th>Jenis</th><th>Pengaju</th><th>Dept</th><th>Approver Steps</th><th>Aksi</th></tr></thead><tbody id="tblApprFlow"></tbody></table></div></div>`;const snap=await db.collection('hrd_approval_flow').get();let h='';if(snap.empty)h='<tr><td colspan="5" class="text-center">Belum ada flow. Klik "Generate Semua" untuk membuat otomatis.</td></tr>';else{const items=[];snap.forEach(d=>items.push({id:d.id,...d.data()}));items.sort((a,b)=>(a.jenis||'').localeCompare(b.jenis||'')||(a.pengaju||'').localeCompare(b.pengaju||''));items.forEach(p=>{h+=`<tr><td class="fw-700">${escHtml(p.jenis)}</td><td>${escHtml(p.pengaju||'Semua')}</td><td>${escHtml(p.departemen||'Semua')}</td><td>${(p.steps||[]).map(s=>`<span class="badge badge-primary">${escHtml(s.nama||s.role)}</span>`).join(' → ')}</td><td><button class="btn btn-xs btn-info" onclick="viewApprovalFlow('${p.id}')">👁️</button> <button class="btn btn-xs btn-primary" onclick="editApprovalFlow('${p.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_approval_flow','${p.id}','approval-mgmt')">🗑️</button></td></tr>`;});}document.getElementById('tblApprFlow').innerHTML=h;}
+
+async function generateAllApprovalFlows(){
+  if(!confirm('Generate approval flow untuk SEMUA karyawan berdasarkan struktur organisasi?\n\nFlow yang sudah ada akan dihapus dan dibuat ulang.'))return;
+  // Delete existing flows
+  const existSnap=await db.collection('hrd_approval_flow').get();
+  if(!existSnap.empty){const batch=db.batch();existSnap.forEach(d=>batch.delete(d.ref));await batch.commit();}
+  // Load karyawan
+  const kSnap=await db.collection('hrd_karyawan').where('status','!=','nonaktif').get();
+  const karyawan=[];kSnap.forEach(d=>karyawan.push({id:d.id,...d.data()}));
+  // Jenis pengajuan
+  const jenisArr=['Cuti/Izin','Overtime','Reimbursement','Kasbon','Insentif','Pelatihan','Perpanjangan Kontrak'];
+  // For each staff/leader, create approval flow based on atasan hierarchy
+  const staffAndLeaders=karyawan.filter(k=>{const pos=(k.posisi||'').toLowerCase();return!pos.includes('founder')&&!pos.includes('general manager');});
+  let count=0;
+  for(const k of staffAndLeaders){
+    // Build approval chain: atasan → atasan's atasan → admin
+    const steps=[];
+    // Step 1: Direct atasan
+    if(k.atasan){
+      const atasan=karyawan.find(a=>a.nama?.toLowerCase()===k.atasan?.toLowerCase());
+      if(atasan)steps.push({nama:atasan.nama,role:atasan.posisi||'',userId:atasan.id});
+    }
+    // Step 2: Head (if atasan is not head)
+    if(steps.length&&steps[0].role){
+      const step1Pos=(steps[0].role||'').toLowerCase();
+      if(!step1Pos.includes('head')&&!step1Pos.includes('general')){
+        // Find head of department
+        const head=karyawan.find(a=>(a.posisi||'').toLowerCase().includes('head')&&(a.departemen||'').toLowerCase()===(k.departemen||'').toLowerCase());
+        if(head&&head.nama!==steps[0].nama)steps.push({nama:head.nama,role:head.posisi||'',userId:head.id});
+      }
+    }
+    // Step 3: GM (for important items)
+    const gm=karyawan.find(a=>(a.posisi||'').toLowerCase().includes('general manager'));
+    if(gm&&!steps.find(s=>s.nama===gm.nama))steps.push({nama:gm.nama,role:'General Manager',userId:gm.id});
+    // If no steps found, default to admin
+    if(!steps.length)steps.push({nama:'Admin',role:'admin'});
+    // Create flow for each jenis
+    for(const jenis of jenisArr){
+      await db.collection('hrd_approval_flow').add({
+        jenis,pengaju:k.nama,departemen:k.departemen||'',
+        steps,createdAt:new Date().toISOString()
+      });
+      count++;
+    }
+  }
+  toast(`${count} approval flow di-generate untuk ${staffAndLeaders.length} karyawan`,'success');
+  renderApprovalMgmt();
+}
+
 function viewApprovalFlow(id){
   db.collection('hrd_approval_flow').doc(id).get().then(d=>{
     const p=d.data();
     let stepsHtml='';
     (p.steps||[]).forEach((s,i)=>{stepsHtml+=`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)"><span class="badge badge-primary" style="font-size:.8rem">Step ${i+1}</span><span class="fw-700">${escHtml(s.nama||s.role)}</span><span class="text-xs" style="color:#999">${escHtml(s.role||'')}</span></div>`;});
     openModal(`<div class="modal-title">📋 Detail Approval Flow</div>
-      <div class="grid-2 mb-16"><div><b>Jenis:</b> ${escHtml(p.jenis)}</div><div><b>Pengaju:</b> ${escHtml(p.pengaju||'Semua')}</div></div>
+      <div class="grid-2 mb-16"><div><b>Jenis:</b> ${escHtml(p.jenis)}</div><div><b>Pengaju:</b> ${escHtml(p.pengaju||'Semua')}</div><div><b>Departemen:</b> ${escHtml(p.departemen||'Semua')}</div></div>
       <div class="fw-700 text-sm mb-8 color-primary">Alur Approval:</div>
       <div style="background:#f8f9ff;padding:12px;border-radius:8px">${stepsHtml||'<p class="text-sm" style="color:#999">Tidak ada step</p>'}</div>`);
   });
+}
+
+async function editApprovalFlow(id){
+  const d=await db.collection('hrd_approval_flow').doc(id).get();
+  const p=d.data();
+  const kSnap=await db.collection('hrd_karyawan').where('status','!=','nonaktif').get();
+  let approverOpts='<option value="">-- Tidak ada --</option>';
+  kSnap.forEach(doc=>{const k=doc.data();approverOpts+=`<option value="${escHtml(k.nama)}">${escHtml(k.nama)} — ${escHtml(k.posisi||'')} (${escHtml(k.departemen||'')})</option>`;});
+  const steps=p.steps||[];
+  openModal(`<div class="modal-title">✏️ Edit Approval Flow</div>
+    <div class="grid-2 mb-16"><div><b>Jenis:</b> ${escHtml(p.jenis)}</div><div><b>Pengaju:</b> ${escHtml(p.pengaju)}</div></div>
+    <div class="form-group"><label>Approver Step 1</label><select class="form-control" id="eafStep1">${approverOpts.replace(`value="${escHtml(steps[0]?.nama||'')}"`,`value="${escHtml(steps[0]?.nama||'')}" selected`)}</select></div>
+    <div class="form-group"><label>Approver Step 2</label><select class="form-control" id="eafStep2">${approverOpts.replace(`value="${escHtml(steps[1]?.nama||'')}"`,`value="${escHtml(steps[1]?.nama||'')}" selected`)}</select></div>
+    <div class="form-group"><label>Approver Step 3</label><select class="form-control" id="eafStep3">${approverOpts.replace(`value="${escHtml(steps[2]?.nama||'')}"`,`value="${escHtml(steps[2]?.nama||'')}" selected`)}</select></div>
+    <button class="btn btn-primary" onclick="simpanEditApprovalFlow('${id}')">💾 Simpan</button>`,true);
+  // Set selected values properly
+  setTimeout(()=>{
+    if(steps[0])document.getElementById('eafStep1').value=steps[0].nama||'';
+    if(steps[1])document.getElementById('eafStep2').value=steps[1].nama||'';
+    if(steps[2])document.getElementById('eafStep3').value=steps[2].nama||'';
+  },100);
+}
+
+async function simpanEditApprovalFlow(id){
+  const steps=[];
+  const s1=document.getElementById('eafStep1').value;
+  const s2=document.getElementById('eafStep2').value;
+  const s3=document.getElementById('eafStep3').value;
+  if(s1)steps.push({nama:s1,role:s1});
+  if(s2)steps.push({nama:s2,role:s2});
+  if(s3)steps.push({nama:s3,role:s3});
+  if(!steps.length)return toast('Minimal 1 approver','warning');
+  await db.collection('hrd_approval_flow').doc(id).update({steps,updatedAt:new Date().toISOString()});
+  closeModalDirect();toast('Flow diupdate','success');renderApprovalMgmt();
 }
 async function modalApprovalFlow(){
   const kSnap=await db.collection('hrd_karyawan').where('status','==','aktif').get();
