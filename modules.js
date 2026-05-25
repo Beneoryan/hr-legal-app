@@ -2128,7 +2128,7 @@ async function kirimBroadcast(){
 // ── NOTIFIKASI ────────────────────────────────────────────────
 async function renderNotifikasi(){
   const main=document.getElementById('mainContent');
-  main.innerHTML=`<div class="page-title"><span>🔔 Notifikasi</span><div class="flex gap-8"><button class="btn btn-sm btn-outline" onclick="markAllRead()">✅ Tandai Semua Dibaca</button><button class="btn btn-sm btn-danger" onclick="hapusSemuaNotif()">🗑️ Hapus Semua</button></div></div><div class="card" id="notifList">Loading...</div>`;
+  main.innerHTML=`<div class="page-title"><span>🔔 Notifikasi</span><div class="flex gap-8"><button class="btn btn-sm btn-danger" onclick="hapusSemuaNotif()">🗑️ Hapus Semua</button></div></div><div class="card" id="notifList">Loading...</div>`;
   try{
     const[snap1,snap2]=await Promise.all([
       db.collection('hrd_notifikasi').where('targetUser','==',currentUser.id).get(),
@@ -2483,25 +2483,30 @@ async function simpanAkun(id){
 async function renderApprovalCenter(){
   const main=document.getElementById('mainContent');
   main.innerHTML=`<div class="page-title"><span>✅ Approval Center</span></div><div class="card" id="approvalList">Loading...</div>`;
-  // Get current user's department
   const myDept=(currentUser.departemen||'').toLowerCase();
-  const isAdmin=hasAccess(5); // BOD & Admin see all
+  const isAdmin=hasAccess(5);
   const isGM=(currentUser.posisi||'').toLowerCase().includes('general manager');
   
+  // Load karyawan to get department mapping
+  const karySnap=await db.collection('hrd_karyawan').get();
+  const deptMap={};// nama -> departemen
+  karySnap.forEach(d=>{const k=d.data();deptMap[(k.nama||'').toLowerCase()]=k.departemen||'';});
+
   const collections=['hrd_cuti','hrd_overtime','hrd_reimbursement','hrd_kasbon'];
   let items=[];
   for(const col of collections){
     const snap=await db.collection(col).where('status','==','pending').get();
     snap.forEach(d=>{
       const data={id:d.id,collection:col,...d.data()};
-      // Department filtering: only show items from same department
-      // Admin, BOD, GM can see all departments
+      // Get department from karyawan data (more reliable than pengajuan doc)
+      const itemDept=(data.departemen||deptMap[(data.nama||'').toLowerCase()]||'').toLowerCase();
+      data._dept=itemDept;
+      // Department filtering
       if(isAdmin||isGM){
         items.push(data);
       }else{
-        // Head/Manager/Leader only see their own department
-        const itemDept=(data.departemen||'').toLowerCase();
-        if(!itemDept||itemDept===myDept)items.push(data);
+        // Only show items from same department
+        if(itemDept===myDept)items.push(data);
       }
     });
   }
@@ -2513,9 +2518,10 @@ async function renderApprovalCenter(){
     const detail=item.jenis||item.kategori||'';
     const jumlah=item.jumlah?` — ${formatCurrency(item.jumlah)}`:'';
     const durasi=item.durasi?` (${item.durasi} hari)`:'';
+    const deptLabel=item._dept?item._dept.toUpperCase():'';
     h+=`<div style="padding:14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
       <div style="flex:1">
-        <div><span class="badge badge-info">${typeLabel}</span> <span class="fw-700">${escHtml(item.nama)}</span>${item.departemen?` <span class="text-xs" style="color:#999">(${escHtml(item.departemen)})</span>`:''}</div>
+        <div><span class="badge badge-info">${typeLabel}</span> <span class="fw-700">${escHtml(item.nama)}</span>${deptLabel?` <span class="badge" style="background:#eee;color:#555;font-size:.6rem">${escHtml(deptLabel)}</span>`:''}</div>
         <div class="text-sm" style="color:#555;margin-top:4px">${escHtml(detail)}${durasi}${jumlah}</div>
         <div class="text-xs" style="color:#999;margin-top:2px">${formatDateTime(item.createdAt)}</div>
       </div>
@@ -2695,7 +2701,7 @@ async function renderInsentif(){
   <div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Dept</th><th>Jenis</th><th>Basis</th><th>Nominal</th><th>Periode</th><th>Aksi</th></tr></thead><tbody id="tblInsentif"></tbody></table></div></div>`;
   const snap=await db.collection('hrd_insentif').get();const items=[];snap.forEach(d=>items.push({id:d.id,...d.data()}));items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
   let h='';if(!items.length)h='<tr><td colspan="7" class="text-center">Belum ada data insentif</td></tr>';
-  else items.forEach(p=>{const jenis=p.jenis||'KPI';const basis=jenis==='KPI'?`KPI ${p.kpiScore||0} (${p.persen||0}% gaji)`:`${p.jumlahSiswa||0} siswa × ${formatCurrency(p.nominalPerSiswa||0)}`;h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.departemen||'-')}</td><td><span class="badge badge-${jenis==='KPI'?'info':'success'}">${jenis}</span></td><td style="font-size:.78rem">${basis}</td><td class="fw-700">${formatCurrency(p.nominal||0)}</td><td>${escHtml(p.periode||'-')}</td><td><button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_insentif','${p.id}','insentif')">🗑️</button></td></tr>`;});
+  else items.forEach(p=>{const jenis=p.jenis||'KPI';const basis=jenis==='KPI'?`KPI ${p.kpiScore||0} (${p.persen||0}% gaji)`:`${p.jumlahSiswa||0} siswa × ${formatCurrency(p.nominalPerSiswa||0)}`;h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.departemen||'-')}</td><td><span class="badge badge-${jenis==='KPI'?'info':'success'}">${jenis}</span></td><td style="font-size:.78rem">${basis}</td><td class="fw-700">${formatCurrency(p.nominal||0)}</td><td>${escHtml(p.periode||'-')}</td><td><button class="btn btn-xs btn-info" onclick="viewInsentifDetail('${p.id}')">👁️</button> <button class="btn btn-xs btn-primary" onclick="editInsentif('${p.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_insentif','${p.id}','insentif')">🗑️</button></td></tr>`;});
   document.getElementById('tblInsentif').innerHTML=h;
 }
 
@@ -2744,6 +2750,88 @@ async function generateInsentifFromKPI(){
   toast(`${count} insentif di-generate dari KPI`,'success');renderInsentif();
 }
 async function hapusSemuaInsentif(){if(!confirm('Hapus semua data insentif?'))return;const snap=await db.collection('hrd_insentif').get();const batch=db.batch();snap.forEach(d=>batch.delete(d.ref));await batch.commit();toast('Semua insentif dihapus','success');renderInsentif();}
+
+function viewInsentifDetail(id){
+  db.collection('hrd_insentif').doc(id).get().then(d=>{const p=d.data();
+    openModal(`<div class="modal-title">🏆 Detail Insentif</div>
+      <div class="grid-2 mb-16"><div><b>Nama:</b> ${escHtml(p.nama)}</div><div><b>Departemen:</b> ${escHtml(p.departemen||'-')}</div><div><b>Jenis:</b> ${escHtml(p.jenis||'KPI')}</div><div><b>Periode:</b> ${escHtml(p.periode||'-')}</div><div><b>Nominal:</b> <span class="fw-700">${formatCurrency(p.nominal||0)}</span></div>${p.jenis==='KPI'?`<div><b>KPI Score:</b> ${p.kpiScore||0} (${p.persen||0}%)</div>`:`<div><b>Siswa:</b> ${p.jumlahSiswa||0} × ${formatCurrency(p.nominalPerSiswa||0)}</div>`}</div>`);
+  });
+}
+async function editInsentif(id){
+  const d=await db.collection('hrd_insentif').doc(id).get();const p=d.data();
+  openModal(`<div class="modal-title">✏️ Edit Insentif</div>
+    <div class="grid-2"><div class="form-group"><label>Nama</label><input class="form-control" id="eiNama" value="${escHtml(p.nama||'')}"></div><div class="form-group"><label>Nominal</label><input class="form-control" type="number" id="eiNominal" value="${p.nominal||0}"></div></div>
+    <div class="form-group"><label>Periode</label><input class="form-control" id="eiPeriode" value="${escHtml(p.periode||'')}"></div>
+    <button class="btn btn-primary" onclick="simpanEditInsentif('${id}')">💾 Simpan</button>`);
+}
+async function simpanEditInsentif(id){
+  await db.collection('hrd_insentif').doc(id).update({nominal:Number(document.getElementById('eiNominal').value)||0,periode:document.getElementById('eiPeriode').value,updatedAt:new Date().toISOString()});
+  closeModalDirect();toast('Insentif diupdate','success');renderInsentif();
+}
+
+// ── TAX & BPJS CALCULATOR ─────────────────────────────────────
+async function renderTaxCalc(){
+  const main=document.getElementById('mainContent');
+  main.innerHTML=`<div class="page-title"><span>🧮 Tax & BPJS Calculator</span></div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title mb-16">🧮 Kalkulator Gaji</div>
+        <div class="form-group"><label>Gaji Pokok (Rp)</label><input class="form-control" type="number" id="tcGaji" value="5000000" oninput="calcTax()"></div>
+        <div class="form-group"><label>Tunjangan (Rp)</label><input class="form-control" type="number" id="tcTunj" value="0" oninput="calcTax()"></div>
+        <div class="form-group"><label>Lembur (Rp)</label><input class="form-control" type="number" id="tcLembur" value="0" oninput="calcTax()"></div>
+        <div class="form-group"><label>Status PTKP</label><select class="form-control" id="tcPTKP" onchange="calcTax()"><option value="54000000">TK/0 (Rp 54.000.000)</option><option value="58500000">K/0 (Rp 58.500.000)</option><option value="63000000">K/1 (Rp 63.000.000)</option><option value="67500000">K/2 (Rp 67.500.000)</option><option value="72000000">K/3 (Rp 72.000.000)</option></select></div>
+        <div id="tcResult" style="background:#f8f9ff;padding:16px;border-radius:8px;margin-top:16px"></div>
+      </div>
+      <div class="card">
+        <div class="card-title mb-16">📊 Potongan per Karyawan</div>
+        <div id="tcKaryList">Loading...</div>
+      </div>
+    </div>`;
+  calcTax();loadTaxKaryList();
+}
+
+function calcTax(){
+  const gaji=Number(document.getElementById('tcGaji')?.value)||0;
+  const tunj=Number(document.getElementById('tcTunj')?.value)||0;
+  const lembur=Number(document.getElementById('tcLembur')?.value)||0;
+  const ptkp=Number(document.getElementById('tcPTKP')?.value)||54000000;
+  const bruto=gaji+tunj+lembur;
+  const bpjsKes=Math.round(gaji*0.01);
+  const bpjsTK=Math.round(gaji*0.02);
+  const bpjsKesPerusahaan=Math.round(gaji*0.04);
+  const bpjsTKPerusahaan=Math.round(gaji*0.037);
+  const nettoTahunan=Math.max(0,(bruto-bpjsKes-bpjsTK)*12-ptkp);
+  let pph=0;
+  if(nettoTahunan<=60000000)pph=nettoTahunan*0.05;
+  else if(nettoTahunan<=250000000)pph=3000000+(nettoTahunan-60000000)*0.15;
+  else if(nettoTahunan<=500000000)pph=3000000+28500000+(nettoTahunan-250000000)*0.25;
+  else pph=3000000+28500000+62500000+(nettoTahunan-500000000)*0.30;
+  const pphBulanan=Math.round(pph/12);
+  const totalPot=bpjsKes+bpjsTK+pphBulanan;
+  const thp=bruto-totalPot;
+  document.getElementById('tcResult').innerHTML=`
+    <div class="text-sm fw-700 mb-8" style="color:var(--accent)">Hasil Perhitungan:</div>
+    <table style="width:100%;font-size:.82rem"><tr><td>Bruto</td><td style="text-align:right">${formatCurrency(bruto)}</td></tr>
+    <tr><td>BPJS Kes (1% karyawan)</td><td style="text-align:right;color:var(--danger)">-${formatCurrency(bpjsKes)}</td></tr>
+    <tr><td>BPJS TK/JHT (2% karyawan)</td><td style="text-align:right;color:var(--danger)">-${formatCurrency(bpjsTK)}</td></tr>
+    <tr><td>PPH 21/bulan</td><td style="text-align:right;color:var(--danger)">-${formatCurrency(pphBulanan)}</td></tr>
+    <tr style="border-top:2px solid var(--accent);font-weight:700"><td>Take Home Pay</td><td style="text-align:right">${formatCurrency(thp)}</td></tr></table>
+    <div class="mt-16 text-xs" style="color:#666"><b>Kontribusi Perusahaan:</b><br>BPJS Kes (4%): ${formatCurrency(bpjsKesPerusahaan)}<br>BPJS TK (3.7%): ${formatCurrency(bpjsTKPerusahaan)}</div>`;
+}
+
+async function loadTaxKaryList(){
+  const snap=await db.collection('hrd_karyawan').where('status','==','aktif').get();
+  let h='<div class="table-wrap"><table><thead><tr><th>Nama</th><th>Gaji</th><th>BPJS Kes</th><th>BPJS TK</th><th>PPH21</th><th>THP</th></tr></thead><tbody>';
+  snap.forEach(d=>{const k=d.data();const gaji=k.gajiPokok||0;
+    const bpjsKes=Math.round(gaji*0.01);const bpjsTK=Math.round(gaji*0.02);
+    const netto=Math.max(0,(gaji-bpjsKes-bpjsTK)*12-54000000);
+    let pph=0;if(netto<=60000000)pph=netto*0.05;else if(netto<=250000000)pph=3000000+(netto-60000000)*0.15;else pph=3000000+28500000+(netto-250000000)*0.25;
+    const pphBln=Math.round(pph/12);const thp=gaji-bpjsKes-bpjsTK-pphBln;
+    h+=`<tr><td class="fw-700">${escHtml(k.nama)}</td><td>${formatCurrency(gaji)}</td><td style="color:var(--danger)">${formatCurrency(bpjsKes)}</td><td style="color:var(--danger)">${formatCurrency(bpjsTK)}</td><td style="color:var(--danger)">${formatCurrency(pphBln)}</td><td class="fw-700">${formatCurrency(thp)}</td></tr>`;
+  });
+  h+='</tbody></table></div>';
+  document.getElementById('tcKaryList').innerHTML=h;
+}
 
 // ── QR & PWA & DOWNLOAD APP ───────────────────────────────────
 function renderQRShare(){

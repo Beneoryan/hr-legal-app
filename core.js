@@ -161,7 +161,7 @@ function buildNavItems(isPortalUser) {
   // Manager+ gets Rekrutmen
   if(hasAccess(3)) nav+=navGroup('🔍 Rekrutmen',[['lowongan','📝','Lowongan'],['pipeline','🔄','Pipeline Kanban'],['kandidat','🧑‍💼','Kandidat']]);
   nav+=navGroup('📍 Kehadiran',[['absensi','📍','Absensi IJEF'],['cuti','🏖️','Cuti/Izin/WFH'],['overtime','⏰','Overtime'],['hari-libur','📅','Hari Libur'],['penalty','⚠️','Penalty Point']]);
-  nav+=navGroup('💰 Keuangan',[['penggajian','💰','Penggajian'],['insentif','🏆','Insentif'],['reimbursement','🧾','Reimbursement'],['kasbon','💳','Kasbon & Loan'],['tunjangan','🎁','Tunjangan']]);
+  nav+=navGroup('💰 Keuangan',[['penggajian','💰','Penggajian'],['tax-calc','🧮','Tax & BPJS'],['insentif','🏆','Insentif'],['reimbursement','🧾','Reimbursement'],['kasbon','💳','Kasbon & Loan'],['tunjangan','🎁','Tunjangan']]);
   nav+=navGroup('📈 Kinerja',[['kpi','📈','KPI & Penilaian'],['pelatihan','🎓','Pelatihan'],['disc-test','🧠','DISC Test']]);
   // Manager+ gets Legal & Aset
   if(hasAccess(3)) nav+=navGroup('📄 Legal & Aset',[['kontrak','📄','Kontrak'],['asset','💻','Asset'],['peraturan','📜','Peraturan'],['surat','✉️','Generator Surat']]);
@@ -204,7 +204,7 @@ function navigateTo(page) {
     'karyawan':renderKaryawan,'struktur-org':renderStrukturOrg,'onboarding':renderOnboarding,'offboarding':renderOffboarding,'jobdesk-mgmt':renderJobdeskMgmt,
     'lowongan':renderLowongan,'pipeline':renderPipeline,'kandidat':renderKandidat,
     'absensi':renderAbsensiAdmin,'cuti':renderCuti,'overtime':renderOvertime,'hari-libur':renderHariLibur,'penalty':renderPenalty,
-    'penggajian':renderPenggajian,'insentif':renderInsentif,'reimbursement':renderReimbursement,'kasbon':renderKasbon,'tunjangan':renderTunjangan,
+    'penggajian':renderPenggajian,'tax-calc':renderTaxCalc,'insentif':renderInsentif,'reimbursement':renderReimbursement,'kasbon':renderKasbon,'tunjangan':renderTunjangan,
     'kpi':renderKPI,'pelatihan':renderPelatihan,'disc-test':renderDiscTestPage,
     'kontrak':renderKontrak,'asset':renderAsset,'peraturan':renderPeraturan,'surat':renderSurat,
     'meeting':renderMeeting,'chat':renderChat,'broadcast':renderBroadcast,'inbox':renderInbox,
