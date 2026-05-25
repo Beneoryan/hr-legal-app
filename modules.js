@@ -1864,15 +1864,17 @@ async function hapusChatThread(threadId){
 }
 
 async function loadChatThreads() {
-  // Load semua thread dimana user ini terlibat (sebagai sender atau receiver)
-  const [sentSnap, recvSnap] = await Promise.all([
+  // Load semua thread dimana user ini terlibat
+  const [sentSnap, recvSnap, groupSnap] = await Promise.all([
     db.collection('hrd_chat_threads').where('fromUser','==',currentUser.id).get(),
-    db.collection('hrd_chat_threads').where('toUser','==',currentUser.id).get()
+    db.collection('hrd_chat_threads').where('toUser','==',currentUser.id).get(),
+    db.collection('hrd_chat_threads').where('participants','array-contains',currentUser.id).get()
   ]);
 
   const threads = new Map();
   sentSnap.forEach(d => threads.set(d.id, {id:d.id, ...d.data()}));
   recvSnap.forEach(d => threads.set(d.id, {id:d.id, ...d.data()}));
+  groupSnap.forEach(d => threads.set(d.id, {id:d.id, ...d.data()}));
 
   // Sort by lastMessageAt
   const sorted = [...threads.values()].sort((a,b) => (b.lastMessageAt||'').localeCompare(a.lastMessageAt||''));
@@ -1976,45 +1978,46 @@ async function startNewChat() {
 async function modalGroupChat(){
   const kSnap=await db.collection('hrd_karyawan').where('status','==','aktif').get();
   const depts=new Set();kSnap.forEach(d=>depts.add(d.data().departemen||''));
-  let deptOpts='<option value="superadmin">🔧 Superadmin (Komplain & Kendala Sistem)</option>';
+  let deptOpts='<option value="admin">🔧 Admin (Komplain & Kendala Sistem)</option>';
   depts.forEach(d=>{if(d)deptOpts+=`<option value="${escHtml(d)}">🏢 ${escHtml(d)}</option>`;});
-  openModal(`<div class="modal-title">👥 Obrolan Group Departemen</div>
-    <div style="background:#e3f2fd;border-radius:8px;padding:10px;margin-bottom:14px;font-size:.82rem;border-left:4px solid var(--info)">Kirim pesan ke semua anggota departemen. Pilih "Superadmin" untuk komplain/kendala sistem.</div>
-    <div class="form-group"><label>Pilih Departemen</label><select class="form-control" id="grpDept">${deptOpts}</select></div>
-    <div class="form-group"><label>Pesan</label><textarea class="form-control" id="grpMsg" placeholder="Ketik pesan untuk group..."></textarea></div>
-    <button class="btn btn-primary" onclick="sendGroupChat()">📤 Kirim ke Group</button>`);
+  openModal(`<div class="modal-title">👥 Buat / Masuk Group Chat</div>
+    <div style="background:#e3f2fd;border-radius:8px;padding:10px;margin-bottom:14px;font-size:.82rem;border-left:4px solid var(--info)">Buat room group chat per departemen. Semua anggota departemen otomatis tergabung dan bisa chat bersama dalam satu room.</div>
+    <div class="form-group"><label>Pilih Group</label><select class="form-control" id="grpDept">${deptOpts}</select></div>
+    <div class="form-group"><label>Pesan Pertama (opsional)</label><textarea class="form-control" id="grpMsg" placeholder="Ketik pesan..."></textarea></div>
+    <button class="btn btn-primary" onclick="sendGroupChat()">👥 Buat / Masuk Group</button>`);
 }
 async function sendGroupChat(){
   const dept=document.getElementById('grpDept').value;const msg=document.getElementById('grpMsg').value.trim();
-  if(!msg)return toast('Tulis pesan','warning');
   const label=dept==='admin'?'Admin':dept;
-  // Find or create group room
+  // Find existing group room
   const existingSnap=await db.collection('hrd_chat_threads').where('isGroup','==',true).where('groupName','==',label).get();
   let threadId=null;
   if(!existingSnap.empty){
     threadId=existingSnap.docs[0].id;
-  }else{
-    // Create group room
-    let members=[];
-    if(dept==='admin'){
-      const usersSnap=await db.collection('hrd_users').get();
-      usersSnap.forEach(d=>{const u=d.data();if(u.role==='admin')members.push(d.id);});
-    }else{
-      const kSnap=await db.collection('hrd_karyawan').where('departemen','==',dept).get();
-      kSnap.forEach(d=>members.push(d.id));
+    // Add current user to participants if not already
+    const threadData=existingSnap.docs[0].data();
+    if(!threadData.participants?.includes(currentUser.id)){
+      const updatedMembers=[...threadData.participants,currentUser.id];
+      await db.collection('hrd_chat_threads').doc(threadId).update({participants:updatedMembers});
     }
-    if(!members.includes(currentUser.id))members.push(currentUser.id);
-    const ref=await db.collection('hrd_chat_threads').add({isGroup:true,groupName:label,participants:members,fromUser:currentUser.id,fromName:currentUser.nama,toUser:'group',toName:`Group ${label}`,lastMessage:msg,lastMessageAt:new Date().toISOString(),createdAt:new Date().toISOString()});
+  }else{
+    // Create new group room — collect all user IDs from that department
+    let members=[currentUser.id];
+    const usersSnap=await db.collection('hrd_users').where('status','==','aktif').get();
+    if(dept==='admin'){
+      usersSnap.forEach(d=>{if(d.data().role==='admin'&&!members.includes(d.id))members.push(d.id);});
+    }else{
+      usersSnap.forEach(d=>{const u=d.data();if((u.departemen||'').toLowerCase()===dept.toLowerCase()&&!members.includes(d.id))members.push(d.id);});
+    }
+    const ref=await db.collection('hrd_chat_threads').add({isGroup:true,groupName:label,participants:members,fromUser:currentUser.id,fromName:currentUser.nama,toUser:'group',toName:`👥 Group ${label}`,lastMessage:msg||'Group dibuat',lastMessageAt:new Date().toISOString(),createdAt:new Date().toISOString()});
     threadId=ref.id;
   }
-  // Send message to group
-  await db.collection('hrd_chat_messages').add({threadId,senderId:currentUser.id,senderName:currentUser.nama,message:msg,createdAt:new Date().toISOString()});
-  await db.collection('hrd_chat_threads').doc(threadId).update({lastMessage:msg,lastMessageAt:new Date().toISOString()});
-  // Notify members
-  const threadDoc=await db.collection('hrd_chat_threads').doc(threadId).get();
-  const members=(threadDoc.data().participants||[]).filter(id=>id!==currentUser.id);
-  if(members.length)await sendNotificationBulk(members,`💬 Group ${label}`,`${currentUser.nama}: ${msg.substring(0,60)}`,'chat');
-  closeModalDirect();toast(`Pesan terkirim ke Group ${label}`,'success');loadChatThreads();
+  // Send message if provided
+  if(msg){
+    await db.collection('hrd_chat_messages').add({threadId,senderId:currentUser.id,senderName:currentUser.nama,message:msg,createdAt:new Date().toISOString()});
+    await db.collection('hrd_chat_threads').doc(threadId).update({lastMessage:msg,lastMessageAt:new Date().toISOString()});
+  }
+  closeModalDirect();toast(`Group ${label} siap!`,'success');loadChatThreads();
   openChatThread(threadId);
 }
 
