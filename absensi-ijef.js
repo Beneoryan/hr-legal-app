@@ -1061,7 +1061,7 @@ async function loadRekapGrid(){
     }
     h+=`<td class="fw-700 text-center">${ut}</td>`;
     h+=`<td class="fw-700 text-center" style="color:#7b1fa2">${userLemburJam>0?userLemburJam.toFixed(1)+'j':'-'}</td>`;
-    h+=`<td><button class="btn btn-xs btn-info" onclick="editAbsenKaryawan('${u.id}','${escHtml(u.nama)}','${bulan}')">✏️</button></td></tr>`;
+    h+=`<td><button class="btn btn-xs btn-info" onclick="editAbsenKaryawan('${u.id}','${(u.nama||'').replace(/'/g,"\\'")}','${bulan}')">✏️</button></td></tr>`;
   });
   h+='</tbody></table></div>';
   document.getElementById('rekapGrid').innerHTML=h;
