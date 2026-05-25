@@ -2074,7 +2074,7 @@ function openChatThread(threadId) {
         const time=p.createdAt?new Date(p.createdAt).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}):'';
         html += `<div class="chat-msg${isMine?' mine':''}">
           <div class="msg-avatar">${(p.senderName||'?').charAt(0)}</div>
-          <div>
+          <div class="msg-content">
             <div class="msg-body">${escHtml(p.message)}</div>
             <div class="msg-time">${isMine?'':escHtml(p.senderName)+' • '}${time}</div>
           </div>
