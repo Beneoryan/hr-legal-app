@@ -2559,21 +2559,31 @@ function viewApprovalDetail(col,id){
     let html=`<div class="modal-title">📋 Detail Pengajuan — ${type.toUpperCase()}</div>`;
     html+=`<div class="grid-2 mb-16">`;
     html+=`<div><b>Nama:</b> ${escHtml(p.nama||'-')}</div>`;
-    html+=`<div><b>Status:</b> <span class="badge badge-warning">${p.status}</span></div>`;
+    html+=`<div><b>Status:</b> <span class="badge badge-${p.status==='approved'?'success':p.status==='rejected'?'danger':'warning'}">${p.status}</span></div>`;
     html+=`<div><b>Tanggal Ajuan:</b> ${formatDateTime(p.createdAt)}</div>`;
+    if(p.departemen)html+=`<div><b>Departemen:</b> ${escHtml(p.departemen)}</div>`;
     if(p.jenis)html+=`<div><b>Jenis:</b> ${escHtml(p.jenis)}</div>`;
     if(p.kategori)html+=`<div><b>Kategori:</b> ${escHtml(p.kategori)}</div>`;
     if(p.mulai)html+=`<div><b>Mulai:</b> ${formatDate(p.mulai)}</div>`;
     if(p.selesai)html+=`<div><b>Selesai:</b> ${formatDate(p.selesai)}</div>`;
     if(p.durasi)html+=`<div><b>Durasi:</b> ${p.durasi} hari</div>`;
     if(p.tanggal)html+=`<div><b>Tanggal:</b> ${formatDate(p.tanggal)}</div>`;
-    if(p.jamMulai)html+=`<div><b>Jam:</b> ${p.jamMulai} - ${p.jamSelesai||'-'}</div>`;
+    if(p.jamMulai)html+=`<div><b>Jam Mulai:</b> ${p.jamMulai}</div>`;
+    if(p.jamSelesai)html+=`<div><b>Jam Selesai:</b> ${p.jamSelesai}</div>`;
     if(p.jumlah)html+=`<div><b>Jumlah:</b> ${formatCurrency(p.jumlah)}</div>`;
     if(p.cicilan)html+=`<div><b>Cicilan:</b> ${p.cicilan}x</div>`;
+    if(p.tujuan)html+=`<div><b>Tujuan/Lokasi:</b> ${escHtml(p.tujuan)}</div>`;
+    if(p.jamBerangkat)html+=`<div><b>Jam Berangkat:</b> ${p.jamBerangkat}</div>`;
+    if(p.jamKembali)html+=`<div><b>Estimasi Kembali:</b> ${p.jamKembali}</div>`;
+    if(p.approvalStep!==undefined)html+=`<div><b>Step Approval:</b> ${p.approvalStep+1}</div>`;
+    if(p.lastApprovedBy)html+=`<div><b>Terakhir disetujui:</b> ${escHtml(p.lastApprovedBy)}</div>`;
     html+=`</div>`;
-    if(p.keterangan)html+=`<div class="mb-16"><b>Keterangan:</b><div class="text-sm mt-8" style="background:#f8f9ff;padding:10px;border-radius:6px;white-space:pre-wrap">${escHtml(p.keterangan)}</div></div>`;
-    if(p.alasan)html+=`<div class="mb-16"><b>Alasan:</b><div class="text-sm mt-8" style="background:#f8f9ff;padding:10px;border-radius:6px">${escHtml(p.alasan)}</div></div>`;
-    html+=`<div class="flex gap-8 mt-16">${hasAccess(2)?`<button class="btn btn-success" onclick="approveItem('${col}','${id}','approved')">✅ Approve</button><button class="btn btn-danger" onclick="approveItem('${col}','${id}','rejected')">❌ Reject</button>`:''}</div>`;
+    if(p.keperluan)html+=`<div class="mb-16"><b>Keperluan:</b><div class="text-sm mt-8" style="background:#f8f9ff;padding:12px;border-radius:6px;white-space:pre-wrap">${escHtml(p.keperluan)}</div></div>`;
+    if(p.keterangan)html+=`<div class="mb-16"><b>Keterangan:</b><div class="text-sm mt-8" style="background:#f8f9ff;padding:12px;border-radius:6px;white-space:pre-wrap">${escHtml(p.keterangan)}</div></div>`;
+    if(p.alasan)html+=`<div class="mb-16"><b>Alasan:</b><div class="text-sm mt-8" style="background:#f8f9ff;padding:12px;border-radius:6px">${escHtml(p.alasan)}</div></div>`;
+    if(p.approvalHistory&&p.approvalHistory.length){html+=`<div class="mb-16"><b>Riwayat Approval:</b><div class="mt-8">`;p.approvalHistory.forEach(h2=>{html+=`<div style="padding:6px 0;border-bottom:1px solid #eee;font-size:.82rem"><span class="badge badge-${h2.action==='approved'?'success':'danger'}" style="font-size:.6rem">${h2.action==='approved'?'✓':'✗'}</span> <b>${escHtml(h2.nama)}</b> <span style="color:#999">(${escHtml(h2.role||'')})</span> — ${formatDateTime(h2.at)}</div>`;});html+=`</div></div>`;}
+    if(p.approvedBy&&!p.approvalHistory)html+=`<div class="mb-16"><b>Diproses oleh:</b> ${escHtml(p.approvedBy)} (${formatDateTime(p.approvedAt)})</div>`;
+    html+=`<div class="flex gap-8 mt-16"><button class="btn btn-success" onclick="approveItem('${col}','${id}','approved')">✅ Approve</button><button class="btn btn-danger" onclick="approveItem('${col}','${id}','rejected')">❌ Reject</button></div>`;
     openModal(html,true);
   });
 }
