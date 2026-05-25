@@ -169,7 +169,7 @@ function buildNavItems(isPortalUser) {
   // Manager+ gets QR & PWA, Admin gets full settings
   if(hasAccess(3)) nav+=navGroup('🔗 Portal',[['portal-share','🔗','Download Aplikasi']]);
   if(hasAccess(6)){
-    nav+=navGroup('⚙️ Pengaturan',[['akun','👤','Manajemen Akun'],['approval-mgmt','⚙️','Approval Mgmt'],['qr-share','📱','QR & PWA']]);
+    nav+=navGroup('⚙️ Pengaturan',[['akun','👤','Manajemen Akun'],['approval-mgmt','⚙️','Approval Mgmt'],['system-admin','🔧','Reset & Backup'],['qr-share','📱','QR & PWA']]);
   } else if(hasAccess(3)){
     nav+=navGroup('⚙️ Pengaturan',[['qr-share','📱','QR & PWA']]);
   }
@@ -204,7 +204,7 @@ function navigateTo(page) {
     'karyawan':renderKaryawan,'struktur-org':renderStrukturOrg,'onboarding':renderOnboarding,'offboarding':renderOffboarding,'jobdesk-mgmt':renderJobdeskMgmt,
     'lowongan':renderLowongan,'pipeline':renderPipeline,'kandidat':renderKandidat,
     'absensi':renderAbsensiAdmin,'cuti':renderCuti,'overtime':renderOvertime,'hari-libur':renderHariLibur,'penalty':renderPenalty,
-    'penggajian':renderPenggajian,'tax-calc':renderTaxCalc,'insentif':renderInsentif,'reimbursement':renderReimbursement,'kasbon':renderKasbon,'tunjangan':renderTunjangan,
+    'penggajian':renderPenggajian,'tax-calc':renderTaxCalc,'insentif':renderInsentif,'system-admin':renderSystemAdmin,'reimbursement':renderReimbursement,'kasbon':renderKasbon,'tunjangan':renderTunjangan,
     'kpi':renderKPI,'pelatihan':renderPelatihan,'disc-test':renderDiscTestPage,
     'kontrak':renderKontrak,'asset':renderAsset,'peraturan':renderPeraturan,'surat':renderSurat,
     'meeting':renderMeeting,'chat':renderChat,'broadcast':renderBroadcast,'inbox':renderInbox,

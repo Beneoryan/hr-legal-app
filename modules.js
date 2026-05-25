@@ -1882,11 +1882,12 @@ async function loadChatThreads() {
     html = '<p class="text-sm" style="color:#999;padding:12px">Belum ada percakapan. Klik "+ Mulai Obrolan" untuk chat.</p>';
   } else {
     sorted.forEach(t => {
-      const otherName = t.fromUser === currentUser.id ? t.toName : t.fromName;
-      const unread = t.fromUser !== currentUser.id && t.unreadBy === currentUser.id;
+      const isGroup=t.isGroup||false;
+      const otherName = isGroup?`👥 Group ${t.groupName||''}`:t.fromUser === currentUser.id ? t.toName : t.fromName;
+      const unread = !isGroup && t.fromUser !== currentUser.id && t.unreadBy === currentUser.id;
       html += `<div class="inbox-item ${unread?'unread':''}" style="position:relative">
         <div onclick="openChatThread('${t.id}')" style="cursor:pointer">
-          <div class="inbox-from">💬 ${escHtml(otherName)}</div>
+          <div class="inbox-from">${isGroup?'👥':'💬'} ${escHtml(otherName)}</div>
           <div class="inbox-subject text-xs">${escHtml((t.lastMessage||'').substring(0,50))}</div>
           <div class="inbox-time">${formatDateTime(t.lastMessageAt)}</div>
         </div>
@@ -1986,26 +1987,35 @@ async function modalGroupChat(){
 async function sendGroupChat(){
   const dept=document.getElementById('grpDept').value;const msg=document.getElementById('grpMsg').value.trim();
   if(!msg)return toast('Tulis pesan','warning');
-  let targets=[];
-  if(dept==='superadmin'){
-    const usersSnap=await db.collection('hrd_users').get();
-    usersSnap.forEach(d=>{const u=d.data();if(u.role==='superadmin'||u.role==='admin')targets.push({id:d.id,nama:u.nama});});
+  const label=dept==='admin'?'Admin':dept;
+  // Find or create group room
+  const existingSnap=await db.collection('hrd_chat_threads').where('isGroup','==',true).where('groupName','==',label).get();
+  let threadId=null;
+  if(!existingSnap.empty){
+    threadId=existingSnap.docs[0].id;
   }else{
-    const kSnap=await db.collection('hrd_karyawan').where('departemen','==',dept).get();
-    kSnap.forEach(d=>{const k=d.data();targets.push({id:d.id,nama:k.nama});});
+    // Create group room
+    let members=[];
+    if(dept==='admin'){
+      const usersSnap=await db.collection('hrd_users').get();
+      usersSnap.forEach(d=>{const u=d.data();if(u.role==='admin')members.push(d.id);});
+    }else{
+      const kSnap=await db.collection('hrd_karyawan').where('departemen','==',dept).get();
+      kSnap.forEach(d=>members.push(d.id));
+    }
+    if(!members.includes(currentUser.id))members.push(currentUser.id);
+    const ref=await db.collection('hrd_chat_threads').add({isGroup:true,groupName:label,participants:members,fromUser:currentUser.id,fromName:currentUser.nama,toUser:'group',toName:`Group ${label}`,lastMessage:msg,lastMessageAt:new Date().toISOString(),createdAt:new Date().toISOString()});
+    threadId=ref.id;
   }
-  const label=dept==='superadmin'?'Superadmin':dept;
-  for(const u of targets){
-    if(u.nama?.toLowerCase()===currentUser.nama?.toLowerCase())continue;
-    // Find or create thread
-    const userId=u.id||u.nama;
-    let threadId=null;const snap=await db.collection('hrd_chat_threads').where('participants','array-contains',currentUser.id).get();
-    snap.forEach(d=>{const data=d.data();if(data.participants&&(data.participants.includes(userId)||data.toName===u.nama))threadId=d.id;});
-    if(!threadId){const ref=await db.collection('hrd_chat_threads').add({fromUser:currentUser.id,fromName:currentUser.nama,toUser:userId,toName:u.nama,participants:[currentUser.id,userId],lastMessage:`[Group ${label}] ${msg}`,lastMessageAt:new Date().toISOString(),createdAt:new Date().toISOString()});threadId=ref.id;}
-    else{await db.collection('hrd_chat_threads').doc(threadId).update({lastMessage:`[Group ${label}] ${msg}`,lastMessageAt:new Date().toISOString()});}
-    await db.collection('hrd_chat_messages').add({threadId,fromUser:currentUser.id,fromName:currentUser.nama,message:`[Group ${label}] ${msg}`,createdAt:new Date().toISOString()});
-  }
-  closeModalDirect();toast(`Pesan terkirim ke ${targets.length} anggota ${label}`,'success');loadChatThreads();
+  // Send message to group
+  await db.collection('hrd_chat_messages').add({threadId,senderId:currentUser.id,senderName:currentUser.nama,message:msg,createdAt:new Date().toISOString()});
+  await db.collection('hrd_chat_threads').doc(threadId).update({lastMessage:msg,lastMessageAt:new Date().toISOString()});
+  // Notify members
+  const threadDoc=await db.collection('hrd_chat_threads').doc(threadId).get();
+  const members=(threadDoc.data().participants||[]).filter(id=>id!==currentUser.id);
+  if(members.length)await sendNotificationBulk(members,`💬 Group ${label}`,`${currentUser.nama}: ${msg.substring(0,60)}`,'chat');
+  closeModalDirect();toast(`Pesan terkirim ke Group ${label}`,'success');loadChatThreads();
+  openChatThread(threadId);
 }
 
 function openChatThread(threadId) {
@@ -2804,26 +2814,43 @@ function calcTax(){
   const lembur=Number(document.getElementById('tcLembur')?.value)||0;
   const ptkp=Number(document.getElementById('tcPTKP')?.value)||54000000;
   const bruto=gaji+tunj+lembur;
-  const bpjsKes=Math.round(gaji*0.01);
-  const bpjsTK=Math.round(gaji*0.02);
+  // Allow manual override of potongan
+  const bpjsKesAuto=Math.round(gaji*0.01);
+  const bpjsTKAuto=Math.round(gaji*0.02);
   const bpjsKesPerusahaan=Math.round(gaji*0.04);
   const bpjsTKPerusahaan=Math.round(gaji*0.037);
-  const nettoTahunan=Math.max(0,(bruto-bpjsKes-bpjsTK)*12-ptkp);
-  let pph=0;
-  if(nettoTahunan<=60000000)pph=nettoTahunan*0.05;
-  else if(nettoTahunan<=250000000)pph=3000000+(nettoTahunan-60000000)*0.15;
-  else if(nettoTahunan<=500000000)pph=3000000+28500000+(nettoTahunan-250000000)*0.25;
-  else pph=3000000+28500000+62500000+(nettoTahunan-500000000)*0.30;
-  const pphBulanan=Math.round(pph/12);
+  const nettoTahunan=Math.max(0,(bruto-bpjsKesAuto-bpjsTKAuto)*12-ptkp);
+  let pphAuto=0;
+  if(nettoTahunan<=60000000)pphAuto=nettoTahunan*0.05;
+  else if(nettoTahunan<=250000000)pphAuto=3000000+(nettoTahunan-60000000)*0.15;
+  else if(nettoTahunan<=500000000)pphAuto=3000000+28500000+(nettoTahunan-250000000)*0.25;
+  else pphAuto=3000000+28500000+62500000+(nettoTahunan-500000000)*0.30;
+  const pphBulananAuto=Math.round(pphAuto/12);
+  // Use manual values if user edited them, otherwise auto
+  const bpjsKes=Number(document.getElementById('tcBpjsKes')?.value)||bpjsKesAuto;
+  const bpjsTK=Number(document.getElementById('tcBpjsTK')?.value)||bpjsTKAuto;
+  const pphBulanan=Number(document.getElementById('tcPPH')?.value)||pphBulananAuto;
   const thp=bruto-bpjsKes-bpjsTK-pphBulanan;
-  const row=(label,val,isNeg)=>`<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #eee"><span style="font-size:.85rem">${label}</span><span style="font-size:.85rem;${isNeg?'color:var(--accent)':''};font-weight:${isNeg?'400':'400'}">${isNeg?'-':''}${formatCurrency(Math.abs(val))}</span></div>`;
-  document.getElementById('tcResultRows').innerHTML=
-    row('Bruto',bruto,false)+
-    row('BPJS Kes (1% karyawan)',bpjsKes,true)+
-    row('BPJS TK/JHT (2% karyawan)',bpjsTK,true)+
-    row('PPH 21/bulan',pphBulanan,true)+
-    `<div style="display:flex;justify-content:space-between;padding:12px 0;font-weight:700;font-size:1.05rem;border-top:2px solid var(--accent);margin-top:4px"><span>Take Home Pay</span><span>${formatCurrency(thp)}</span></div>`;
-  document.getElementById('tcResultFooter').innerHTML=`<div style="font-size:.75rem;color:#666;padding-top:8px;border-top:1px dashed #ddd"><b>Kontribusi Perusahaan:</b><br>BPJS Kes (4%): ${formatCurrency(bpjsKesPerusahaan)}<br>BPJS TK (3.7%): ${formatCurrency(bpjsTKPerusahaan)}</div>`;
+  
+  document.getElementById('tcResultRows').innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #eee"><span style="font-size:.85rem">Bruto</span><span class="fw-700">${formatCurrency(bruto)}</span></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #eee"><span style="font-size:.82rem">BPJS Kes (1%)</span><input class="form-control" type="number" id="tcBpjsKes" value="${bpjsKes}" oninput="calcTaxResult()" style="width:130px;text-align:right;padding:4px 8px;font-size:.82rem;color:var(--accent)"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #eee"><span style="font-size:.82rem">BPJS TK/JHT (2%)</span><input class="form-control" type="number" id="tcBpjsTK" value="${bpjsTK}" oninput="calcTaxResult()" style="width:130px;text-align:right;padding:4px 8px;font-size:.82rem;color:var(--accent)"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #eee"><span style="font-size:.82rem">PPH 21/bulan</span><input class="form-control" type="number" id="tcPPH" value="${pphBulanan}" oninput="calcTaxResult()" style="width:130px;text-align:right;padding:4px 8px;font-size:.82rem;color:var(--accent)"></div>
+    <div style="display:flex;justify-content:space-between;padding:12px 0;font-weight:700;font-size:1.05rem;border-top:2px solid var(--accent);margin-top:4px"><span>Take Home Pay</span><span id="tcTHP">${formatCurrency(thp)}</span></div>`;
+  document.getElementById('tcResultFooter').innerHTML=`<div style="font-size:.75rem;color:#666;padding-top:8px;border-top:1px dashed #ddd"><b>Kontribusi Perusahaan:</b><br>BPJS Kes (4%): ${formatCurrency(bpjsKesPerusahaan)}<br>BPJS TK (3.7%): ${formatCurrency(bpjsTKPerusahaan)}</div>
+    <div class="text-xs mt-8" style="color:#999">💡 Nilai potongan bisa diedit manual. Klik angka untuk mengubah.</div>`;
+}
+function calcTaxResult(){
+  const gaji=Number(document.getElementById('tcGaji')?.value)||0;
+  const tunj=Number(document.getElementById('tcTunj')?.value)||0;
+  const lembur=Number(document.getElementById('tcLembur')?.value)||0;
+  const bruto=gaji+tunj+lembur;
+  const bpjsKes=Number(document.getElementById('tcBpjsKes')?.value)||0;
+  const bpjsTK=Number(document.getElementById('tcBpjsTK')?.value)||0;
+  const pph=Number(document.getElementById('tcPPH')?.value)||0;
+  const thp=bruto-bpjsKes-bpjsTK-pph;
+  const el=document.getElementById('tcTHP');if(el)el.textContent=formatCurrency(thp);
 }
 async function loadTaxKaryList(){
   const snap=await db.collection('hrd_karyawan').where('status','==','aktif').get();
@@ -3924,3 +3951,88 @@ function previewProfilePic(input){
 }
 
 async function simpanPortalSetting(){const data={nama:document.getElementById('psNama').value,email:document.getElementById('psEmail').value,telepon:document.getElementById('psTelp').value,updatedAt:new Date().toISOString()};if(window._profilePic)data.profilePic=window._profilePic;const newPass=document.getElementById('psPass').value;if(newPass)data.password=newPass;const newUser=document.getElementById('psUser').value.trim();if(newUser&&newUser!==currentUser.id){await db.collection('hrd_users').doc(newUser).set({...currentUser,...data,username:newUser});await db.collection('hrd_users').doc(currentUser.id).delete();currentUser={...currentUser,...data,id:newUser};localStorage.setItem('hrd_session',JSON.stringify(currentUser));}else{await db.collection('hrd_users').doc(currentUser.id).update(data);currentUser={...currentUser,...data};localStorage.setItem('hrd_session',JSON.stringify(currentUser));}window._profilePic=null;toast('Akun diperbarui','success');renderApp();}
+
+// ── SYSTEM ADMIN — Reset & Backup ─────────────────────────────
+function renderSystemAdmin(){
+  if(!hasAccess(6))return document.getElementById('mainContent').innerHTML='<div class="card"><p>Akses ditolak.</p></div>';
+  const main=document.getElementById('mainContent');
+  main.innerHTML=`<div class="page-title"><span>🔧 Reset & Backup Sistem</span></div>
+    <div class="card" style="border-left:4px solid var(--accent)">
+      <div class="card-title mb-16">⚠️ Zona Berbahaya</div>
+      <p class="text-sm mb-16" style="color:#666">Fitur ini hanya untuk Administrator. Semua aksi bersifat permanen dan berlaku untuk seluruh data sistem.</p>
+      <div class="grid-2">
+        <div class="card" style="background:#fff3e0;border:1px solid var(--warning)">
+          <div class="fw-700 mb-8">📥 Backup Data</div>
+          <p class="text-xs mb-12" style="color:#666">Export semua data ke file JSON untuk backup.</p>
+          <button class="btn btn-info btn-sm" onclick="backupAllData()">📥 Download Backup</button>
+        </div>
+        <div class="card" style="background:#ffebee;border:1px solid var(--accent)">
+          <div class="fw-700 mb-8">🗑️ Reset Data</div>
+          <p class="text-xs mb-12" style="color:#666">Hapus data per koleksi atau reset seluruh sistem.</p>
+          <div class="flex flex-wrap gap-8">
+            <button class="btn btn-danger btn-sm" onclick="resetCollection('hrd_absensi','Absensi')">🗑️ Absensi</button>
+            <button class="btn btn-danger btn-sm" onclick="resetCollection('hrd_cuti','Cuti')">🗑️ Cuti</button>
+            <button class="btn btn-danger btn-sm" onclick="resetCollection('hrd_overtime','Overtime')">🗑️ Overtime</button>
+            <button class="btn btn-danger btn-sm" onclick="resetCollection('hrd_penggajian','Penggajian')">🗑️ Penggajian</button>
+            <button class="btn btn-danger btn-sm" onclick="resetCollection('hrd_reimbursement','Reimburse')">🗑️ Reimburse</button>
+            <button class="btn btn-danger btn-sm" onclick="resetCollection('hrd_kasbon','Kasbon')">🗑️ Kasbon</button>
+            <button class="btn btn-danger btn-sm" onclick="resetCollection('hrd_notifikasi','Notifikasi')">🗑️ Notifikasi</button>
+            <button class="btn btn-danger btn-sm" onclick="resetCollection('hrd_chat_threads','Chat')">🗑️ Chat</button>
+            <button class="btn btn-danger btn-sm" onclick="resetCollection('hrd_chat_messages','Pesan Chat')">🗑️ Pesan</button>
+            <button class="btn btn-danger btn-sm" onclick="resetCollection('hrd_broadcast','Broadcast')">🗑️ Broadcast</button>
+            <button class="btn btn-danger btn-sm" onclick="resetCollection('hrd_meeting','Meeting')">🗑️ Meeting</button>
+            <button class="btn btn-danger btn-sm" onclick="resetCollection('hrd_online_meeting','Meeting Online')">🗑️ Meeting Online</button>
+            <button class="btn btn-danger btn-sm" onclick="resetCollection('hrd_insentif','Insentif')">🗑️ Insentif</button>
+            <button class="btn btn-danger btn-sm" onclick="resetCollection('hrd_approval_flow','Approval Flow')">🗑️ Approval Flow</button>
+          </div>
+        </div>
+      </div>
+      <div class="card mt-16" style="background:#f5f5f5;border:2px solid var(--accent)">
+        <div class="fw-700 mb-8" style="color:var(--accent)">☢️ Reset Seluruh Sistem</div>
+        <p class="text-xs mb-12" style="color:#666">Hapus SEMUA data (karyawan, absensi, penggajian, chat, dll). Hanya akun admin yang dipertahankan. TIDAK BISA DIBATALKAN.</p>
+        <button class="btn btn-danger" onclick="resetEntireSystem()">☢️ RESET SELURUH SISTEM</button>
+      </div>
+    </div>`;
+}
+
+async function backupAllData(){
+  toast('Memproses backup...','info');
+  const collections=['hrd_karyawan','hrd_users','hrd_absensi','hrd_cuti','hrd_overtime','hrd_penggajian','hrd_reimbursement','hrd_kasbon','hrd_insentif','hrd_tunjangan','hrd_notifikasi','hrd_pengumuman','hrd_broadcast','hrd_meeting','hrd_online_meeting','hrd_chat_threads','hrd_chat_messages','hrd_approval_flow','hrd_settings'];
+  const backup={exportDate:new Date().toISOString(),exportBy:currentUser.nama,data:{}};
+  for(const col of collections){
+    try{const snap=await db.collection(col).get();backup.data[col]=[];snap.forEach(d=>backup.data[col].push({id:d.id,...d.data()}));}catch(e){}
+  }
+  const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`IMS_backup_${todayStr()}.json`;a.click();
+  toast('Backup berhasil didownload','success');
+}
+
+async function resetCollection(col,label){
+  if(!confirm(`Hapus SEMUA data ${label}? Ini tidak bisa dibatalkan.`))return;
+  if(!confirm(`KONFIRMASI: Yakin hapus semua ${label}?`))return;
+  const snap=await db.collection(col).get();
+  if(snap.empty)return toast(`${label} sudah kosong`,'info');
+  const batchSize=400;let count=0;
+  let batch=db.batch();
+  snap.forEach(d=>{batch.delete(d.ref);count++;if(count%batchSize===0){batch.commit();batch=db.batch();}});
+  await batch.commit();
+  toast(`${count} data ${label} dihapus`,'success');
+}
+
+async function resetEntireSystem(){
+  if(!confirm('⚠️ PERINGATAN: Ini akan menghapus SELURUH data sistem!\n\nHanya akun admin yang dipertahankan.\n\nApakah Anda yakin?'))return;
+  if(!confirm('KONFIRMASI TERAKHIR: Ketik "RESET" di prompt berikutnya untuk melanjutkan.'))return;
+  const input=prompt('Ketik RESET untuk konfirmasi:');
+  if(input!=='RESET')return toast('Reset dibatalkan','info');
+  toast('Mereset sistem...','warning');
+  const collections=['hrd_karyawan','hrd_absensi','hrd_cuti','hrd_overtime','hrd_penggajian','hrd_reimbursement','hrd_kasbon','hrd_insentif','hrd_tunjangan','hrd_notifikasi','hrd_pengumuman','hrd_broadcast','hrd_meeting','hrd_online_meeting','hrd_chat_threads','hrd_chat_messages','hrd_approval_flow','hrd_meeting_invites','hrd_kpi','hrd_disc_results'];
+  for(const col of collections){
+    try{const snap=await db.collection(col).get();const batch=db.batch();snap.forEach(d=>batch.delete(d.ref));await batch.commit();}catch(e){}
+  }
+  // Delete non-admin users
+  const usersSnap=await db.collection('hrd_users').get();
+  const batch=db.batch();
+  usersSnap.forEach(d=>{if(d.data().role!=='admin')batch.delete(d.ref);});
+  await batch.commit();
+  toast('Sistem berhasil direset. Hanya akun admin yang tersisa.','success');
+}
