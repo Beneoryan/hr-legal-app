@@ -2508,7 +2508,7 @@ async function renderApprovalCenter(){
   // Load karyawan for dept mapping
   const karySnap=await db.collection('hrd_karyawan').get();
   const deptMap={};karySnap.forEach(d=>{const k=d.data();deptMap[(k.nama||'').toLowerCase()]=k.departemen||'';});
-  const collections=['hrd_cuti','hrd_overtime','hrd_reimbursement','hrd_kasbon'];
+  const collections=['hrd_cuti','hrd_overtime','hrd_reimbursement','hrd_kasbon','hrd_dinas_luar'];
   let items=[];
   for(const col of collections){
     try{const snap=await db.collection(col).where('status','in',['pending','step1','step2']).get();snap.forEach(d=>{const data={id:d.id,collection:col,...d.data()};data._dept=(data.departemen||deptMap[(data.nama||'').toLowerCase()]||'').toLowerCase();items.push(data);});}catch(e){const snap=await db.collection(col).where('status','==','pending').get();snap.forEach(d=>{const data={id:d.id,collection:col,...d.data()};data._dept=(data.departemen||deptMap[(data.nama||'').toLowerCase()]||'').toLowerCase();items.push(data);});}

@@ -881,15 +881,15 @@ async function loadDinasTab(tab) {
     const snap = await db.collection('hrd_dinas_luar').get();
     let h = '<div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Tanggal</th><th>Tujuan</th><th>Status</th><th>Aksi</th></tr></thead><tbody>';
     if(snap.empty) h += '<tr><td colspan="5" class="text-center">Belum ada pengajuan</td></tr>';
-    else snap.forEach(d=>{const p=d.data();const badge=p.status==='approved'?'badge-success':p.status==='rejected'?'badge-danger':'badge-warning';h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggal)}</td><td>${escHtml(p.tujuan)}</td><td><span class="badge ${badge}">${p.status}</span></td><td>${p.status==='pending'&&hasAccess(3)?`<button class="btn btn-xs btn-success" onclick="approveDinas('${d.id}','approved')">✅</button> <button class="btn btn-xs btn-danger" onclick="approveDinas('${d.id}','rejected')">❌</button>`:'-'}</td></tr>`;});
+    else snap.forEach(d=>{const p=d.data();const badge=p.status==='approved'?'badge-success':p.status==='rejected'?'badge-danger':'badge-warning';h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggal)}</td><td>${escHtml(p.tujuan)}</td><td><span class="badge ${badge}">${p.status}</span></td><td><button class="btn btn-xs btn-info" onclick="viewDinasLuar('${d.id}')">👁️</button> <button class="btn btn-xs btn-primary" onclick="editDinasLuar('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_dinas_luar','${d.id}','dinas')">🗑️</button>${p.status==='pending'&&hasAccess(3)?` <button class="btn btn-xs btn-success" onclick="approveDinas('${d.id}','approved')">✅</button>`:''}</td></tr>`;});
     h += '</tbody></table></div>';
     el.innerHTML = h;
   } else {
     // Riwayat absen dinas luar (selfie+GPS)
     const snap = await db.collection('hrd_absensi').where('tipe','==','dinas_luar').get();
-    let h = '<div class="table-wrap"><table><thead><tr><th>Foto</th><th>Karyawan</th><th>Tanggal</th><th>Waktu</th><th>Lokasi</th><th>Tujuan</th></tr></thead><tbody>';
-    if(snap.empty) h += '<tr><td colspan="6" class="text-center">Belum ada absen dinas luar</td></tr>';
-    else snap.forEach(d=>{const p=d.data();h+=`<tr><td>${p.foto?`<img src="${p.foto}" style="width:36px;height:36px;border-radius:50%;object-fit:cover">`:'👤'}</td><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggal)}</td><td>${p.waktu}</td><td class="text-xs">${p.lat?.toFixed(4)||'-'}, ${p.lng?.toFixed(4)||'-'}</td><td>${escHtml(p.tujuanDinas||'-')}</td></tr>`;});
+    let h = '<div class="table-wrap"><table><thead><tr><th>Foto</th><th>Karyawan</th><th>Tanggal</th><th>Waktu</th><th>Lokasi</th><th>Tujuan</th><th>Aksi</th></tr></thead><tbody>';
+    if(snap.empty) h += '<tr><td colspan="7" class="text-center">Belum ada absen dinas luar</td></tr>';
+    else snap.forEach(d=>{const p=d.data();h+=`<tr><td>${p.foto?`<img src="${p.foto}" style="width:36px;height:36px;border-radius:50%;object-fit:cover">`:'👤'}</td><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggal)}</td><td>${p.waktu}</td><td class="text-xs">${p.lat?.toFixed(4)||'-'}, ${p.lng?.toFixed(4)||'-'}</td><td>${escHtml(p.tujuanDinas||'-')}</td><td><button class="btn btn-xs btn-info" onclick="viewAbsenDinas('${d.id}')">👁️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_absensi','${d.id}','absensi')">🗑️</button></td></tr>`;});
     h += '</tbody></table></div>';
     el.innerHTML = h;
   }
@@ -1188,4 +1188,38 @@ async function hapusAbsenHari(userId) {
   toast(`${snap.size} record dihapus`, 'success');
   closeModalDirect();
   loadRekapGrid();
+}
+
+// ── VIEW/EDIT DINAS LUAR ──────────────────────────────────────
+function viewDinasLuar(id){
+  db.collection('hrd_dinas_luar').doc(id).get().then(d=>{const p=d.data();
+    openModal(`<div class="modal-title">📋 Detail Pengajuan Dinas Luar</div>
+      <div class="grid-2 mb-16"><div><b>Nama:</b> ${escHtml(p.nama)}</div><div><b>Tanggal:</b> ${formatDate(p.tanggal)}</div><div><b>Tujuan:</b> ${escHtml(p.tujuan||'-')}</div><div><b>Status:</b> <span class="badge badge-${p.status==='approved'?'success':p.status==='rejected'?'danger':'warning'}">${p.status}</span></div><div><b>Jam Berangkat:</b> ${p.jamBerangkat||'-'}</div><div><b>Estimasi Kembali:</b> ${p.jamKembali||'-'}</div></div>
+      ${p.keperluan?`<div class="mb-16"><b>Keperluan:</b><div class="text-sm mt-8" style="background:#f8f9ff;padding:10px;border-radius:6px">${escHtml(p.keperluan)}</div></div>`:''}
+      ${p.approvedBy?`<div><b>Diproses oleh:</b> ${escHtml(p.approvedBy)}</div>`:''}`);
+  });
+}
+
+async function editDinasLuar(id){
+  const d=await db.collection('hrd_dinas_luar').doc(id).get();const p=d.data();
+  openModal(`<div class="modal-title">✏️ Edit Pengajuan Dinas Luar</div>
+    <div class="grid-2"><div class="form-group"><label>Nama</label><input class="form-control" id="edlNama" value="${escHtml(p.nama||'')}"></div><div class="form-group"><label>Tanggal</label><input class="form-control" type="date" id="edlTgl" value="${p.tanggal||''}"></div></div>
+    <div class="form-group"><label>Tujuan / Lokasi</label><input class="form-control" id="edlTujuan" value="${escHtml(p.tujuan||'')}"></div>
+    <div class="form-group"><label>Keperluan</label><textarea class="form-control" id="edlKeperluan">${escHtml(p.keperluan||'')}</textarea></div>
+    <div class="grid-2"><div class="form-group"><label>Jam Berangkat</label><input class="form-control" type="time" id="edlJamGo" value="${p.jamBerangkat||''}"></div><div class="form-group"><label>Estimasi Kembali</label><input class="form-control" type="time" id="edlJamBack" value="${p.jamKembali||''}"></div></div>
+    <button class="btn btn-primary" onclick="simpanEditDinas('${id}')">💾 Simpan</button>`);
+}
+
+async function simpanEditDinas(id){
+  await db.collection('hrd_dinas_luar').doc(id).update({nama:document.getElementById('edlNama').value,tanggal:document.getElementById('edlTgl').value,tujuan:document.getElementById('edlTujuan').value,keperluan:document.getElementById('edlKeperluan').value,jamBerangkat:document.getElementById('edlJamGo').value,jamKembali:document.getElementById('edlJamBack').value,updatedAt:new Date().toISOString()});
+  closeModalDirect();toast('Diupdate','success');loadDinasTab('pengajuan');
+}
+
+function viewAbsenDinas(id){
+  db.collection('hrd_absensi').doc(id).get().then(d=>{const p=d.data();
+    openModal(`<div class="modal-title">📸 Detail Absen Dinas Luar</div>
+      <div style="text-align:center;margin-bottom:16px">${p.foto?`<img src="${p.foto}" style="width:120px;height:120px;border-radius:50%;object-fit:cover;border:3px solid var(--accent)">`:'<div style="width:80px;height:80px;border-radius:50%;background:#eee;margin:0 auto;display:flex;align-items:center;justify-content:center;font-size:2rem">👤</div>'}</div>
+      <div class="grid-2 mb-16"><div><b>Nama:</b> ${escHtml(p.nama)}</div><div><b>Tanggal:</b> ${formatDate(p.tanggal)}</div><div><b>Waktu:</b> ${p.waktu||'-'}</div><div><b>Tujuan:</b> ${escHtml(p.tujuanDinas||'-')}</div><div><b>GPS:</b> ${p.lat?.toFixed(5)||'-'}, ${p.lng?.toFixed(5)||'-'}</div><div><b>Akurasi:</b> ${p.accuracy?p.accuracy.toFixed(0)+'m':'-'}</div></div>
+      ${p.keteranganDinas?`<div><b>Keterangan:</b><div class="text-sm mt-8">${escHtml(p.keteranganDinas)}</div></div>`:''}`);
+  });
 }
