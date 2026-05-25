@@ -1122,19 +1122,22 @@ async function processAbsenImportText(text){const rows=parseCsvRows(text);if(row
 
 // ── EDIT ABSEN PER KARYAWAN ───────────────────────────────────
 async function editAbsenKaryawan(userId, nama, bulan) {
+  if(!userId||!bulan){toast('Data tidak valid','error');return;}
   const days = getMonthDays(bulan);
   const startDate = bulan + '-01', endDate = bulan + '-' + String(days).padStart(2, '0');
-  const snap = await db.collection('hrd_absensi').where('userId', '==', userId).where('tanggal', '>=', startDate).where('tanggal', '<=', endDate).get();
-  
-  // Count attendance
   let masuk = 0, pulang = 0, dinas = 0, lembur = 0;
-  snap.forEach(d => {
-    const p = d.data();
-    if (p.tipe === 'masuk') masuk++;
-    if (p.tipe === 'pulang') pulang++;
-    if (p.tipe === 'dinas_luar') dinas++;
-    if (p.tipe === 'pulang' && p.lembur) lembur += (p.lemburJam || 0);
-  });
+  try{
+    const snap = await db.collection('hrd_absensi').where('userId', '==', userId).get();
+    snap.forEach(d => {
+      const p = d.data();
+      if(p.tanggal>=startDate&&p.tanggal<=endDate){
+        if (p.tipe === 'masuk') masuk++;
+        if (p.tipe === 'pulang') pulang++;
+        if (p.tipe === 'dinas_luar') dinas++;
+        if (p.tipe === 'pulang' && p.lembur) lembur += (p.lemburJam || 0);
+      }
+    });
+  }catch(e){console.error('editAbsenKaryawan error:',e);}
 
   openModal(`<div class="modal-title">✏️ Edit Absensi — ${escHtml(nama)}</div>
     <div class="text-sm mb-16" style="color:#666">Periode: ${bulan} (${days} hari)</div>
@@ -1154,7 +1157,7 @@ async function editAbsenKaryawan(userId, nama, bulan) {
       <div class="form-group"><label>Status</label><select class="form-control" id="editAbsStatus"><option value="tepat_waktu">Tepat Waktu</option><option value="hadir">Hadir</option><option value="terlambat">Terlambat</option><option value="lengkap">Lengkap</option><option value="kurang_jam">Kurang Jam</option></select></div>
     </div>
     <div class="flex gap-8 mt-16">
-      <button class="btn btn-primary" onclick="simpanEditAbsen('${userId}','${escHtml(nama)}')">💾 Simpan</button>
+      <button class="btn btn-primary" onclick="simpanEditAbsen('${userId}','${nama.replace(/'/g,"\\'")}')">💾 Simpan</button>
       <button class="btn btn-danger" onclick="hapusAbsenHari('${userId}')">🗑️ Hapus Absen Tanggal Ini</button>
     </div>`, true);
 }
