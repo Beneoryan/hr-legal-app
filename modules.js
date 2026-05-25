@@ -2772,15 +2772,23 @@ async function simpanEditInsentif(id){
 // ── TAX & BPJS CALCULATOR ─────────────────────────────────────
 async function renderTaxCalc(){
   const main=document.getElementById('mainContent');
+  const kSnap=await db.collection('hrd_karyawan').where('status','==','aktif').get();
+  let karyOpts='<option value="">-- Input Manual --</option>';
+  kSnap.forEach(d=>{const k=d.data();karyOpts+=`<option value="${k.gajiPokok||0}" data-nama="${escHtml(k.nama)}">${escHtml(k.nama)} — ${formatCurrency(k.gajiPokok||0)}</option>`;});
   main.innerHTML=`<div class="page-title"><span>🧮 Tax & BPJS Calculator</span></div>
     <div class="grid-2">
       <div class="card">
         <div class="card-title mb-16">🧮 Kalkulator Gaji</div>
+        <div class="form-group"><label>Pilih Karyawan (atau input manual)</label><select class="form-control" id="tcKarySelect" onchange="onTcKarySelect()">${karyOpts}</select></div>
         <div class="form-group"><label>Gaji Pokok (Rp)</label><input class="form-control" type="number" id="tcGaji" value="5000000" oninput="calcTax()"></div>
         <div class="form-group"><label>Tunjangan (Rp)</label><input class="form-control" type="number" id="tcTunj" value="0" oninput="calcTax()"></div>
         <div class="form-group"><label>Lembur (Rp)</label><input class="form-control" type="number" id="tcLembur" value="0" oninput="calcTax()"></div>
         <div class="form-group"><label>Status PTKP</label><select class="form-control" id="tcPTKP" onchange="calcTax()"><option value="54000000">TK/0 (Rp 54.000.000)</option><option value="58500000">K/0 (Rp 58.500.000)</option><option value="63000000">K/1 (Rp 63.000.000)</option><option value="67500000">K/2 (Rp 67.500.000)</option><option value="72000000">K/3 (Rp 72.000.000)</option></select></div>
-        <div id="tcResult" style="background:#f8f9ff;padding:16px;border-radius:8px;margin-top:16px"></div>
+        <div style="background:#f8f9ff;padding:16px;border-radius:8px;margin-top:16px;border:1px solid var(--border)">
+          <div class="fw-700 mb-12" style="color:var(--accent)">Hasil Perhitungan:</div>
+          <div id="tcResultRows"></div>
+          <div id="tcResultFooter" class="mt-12"></div>
+        </div>
       </div>
       <div class="card">
         <div class="card-title mb-16">📊 Potongan per Karyawan</div>
@@ -2789,7 +2797,7 @@ async function renderTaxCalc(){
     </div>`;
   calcTax();loadTaxKaryList();
 }
-
+function onTcKarySelect(){const sel=document.getElementById('tcKarySelect');if(sel.value){document.getElementById('tcGaji').value=sel.value;calcTax();}}
 function calcTax(){
   const gaji=Number(document.getElementById('tcGaji')?.value)||0;
   const tunj=Number(document.getElementById('tcTunj')?.value)||0;
@@ -2807,18 +2815,16 @@ function calcTax(){
   else if(nettoTahunan<=500000000)pph=3000000+28500000+(nettoTahunan-250000000)*0.25;
   else pph=3000000+28500000+62500000+(nettoTahunan-500000000)*0.30;
   const pphBulanan=Math.round(pph/12);
-  const totalPot=bpjsKes+bpjsTK+pphBulanan;
-  const thp=bruto-totalPot;
-  document.getElementById('tcResult').innerHTML=`
-    <div class="text-sm fw-700 mb-8" style="color:var(--accent)">Hasil Perhitungan:</div>
-    <table style="width:100%;font-size:.82rem"><tr><td>Bruto</td><td style="text-align:right">${formatCurrency(bruto)}</td></tr>
-    <tr><td>BPJS Kes (1% karyawan)</td><td style="text-align:right;color:var(--danger)">-${formatCurrency(bpjsKes)}</td></tr>
-    <tr><td>BPJS TK/JHT (2% karyawan)</td><td style="text-align:right;color:var(--danger)">-${formatCurrency(bpjsTK)}</td></tr>
-    <tr><td>PPH 21/bulan</td><td style="text-align:right;color:var(--danger)">-${formatCurrency(pphBulanan)}</td></tr>
-    <tr style="border-top:2px solid var(--accent);font-weight:700"><td>Take Home Pay</td><td style="text-align:right">${formatCurrency(thp)}</td></tr></table>
-    <div class="mt-16 text-xs" style="color:#666"><b>Kontribusi Perusahaan:</b><br>BPJS Kes (4%): ${formatCurrency(bpjsKesPerusahaan)}<br>BPJS TK (3.7%): ${formatCurrency(bpjsTKPerusahaan)}</div>`;
+  const thp=bruto-bpjsKes-bpjsTK-pphBulanan;
+  const row=(label,val,isNeg)=>`<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #eee"><span style="font-size:.85rem">${label}</span><span style="font-size:.85rem;${isNeg?'color:var(--accent)':''};font-weight:${isNeg?'400':'400'}">${isNeg?'-':''}${formatCurrency(Math.abs(val))}</span></div>`;
+  document.getElementById('tcResultRows').innerHTML=
+    row('Bruto',bruto,false)+
+    row('BPJS Kes (1% karyawan)',bpjsKes,true)+
+    row('BPJS TK/JHT (2% karyawan)',bpjsTK,true)+
+    row('PPH 21/bulan',pphBulanan,true)+
+    `<div style="display:flex;justify-content:space-between;padding:12px 0;font-weight:700;font-size:1.05rem;border-top:2px solid var(--accent);margin-top:4px"><span>Take Home Pay</span><span>${formatCurrency(thp)}</span></div>`;
+  document.getElementById('tcResultFooter').innerHTML=`<div style="font-size:.75rem;color:#666;padding-top:8px;border-top:1px dashed #ddd"><b>Kontribusi Perusahaan:</b><br>BPJS Kes (4%): ${formatCurrency(bpjsKesPerusahaan)}<br>BPJS TK (3.7%): ${formatCurrency(bpjsTKPerusahaan)}</div>`;
 }
-
 async function loadTaxKaryList(){
   const snap=await db.collection('hrd_karyawan').where('status','==','aktif').get();
   let h='<div class="table-wrap"><table><thead><tr><th>Nama</th><th>Gaji</th><th>BPJS Kes</th><th>BPJS TK</th><th>PPH21</th><th>THP</th></tr></thead><tbody>';
@@ -2827,7 +2833,7 @@ async function loadTaxKaryList(){
     const netto=Math.max(0,(gaji-bpjsKes-bpjsTK)*12-54000000);
     let pph=0;if(netto<=60000000)pph=netto*0.05;else if(netto<=250000000)pph=3000000+(netto-60000000)*0.15;else pph=3000000+28500000+(netto-250000000)*0.25;
     const pphBln=Math.round(pph/12);const thp=gaji-bpjsKes-bpjsTK-pphBln;
-    h+=`<tr><td class="fw-700">${escHtml(k.nama)}</td><td>${formatCurrency(gaji)}</td><td style="color:var(--danger)">${formatCurrency(bpjsKes)}</td><td style="color:var(--danger)">${formatCurrency(bpjsTK)}</td><td style="color:var(--danger)">${formatCurrency(pphBln)}</td><td class="fw-700">${formatCurrency(thp)}</td></tr>`;
+    h+=`<tr><td class="fw-700">${escHtml(k.nama)}</td><td>${formatCurrency(gaji)}</td><td style="color:var(--accent)">${formatCurrency(bpjsKes)}</td><td style="color:var(--accent)">${formatCurrency(bpjsTK)}</td><td style="color:var(--accent)">${formatCurrency(pphBln)}</td><td class="fw-700">${formatCurrency(thp)}</td></tr>`;
   });
   h+='</tbody></table></div>';
   document.getElementById('tcKaryList').innerHTML=h;
