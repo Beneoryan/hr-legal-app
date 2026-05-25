@@ -2555,34 +2555,36 @@ async function renderApprovalCenter(){
 
 function viewApprovalDetail(col,id){
   db.collection(col).doc(id).get().then(d=>{
-    const p=d.data();const type=col.replace('hrd_','');
-    let html=`<div class="modal-title">📋 Detail Pengajuan — ${type.toUpperCase()}</div>`;
-    html+=`<div class="grid-2 mb-16">`;
+    const p=d.data();const type=col.replace('hrd_','').replace('_',' ').toUpperCase();
+    let html=`<div class="modal-title">📋 Detail Pengajuan — ${type}</div>`;
+    html+=`<div style="background:#f8f9ff;padding:16px;border-radius:8px;margin-bottom:16px">`;
+    html+=`<div class="grid-2" style="gap:12px">`;
     html+=`<div><b>Nama:</b> ${escHtml(p.nama||'-')}</div>`;
-    html+=`<div><b>Status:</b> <span class="badge badge-${p.status==='approved'?'success':p.status==='rejected'?'danger':'warning'}">${p.status}</span></div>`;
+    html+=`<div><b>Status:</b> <span class="badge badge-${p.status==='approved'?'success':p.status==='rejected'?'danger':'warning'}">${p.status||'pending'}</span></div>`;
     html+=`<div><b>Tanggal Ajuan:</b> ${formatDateTime(p.createdAt)}</div>`;
     if(p.departemen)html+=`<div><b>Departemen:</b> ${escHtml(p.departemen)}</div>`;
+    if(p.userId)html+=`<div><b>User ID:</b> ${escHtml(p.userId)}</div>`;
     if(p.jenis)html+=`<div><b>Jenis:</b> ${escHtml(p.jenis)}</div>`;
     if(p.kategori)html+=`<div><b>Kategori:</b> ${escHtml(p.kategori)}</div>`;
+    if(p.tanggal)html+=`<div><b>Tanggal Pelaksanaan:</b> ${formatDate(p.tanggal)}</div>`;
     if(p.mulai)html+=`<div><b>Mulai:</b> ${formatDate(p.mulai)}</div>`;
     if(p.selesai)html+=`<div><b>Selesai:</b> ${formatDate(p.selesai)}</div>`;
     if(p.durasi)html+=`<div><b>Durasi:</b> ${p.durasi} hari</div>`;
-    if(p.tanggal)html+=`<div><b>Tanggal:</b> ${formatDate(p.tanggal)}</div>`;
     if(p.jamMulai)html+=`<div><b>Jam Mulai:</b> ${p.jamMulai}</div>`;
     if(p.jamSelesai)html+=`<div><b>Jam Selesai:</b> ${p.jamSelesai}</div>`;
     if(p.jumlah)html+=`<div><b>Jumlah:</b> ${formatCurrency(p.jumlah)}</div>`;
     if(p.cicilan)html+=`<div><b>Cicilan:</b> ${p.cicilan}x</div>`;
-    if(p.tujuan)html+=`<div><b>Tujuan/Lokasi:</b> ${escHtml(p.tujuan)}</div>`;
+    if(p.tujuan)html+=`<div><b>Tujuan / Lokasi:</b> ${escHtml(p.tujuan)}</div>`;
     if(p.jamBerangkat)html+=`<div><b>Jam Berangkat:</b> ${p.jamBerangkat}</div>`;
     if(p.jamKembali)html+=`<div><b>Estimasi Kembali:</b> ${p.jamKembali}</div>`;
-    if(p.approvalStep!==undefined)html+=`<div><b>Step Approval:</b> ${p.approvalStep+1}</div>`;
+    if(p.approvalStep!==undefined)html+=`<div><b>Step Approval:</b> Step ${p.approvalStep+1}</div>`;
     if(p.lastApprovedBy)html+=`<div><b>Terakhir disetujui:</b> ${escHtml(p.lastApprovedBy)}</div>`;
-    html+=`</div>`;
-    if(p.keperluan)html+=`<div class="mb-16"><b>Keperluan:</b><div class="text-sm mt-8" style="background:#f8f9ff;padding:12px;border-radius:6px;white-space:pre-wrap">${escHtml(p.keperluan)}</div></div>`;
-    if(p.keterangan)html+=`<div class="mb-16"><b>Keterangan:</b><div class="text-sm mt-8" style="background:#f8f9ff;padding:12px;border-radius:6px;white-space:pre-wrap">${escHtml(p.keterangan)}</div></div>`;
-    if(p.alasan)html+=`<div class="mb-16"><b>Alasan:</b><div class="text-sm mt-8" style="background:#f8f9ff;padding:12px;border-radius:6px">${escHtml(p.alasan)}</div></div>`;
-    if(p.approvalHistory&&p.approvalHistory.length){html+=`<div class="mb-16"><b>Riwayat Approval:</b><div class="mt-8">`;p.approvalHistory.forEach(h2=>{html+=`<div style="padding:6px 0;border-bottom:1px solid #eee;font-size:.82rem"><span class="badge badge-${h2.action==='approved'?'success':'danger'}" style="font-size:.6rem">${h2.action==='approved'?'✓':'✗'}</span> <b>${escHtml(h2.nama)}</b> <span style="color:#999">(${escHtml(h2.role||'')})</span> — ${formatDateTime(h2.at)}</div>`;});html+=`</div></div>`;}
-    if(p.approvedBy&&!p.approvalHistory)html+=`<div class="mb-16"><b>Diproses oleh:</b> ${escHtml(p.approvedBy)} (${formatDateTime(p.approvedAt)})</div>`;
+    if(p.approvedBy)html+=`<div><b>Disetujui oleh:</b> ${escHtml(p.approvedBy)}</div>`;
+    html+=`</div></div>`;
+    if(p.keperluan)html+=`<div class="mb-16"><div class="fw-700 mb-4">📝 Keperluan:</div><div style="background:#fff;padding:12px;border-radius:6px;border:1px solid var(--border);white-space:pre-wrap;font-size:.85rem">${escHtml(p.keperluan)}</div></div>`;
+    if(p.keterangan)html+=`<div class="mb-16"><div class="fw-700 mb-4">📝 Keterangan:</div><div style="background:#fff;padding:12px;border-radius:6px;border:1px solid var(--border);white-space:pre-wrap;font-size:.85rem">${escHtml(p.keterangan)}</div></div>`;
+    if(p.alasan)html+=`<div class="mb-16"><div class="fw-700 mb-4">📝 Alasan:</div><div style="background:#fff;padding:12px;border-radius:6px;border:1px solid var(--border);font-size:.85rem">${escHtml(p.alasan)}</div></div>`;
+    if(p.approvalHistory&&p.approvalHistory.length){html+=`<div class="mb-16"><div class="fw-700 mb-8">📋 Riwayat Approval:</div>`;p.approvalHistory.forEach(h2=>{html+=`<div style="padding:6px 10px;margin-bottom:4px;border-radius:6px;font-size:.82rem;background:${h2.action==='approved'?'#e8f5e9':'#ffebee'}"><span class="fw-700">${h2.action==='approved'?'✅':'❌'} ${escHtml(h2.nama)}</span> <span style="color:#666">(${escHtml(h2.role||'')})</span> — <span style="color:#999">${formatDateTime(h2.at)}</span></div>`;});html+=`</div>`;}
     html+=`<div class="flex gap-8 mt-16"><button class="btn btn-success" onclick="approveItem('${col}','${id}','approved')">✅ Approve</button><button class="btn btn-danger" onclick="approveItem('${col}','${id}','rejected')">❌ Reject</button></div>`;
     openModal(html,true);
   });
