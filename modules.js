@@ -6,18 +6,35 @@
 // ── DASHBOARD ─────────────────────────────────────────────────
 async function renderDashboard() {
   const main=document.getElementById('mainContent');
-  main.innerHTML='<div class="page-title"><span>📊 Dashboard</span></div><div class="stats-grid" id="dashStats">Loading...</div><div class="grid-2" id="dashWidgets"></div>';
-  const[karyawan,cuti,absen,pengumuman]=await Promise.all([db.collection('hrd_karyawan').get(),db.collection('hrd_cuti').where('status','==','pending').get(),db.collection('hrd_absensi').where('tanggal','==',todayStr()).get(),db.collection('hrd_pengumuman').get()]);
+  main.innerHTML='<div class="page-title"><span>🏠 Beranda</span></div><div class="stats-grid" id="dashStats">Loading...</div><div class="grid-2" id="dashWidgets"></div>';
+  const[karyawan,cuti,absen,pengumuman,overtime,reimburse,dinas]=await Promise.all([db.collection('hrd_karyawan').where('status','==','aktif').get(),db.collection('hrd_cuti').where('status','==','pending').get(),db.collection('hrd_absensi').where('tanggal','==',todayStr()).get(),db.collection('hrd_pengumuman').get(),db.collection('hrd_overtime').where('status','==','pending').get(),db.collection('hrd_reimbursement').where('status','==','pending').get(),db.collection('hrd_dinas_luar').where('status','==','pending').get()]);
+  const totalPending=cuti.size+overtime.size+reimburse.size+dinas.size;
   document.getElementById('dashStats').innerHTML=`
-    <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-value">${karyawan.size}</div><div class="stat-label">Total Karyawan</div></div>
-    <div class="stat-card"><div class="stat-icon">📍</div><div class="stat-value">${absen.size}</div><div class="stat-label">Hadir Hari Ini</div></div>
-    <div class="stat-card"><div class="stat-icon">🏖️</div><div class="stat-value">${cuti.size}</div><div class="stat-label">Cuti Pending</div></div>
-    <div class="stat-card"><div class="stat-icon">📢</div><div class="stat-value">${pengumuman.size}</div><div class="stat-label">Pengumuman</div></div>`;
-  let aHtml='<div class="card"><div class="card-title">📢 Pengumuman Terbaru</div>';
-  if(pengumuman.empty)aHtml+='<p class="text-sm" style="color:#999;margin-top:8px">Belum ada</p>';
-  else pengumuman.forEach(d=>{const p=d.data();aHtml+=`<div style="padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="viewPengumuman('${d.id}')"><div class="fw-700 text-sm">${escHtml(p.judul)}</div><div class="text-xs" style="color:#999">${formatDate(p.createdAt)}</div></div>`;});
-  aHtml+='</div>';
-  document.getElementById('dashWidgets').innerHTML=aHtml+'<div class="card"><div class="card-title">⚡ Aksi Cepat</div><div class="flex flex-wrap gap-8 mt-8"><button class="btn btn-primary btn-sm" onclick="navigateTo(\'absensi\')">📍 Absensi</button><button class="btn btn-info btn-sm" onclick="navigateTo(\'cuti\')">🏖️ Cuti</button><button class="btn btn-sm" style="background:#ff6f00;color:#fff" onclick="navigateTo(\'overtime\')">⏰ Overtime</button><button class="btn btn-success btn-sm" onclick="navigateTo(\'karyawan\')">👥 Karyawan</button><button class="btn btn-warning btn-sm" onclick="navigateTo(\'approval-center\')">✅ Approval</button><button class="btn btn-sm" style="background:#7b1fa2;color:#fff" onclick="navigateTo(\'penggajian\')">💰 Penggajian</button><button class="btn btn-sm" style="background:#00796b;color:#fff" onclick="navigateTo(\'reimbursement\')">🧾 Reimburse</button><button class="btn btn-sm" style="background:#1565c0;color:#fff" onclick="navigateTo(\'meeting\')">📅 Meeting</button><button class="btn btn-sm" style="background:#4e342e;color:#fff" onclick="navigateTo(\'chat\')">💬 Obrolan</button><button class="btn btn-sm" style="background:#37474f;color:#fff" onclick="navigateTo(\'broadcast\')">📡 Broadcast</button></div></div>';
+    <div class="stat-card" style="cursor:pointer" onclick="navigateTo('karyawan')"><div class="stat-icon">👥</div><div class="stat-value">${karyawan.size}</div><div class="stat-label">Total Karyawan</div></div>
+    <div class="stat-card" style="cursor:pointer" onclick="navigateTo('absensi')"><div class="stat-icon">📍</div><div class="stat-value">${absen.size}</div><div class="stat-label">Hadir Hari Ini</div></div>
+    <div class="stat-card" style="cursor:pointer" onclick="navigateTo('approval-center')"><div class="stat-icon">📋</div><div class="stat-value">${totalPending}</div><div class="stat-label">Pengajuan Pending</div></div>
+    <div class="stat-card" style="cursor:pointer" onclick="navigateTo('pengumuman')"><div class="stat-icon">📢</div><div class="stat-value">${pengumuman.size}</div><div class="stat-label">Pengumuman</div></div>`;
+  // Widgets
+  let widgetLeft='<div class="card"><div class="card-title mb-8">📋 Pengajuan Menunggu Approval</div>';
+  if(!totalPending)widgetLeft+='<p class="text-sm" style="color:#999">Tidak ada pengajuan pending</p>';
+  else{
+    widgetLeft+=`<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">`;
+    if(cuti.size)widgetLeft+=`<div style="cursor:pointer;padding:8px 12px;background:#fff3e0;border-radius:8px;font-size:.82rem" onclick="navigateTo('cuti')"><span class="fw-700">${cuti.size}</span> Cuti/Izin</div>`;
+    if(overtime.size)widgetLeft+=`<div style="cursor:pointer;padding:8px 12px;background:#e3f2fd;border-radius:8px;font-size:.82rem" onclick="navigateTo('overtime')"><span class="fw-700">${overtime.size}</span> Overtime</div>`;
+    if(reimburse.size)widgetLeft+=`<div style="cursor:pointer;padding:8px 12px;background:#e8f5e9;border-radius:8px;font-size:.82rem" onclick="navigateTo('reimbursement')"><span class="fw-700">${reimburse.size}</span> Reimburse</div>`;
+    if(dinas.size)widgetLeft+=`<div style="cursor:pointer;padding:8px 12px;background:#fce4ec;border-radius:8px;font-size:.82rem" onclick="navigateTo('absensi')"><span class="fw-700">${dinas.size}</span> Dinas Luar</div>`;
+    widgetLeft+=`</div>`;
+  }
+  widgetLeft+='</div>';
+  // Pengumuman
+  widgetLeft+='<div class="card"><div class="card-title mb-8">📢 Pengumuman Terbaru</div>';
+  if(pengumuman.empty)widgetLeft+='<p class="text-sm" style="color:#999">Belum ada</p>';
+  else{const items=[];pengumuman.forEach(d=>items.push({id:d.id,...d.data()}));items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));items.slice(0,5).forEach(p=>{widgetLeft+=`<div style="padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="viewPengumuman('${p.id}')"><div class="fw-700 text-sm">${escHtml(p.judul)}</div><div class="text-xs" style="color:#999">${formatDate(p.createdAt)}</div></div>`;});}
+  widgetLeft+='</div>';
+  // Right: Aksi Cepat + Info User
+  let widgetRight=`<div class="card" style="border-left:4px solid var(--accent)"><div class="card-title mb-8">👤 ${escHtml(currentUser.nama)}</div><div class="text-sm" style="color:#666">${escHtml(currentUser.posisi||currentUser.role)} • ${escHtml(currentUser.departemen||'-')}</div></div>`;
+  widgetRight+='<div class="card"><div class="card-title mb-8">⚡ Aksi Cepat</div><div class="flex flex-wrap gap-8"><button class="btn btn-primary btn-sm" onclick="navigateTo(\'absensi\')">📍 Absensi</button><button class="btn btn-info btn-sm" onclick="navigateTo(\'cuti\')">🏖️ Cuti</button><button class="btn btn-sm" style="background:#ff6f00;color:#fff" onclick="navigateTo(\'overtime\')">⏰ Overtime</button><button class="btn btn-success btn-sm" onclick="navigateTo(\'karyawan\')">👥 Karyawan</button><button class="btn btn-warning btn-sm" onclick="navigateTo(\'approval-center\')">✅ Approval</button><button class="btn btn-sm" style="background:#7b1fa2;color:#fff" onclick="navigateTo(\'penggajian\')">💰 Penggajian</button><button class="btn btn-sm" style="background:#00796b;color:#fff" onclick="navigateTo(\'reimbursement\')">🧾 Reimburse</button><button class="btn btn-sm" style="background:#1565c0;color:#fff" onclick="navigateTo(\'meeting\')">📅 Meeting</button><button class="btn btn-sm" style="background:#4e342e;color:#fff" onclick="navigateTo(\'chat\')">💬 Obrolan</button><button class="btn btn-sm" style="background:#37474f;color:#fff" onclick="navigateTo(\'broadcast\')">📡 Broadcast</button></div></div>';
+  document.getElementById('dashWidgets').innerHTML=widgetLeft+widgetRight;
 }
 
 // ── DEPARTEMEN ────────────────────────────────────────────────
