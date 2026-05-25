@@ -2598,7 +2598,7 @@ async function generateAllApprovalFlows(){
   const kSnap=await db.collection('hrd_karyawan').where('status','!=','nonaktif').get();
   const karyawan=[];kSnap.forEach(d=>karyawan.push({id:d.id,...d.data()}));
   // Jenis pengajuan
-  const jenisArr=['Cuti/Izin','Overtime','Reimbursement','Kasbon','Insentif','Pelatihan','Perpanjangan Kontrak'];
+  const jenisArr=['Cuti/Izin','WFH','Dinas Luar','Overtime','Reimbursement','Kasbon','Insentif','Penggajian','Onboarding','Offboarding','Perpanjangan Kontrak','Pelatihan'];
   // For each staff/leader, create approval flow based on atasan hierarchy
   const staffAndLeaders=karyawan.filter(k=>{const pos=(k.posisi||'').toLowerCase();return!pos.includes('founder');});
   let count=0;
@@ -2696,7 +2696,7 @@ async function modalApprovalFlow(){
     const pos=(k.posisi||'').toUpperCase();if(pos.includes('HEAD')||pos.includes('MANAGER')||pos.includes('GENERAL')||pos.includes('FOUNDER'))approverOpts+=`<option value="${escHtml(k.nama)}">${escHtml(k.nama)} — ${escHtml(k.posisi||'')} (${escHtml(k.departemen||'')})</option>`;});
   let deptOpts='';depts.forEach(d=>{if(d)deptOpts+=`<option>${escHtml(d)}</option>`;});
   openModal(`<div class="modal-title">Tambah Approval Flow</div>
-    <div class="form-group"><label>Jenis Pengajuan</label><select class="form-control" id="afJenis"><option value="cuti">Cuti / Izin</option><option value="overtime">Overtime / Lembur</option><option value="reimbursement">Reimbursement</option><option value="kasbon">Kasbon & Loan</option><option value="insentif">Insentif</option><option value="penggajian">Penggajian</option><option value="onboarding">Onboarding</option><option value="offboarding">Offboarding</option><option value="kontrak">Perpanjangan Kontrak</option><option value="pelatihan">Pelatihan</option></select></div>
+    <div class="form-group"><label>Jenis Pengajuan</label><select class="form-control" id="afJenis"><option value="Cuti/Izin">Cuti / Izin</option><option value="WFH">WFH (Work From Home)</option><option value="Dinas Luar">Dinas Luar</option><option value="Overtime">Overtime / Lembur</option><option value="Reimbursement">Reimbursement</option><option value="Kasbon">Kasbon & Loan</option><option value="Insentif">Insentif</option><option value="Penggajian">Penggajian</option><option value="Onboarding">Onboarding</option><option value="Offboarding">Offboarding</option><option value="Perpanjangan Kontrak">Perpanjangan Kontrak</option><option value="Pelatihan">Pelatihan</option></select></div>
     <div class="form-group"><label>Departemen</label><select class="form-control" id="afDept" onchange="filterApprovalByDept()"><option value="">Semua Departemen</option>${deptOpts}</select></div>
     <div class="form-group"><label>Siapa yang Mengajukan</label><select class="form-control" id="afPengaju">${karyOpts}</select></div>
     <div class="form-group"><label>Approver Step 1</label><select class="form-control" id="afStep1"><option value="">-- Pilih --</option>${approverOpts}<option value="hr">HR (Role)</option><option value="admin">Admin (Role)</option><option value="superadmin">Super Admin (Role)</option></select></div>
