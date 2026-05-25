@@ -2494,59 +2494,45 @@ async function simpanAkun(id){
   }
 }
 
-// ── APPROVAL CENTER — dengan View detail + routing ke atasan ──
+// ── APPROVAL CENTER — Multi-step flow with department filtering ──
 async function renderApprovalCenter(){
   const main=document.getElementById('mainContent');
   main.innerHTML=`<div class="page-title"><span>✅ Approval Center</span></div><div class="card" id="approvalList">Loading...</div>`;
+  const myName=currentUser.nama?.toLowerCase()||'';
   const myDept=(currentUser.departemen||'').toLowerCase();
   const isAdmin=hasAccess(5);
   const isGM=(currentUser.posisi||'').toLowerCase().includes('general manager');
-  
-  // Load karyawan to get department mapping
+  // Load approval flows
+  const flowSnap=await db.collection('hrd_approval_flow').get();
+  const flows=[];flowSnap.forEach(d=>flows.push({id:d.id,...d.data()}));
+  // Load karyawan for dept mapping
   const karySnap=await db.collection('hrd_karyawan').get();
-  const deptMap={};// nama -> departemen
-  karySnap.forEach(d=>{const k=d.data();deptMap[(k.nama||'').toLowerCase()]=k.departemen||'';});
-
+  const deptMap={};karySnap.forEach(d=>{const k=d.data();deptMap[(k.nama||'').toLowerCase()]=k.departemen||'';});
   const collections=['hrd_cuti','hrd_overtime','hrd_reimbursement','hrd_kasbon'];
   let items=[];
   for(const col of collections){
-    const snap=await db.collection(col).where('status','==','pending').get();
-    snap.forEach(d=>{
-      const data={id:d.id,collection:col,...d.data()};
-      // Get department from karyawan data (more reliable than pengajuan doc)
-      const itemDept=(data.departemen||deptMap[(data.nama||'').toLowerCase()]||'').toLowerCase();
-      data._dept=itemDept;
-      // Department filtering
-      if(isAdmin||isGM){
-        items.push(data);
-      }else{
-        // Only show items from same department
-        if(itemDept===myDept)items.push(data);
-      }
-    });
+    try{const snap=await db.collection(col).where('status','in',['pending','step1','step2']).get();snap.forEach(d=>{const data={id:d.id,collection:col,...d.data()};data._dept=(data.departemen||deptMap[(data.nama||'').toLowerCase()]||'').toLowerCase();items.push(data);});}catch(e){const snap=await db.collection(col).where('status','==','pending').get();snap.forEach(d=>{const data={id:d.id,collection:col,...d.data()};data._dept=(data.departemen||deptMap[(data.nama||'').toLowerCase()]||'').toLowerCase();items.push(data);});}
   }
   items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
-  let h='';
-  if(!items.length) h='<div class="empty-state"><div class="icon">✅</div><p>Tidak ada pengajuan pending di departemen Anda</p></div>';
-  else items.forEach(item=>{
+  let h='';let visibleCount=0;
+  items.forEach(item=>{
+    const flow=flows.find(f=>f.pengaju?.toLowerCase()===item.nama?.toLowerCase());
+    const steps=flow?.steps||[];
+    const currentStep=item.approvalStep||0;
+    const currentApprover=steps[currentStep]?.nama?.toLowerCase()||'';
+    const canSee=isAdmin||isGM||(item._dept===myDept);
+    if(!canSee)return;
+    const isMyTurn=isAdmin||currentApprover===myName;
     const typeLabel=item.collection.replace('hrd_','').toUpperCase();
     const detail=item.jenis||item.kategori||'';
     const jumlah=item.jumlah?` — ${formatCurrency(item.jumlah)}`:'';
     const durasi=item.durasi?` (${item.durasi} hari)`:'';
-    const deptLabel=item._dept?item._dept.toUpperCase():'';
-    h+=`<div style="padding:14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-      <div style="flex:1">
-        <div><span class="badge badge-info">${typeLabel}</span> <span class="fw-700">${escHtml(item.nama)}</span>${deptLabel?` <span class="badge" style="background:#eee;color:#555;font-size:.6rem">${escHtml(deptLabel)}</span>`:''}</div>
-        <div class="text-sm" style="color:#555;margin-top:4px">${escHtml(detail)}${durasi}${jumlah}</div>
-        <div class="text-xs" style="color:#999;margin-top:2px">${formatDateTime(item.createdAt)}</div>
-      </div>
-      <div class="flex gap-8">
-        <button class="btn btn-xs btn-primary" onclick="viewApprovalDetail('${item.collection}','${item.id}')">👁️</button>
-        <button class="btn btn-xs btn-success" onclick="approveItem('${item.collection}','${item.id}','approved')">✅</button>
-        <button class="btn btn-xs btn-danger" onclick="approveItem('${item.collection}','${item.id}','rejected')">❌</button>
-      </div>
-    </div>`;
+    let progressHtml='';
+    if(steps.length){progressHtml='<div class="flex gap-4 mt-8" style="flex-wrap:wrap">';steps.forEach((s,i)=>{const done=i<currentStep;const active=i===currentStep;const color=done?'#2e7d32':active?'var(--accent)':'#ccc';progressHtml+=`<span style="font-size:.6rem;padding:2px 6px;border-radius:4px;background:${done?'#e8f5e9':active?'#fce4ec':'#f5f5f5'};color:${color};border:1px solid ${color}">${done?'✓ ':''}${escHtml(s.nama||'')}</span>`;if(i<steps.length-1)progressHtml+=`<span style="color:#ccc;font-size:.6rem">→</span>`;});progressHtml+='</div>';}
+    visibleCount++;
+    h+=`<div style="padding:14px;border-bottom:1px solid var(--border)"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px"><div style="flex:1"><div><span class="badge badge-info">${typeLabel}</span> <span class="fw-700">${escHtml(item.nama)}</span> <span class="badge" style="background:#eee;color:#555;font-size:.6rem">${escHtml(item._dept?.toUpperCase()||'')}</span></div><div class="text-sm" style="color:#555;margin-top:4px">${escHtml(detail)}${durasi}${jumlah}</div><div class="text-xs" style="color:#999;margin-top:2px">${formatDateTime(item.createdAt)}</div></div><div class="flex gap-8"><button class="btn btn-xs btn-primary" onclick="viewApprovalDetail('${item.collection}','${item.id}')">👁️</button>${isMyTurn?`<button class="btn btn-xs btn-success" onclick="approveItem('${item.collection}','${item.id}','approved')">✅</button><button class="btn btn-xs btn-danger" onclick="approveItem('${item.collection}','${item.id}','rejected')">❌</button>`:`<span class="badge badge-warning" style="font-size:.6rem">Menunggu ${escHtml(steps[currentStep]?.nama||'')}</span>`}</div></div>${progressHtml}</div>`;
   });
+  if(!visibleCount)h='<div class="empty-state"><div class="icon">✅</div><p>Tidak ada pengajuan pending</p></div>';
   document.getElementById('approvalList').innerHTML=h;
 }
 
@@ -2576,14 +2562,29 @@ function viewApprovalDetail(col,id){
 }
 
 async function approveItem(col,id,status){
-  await db.collection(col).doc(id).update({status,approvedBy:currentUser.nama,approvedAt:new Date().toISOString()});
-  // Notify the requester
   const doc=await db.collection(col).doc(id).get();
   const data=doc.data();
-  if(data.userId)await sendNotification(data.userId,`${status==='approved'?'✅ Disetujui':'❌ Ditolak'}`,`Pengajuan ${data.jenis||data.kategori||col.replace('hrd_','')} Anda telah ${status} oleh ${currentUser.nama}`);
-  closeModalDirect();
-  toast(status==='approved'?'Disetujui':'Ditolak','success');
-  renderApprovalCenter();
+  const currentStep=data.approvalStep||0;
+  const history=data.approvalHistory||[];
+  history.push({nama:currentUser.nama,role:currentUser.role,action:status,at:new Date().toISOString()});
+  if(status==='rejected'){
+    await db.collection(col).doc(id).update({status:'rejected',approvedBy:currentUser.nama,approvedAt:new Date().toISOString(),approvalHistory:history});
+    if(data.userId)await sendNotification(data.userId,'❌ Ditolak',`Pengajuan ${data.jenis||col.replace('hrd_','')} ditolak oleh ${currentUser.nama}`);
+  }else{
+    const flowSnap=await db.collection('hrd_approval_flow').where('pengaju','==',data.nama).get();
+    let steps=[];flowSnap.forEach(d=>{const f=d.data();if(!steps.length)steps=f.steps||[];});
+    const nextStep=currentStep+1;
+    if(nextStep<steps.length){
+      await db.collection(col).doc(id).update({status:`step${nextStep}`,approvalStep:nextStep,approvalHistory:history,lastApprovedBy:currentUser.nama});
+      const nextApprover=steps[nextStep];
+      if(nextApprover?.nama){const uSnap=await db.collection('hrd_users').where('nama','==',nextApprover.nama).limit(1).get();if(!uSnap.empty)await sendNotification(uSnap.docs[0].id,'📋 Perlu Approval',`${data.nama}: ${data.jenis||col.replace('hrd_','')} — disetujui ${currentUser.nama}, menunggu Anda`);}
+      if(data.userId)await sendNotification(data.userId,'⏳ Proses',`Disetujui ${currentUser.nama}, menunggu ${nextApprover?.nama||'selanjutnya'}`);
+    }else{
+      await db.collection(col).doc(id).update({status:'approved',approvedBy:currentUser.nama,approvedAt:new Date().toISOString(),approvalStep:nextStep,approvalHistory:history});
+      if(data.userId)await sendNotification(data.userId,'✅ Disetujui (Final)',`Pengajuan ${data.jenis||col.replace('hrd_','')} DISETUJUI oleh ${currentUser.nama}`);
+    }
+  }
+  closeModalDirect();toast(status==='approved'?'Disetujui':'Ditolak','success');renderApprovalCenter();
 }
 
 // ── APPROVAL MANAGEMENT ───────────────────────────────────────
