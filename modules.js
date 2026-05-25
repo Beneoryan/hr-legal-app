@@ -3158,7 +3158,16 @@ async function renderPortalBroadcast(){
 // ── PORTAL MEETING PAGE ───────────────────────────────────────
 async function renderPortalMeeting(){
   const main=document.getElementById('mainContent');
-  main.innerHTML=`<div class="page-title"><span>📅 Meeting</span></div><div class="card" id="portalMtList">Loading...</div>`;
+  main.innerHTML=`<div class="page-title"><span>📅 Meeting</span><button class="btn btn-success btn-sm" onclick="startInstantMeeting()">🎥 Meeting Online</button></div>
+    <div class="card mb-16"><div class="card-title mb-8">🎥 Meeting Online Aktif</div><div id="portalOnlineMeetings">Loading...</div></div>
+    <div class="card" id="portalMtList">Loading...</div>`;
+  // Load online meetings
+  const onlineSnap=await db.collection('hrd_online_meeting').where('status','==','active').get();
+  let onlineH='';
+  if(onlineSnap.empty)onlineH='<p class="text-sm" style="color:#999">Tidak ada meeting online aktif saat ini</p>';
+  else onlineSnap.forEach(d=>{const m=d.data();onlineH+=`<div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between"><div><div class="fw-700 text-sm">${escHtml(m.judul||'Meeting Online')}</div><div class="text-xs" style="color:#999">${escHtml(m.createdByName||'')} — ${formatDateTime(m.createdAt)}</div></div><button class="btn btn-xs btn-success" onclick="joinOnlineMeeting('${m.roomId}')">🎥 Join</button></div>`;});
+  document.getElementById('portalOnlineMeetings').innerHTML=onlineH;
+  // Load regular meetings
   const snap=await db.collection('hrd_meeting').get();
   const items=[];snap.forEach(d=>items.push({id:d.id,...d.data()}));
   items.sort((a,b)=>(b.tanggal||'').localeCompare(a.tanggal||''));
