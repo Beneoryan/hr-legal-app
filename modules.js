@@ -2072,11 +2072,13 @@ function openChatThread(threadId) {
       messages.forEach(p => {
         const isMine = p.senderId === currentUser.id;
         const time=p.createdAt?new Date(p.createdAt).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}):'';
+        const senderLabel=isMine?'':`<div class="msg-sender" style="font-size:.7rem;font-weight:700;color:var(--primary);margin-bottom:2px;padding-left:2px">${escHtml(p.senderName||'?')}</div>`;
         html += `<div class="chat-msg${isMine?' mine':''}">
-          <div class="msg-avatar">${(p.senderName||'?').charAt(0)}</div>
+          <div class="msg-avatar" title="${escHtml(p.senderName||'')}">${(p.senderName||'?').charAt(0)}</div>
           <div class="msg-content">
+            ${senderLabel}
             <div class="msg-body">${escHtml(p.message)}</div>
-            <div class="msg-time">${isMine?'':escHtml(p.senderName)+' • '}${time}</div>
+            <div class="msg-time">${time}</div>
           </div>
         </div>`;
       });
@@ -3158,7 +3160,7 @@ async function renderPortalBroadcast(){
 // ── PORTAL MEETING PAGE ───────────────────────────────────────
 async function renderPortalMeeting(){
   const main=document.getElementById('mainContent');
-  main.innerHTML=`<div class="page-title"><span>📅 Meeting</span><button class="btn btn-success btn-sm" onclick="startInstantMeeting()">🎥 Meeting Online</button></div>
+  main.innerHTML=`<div class="page-title"><span>📅 Meeting</span><div class="flex gap-8"><button class="btn btn-success btn-sm" onclick="startInstantMeeting()">🎥 Meeting Online</button><button class="btn btn-primary btn-sm" onclick="modalMeetingCreate()">+ Buat Meeting</button></div></div>
     <div class="card mb-16"><div class="card-title mb-8">🎥 Meeting Online Aktif</div><div id="portalOnlineMeetings">Loading...</div></div>
     <div class="card" id="portalMtList">Loading...</div>`;
   // Load online meetings
