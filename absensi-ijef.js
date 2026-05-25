@@ -1168,15 +1168,23 @@ async function simpanEditAbsen(userId, nama) {
   const waktu = document.getElementById('editAbsWaktu').value;
   const status = document.getElementById('editAbsStatus').value;
   if (!tgl) return toast('Pilih tanggal', 'warning');
+  if (!waktu) return toast('Isi waktu', 'warning');
 
-  await db.collection('hrd_absensi').add({
-    userId, nama, tanggal: tgl, waktu, tipe, status,
-    departemen: '', manual: true, editedBy: currentUser.nama,
-    createdAt: new Date().toISOString()
-  });
-  toast('Absensi ditambahkan', 'success');
-  closeModalDirect();
-  loadRekapGrid();
+  try{
+    await db.collection('hrd_absensi').add({
+      userId, nama, tanggal: tgl, waktu, tipe, status,
+      departemen: currentUser.departemen||'', 
+      manual: true, editedBy: currentUser.nama,
+      createdAt: new Date().toISOString()
+    });
+    toast('✅ Absensi berhasil ditambahkan! Rekap akan diupdate.', 'success');
+    closeModalDirect();
+    // Reload rekap after short delay to ensure Firestore synced
+    setTimeout(()=>loadRekapGrid(), 500);
+  }catch(e){
+    toast('Gagal simpan: '+e.message, 'error');
+    console.error('simpanEditAbsen error:', e);
+  }
 }
 
 async function hapusAbsenHari(userId) {
