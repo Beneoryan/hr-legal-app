@@ -1010,7 +1010,7 @@ async function loadRekapGrid(){
   const bulan=document.getElementById('rekapBulan')?.value||monthStr();
   const days=getMonthDays(bulan);
   const startDate=bulan+'-01',endDate=bulan+'-'+String(days).padStart(2,'0');
-  const[usersSnap,absenSnap,settDoc,cutiSnap,overtimeSnap,hariLiburSnap]=await Promise.all([db.collection('hrd_karyawan').where('status','==','aktif').get(),db.collection('hrd_absensi').where('tanggal','>=',startDate).where('tanggal','<=',endDate).get(),db.collection('hrd_settings').doc('absensi').get(),db.collection('hrd_cuti').where('status','==','approved').get(),db.collection('hrd_overtime').get(),db.collection('hrd_hari_libur').where('tanggal','>=',startDate).where('tanggal','<=',endDate).get()]);
+  const[usersSnap,absenSnap,settDoc,cutiSnap,overtimeSnap,hariLiburSnap]=await Promise.all([db.collection('hrd_karyawan').where('status','==','aktif').get(),db.collection('hrd_absensi').get(),db.collection('hrd_settings').doc('absensi').get(),db.collection('hrd_cuti').where('status','==','approved').get(),db.collection('hrd_overtime').get(),db.collection('hrd_hari_libur').get()]);
   const sett = settDoc.exists ? settDoc.data() : {};
   const flex = sett.flexTime || { enabled: true, durasiKerja: 8, durasiIstirahat: 1 };
   // Build cuti map: userId -> {day: jenis}
@@ -1020,7 +1020,7 @@ async function loadRekapGrid(){
   const otMap={};
   overtimeSnap.forEach(d=>{const o=d.data();if(o.tanggal&&o.tanggal>=startDate&&o.tanggal<=endDate&&o.status==='approved'){const uid=o.userId||o.nama;const day=parseInt(o.tanggal.split('-')[2]);if(!otMap[uid])otMap[uid]={};otMap[uid][day]=true;}});
   // Build hari libur set
-  const liburSet=new Set();hariLiburSnap.forEach(d=>{const h=d.data();if(h.tanggal)liburSet.add(parseInt(h.tanggal.split('-')[2]));});
+  const liburSet=new Set();hariLiburSnap.forEach(d=>{const h=d.data();if(h.tanggal&&h.tanggal>=startDate&&h.tanggal<=endDate)liburSet.add(parseInt(h.tanggal.split('-')[2]));});
   const users=[];usersSnap.forEach(d=>users.push({id:d.id,...d.data()}));
   // Portal mode: only show current user (unless GM/admin)
   const isPortalMode=window._portalAbsensiMode&&!hasAccess(2);
@@ -1028,7 +1028,7 @@ async function loadRekapGrid(){
   const absenMap={};
   const jamKerjaMap={};
   const lemburMap={};
-  absenSnap.forEach(d=>{const p=d.data();if(!absenMap[p.userId])absenMap[p.userId]={};const day=parseInt(p.tanggal.split('-')[2]);if(p.tipe==='masuk')absenMap[p.userId][day]=p.status||'hadir';else if(p.tipe==='pulang'&&p.lembur){absenMap[p.userId][day]='lembur';if(!lemburMap[p.userId])lemburMap[p.userId]={};lemburMap[p.userId][day]=p.lemburJam||0;if(p.jamKerjaActual){if(!jamKerjaMap[p.userId])jamKerjaMap[p.userId]={};jamKerjaMap[p.userId][day]=p.jamKerjaActual;}}else if(p.tipe==='pulang'&&p.jamKerjaActual){if(!jamKerjaMap[p.userId])jamKerjaMap[p.userId]={};jamKerjaMap[p.userId][day]=p.jamKerjaActual;if(p.status==='kurang_jam')absenMap[p.userId][day]='kurang_jam';else if(p.status==='lengkap')absenMap[p.userId][day]='lengkap';}else if(p.tipe==='pulang'&&p.status==='kurang_jam')absenMap[p.userId][day]='kurang_jam';else if(p.tipe==='pulang'&&p.status==='lengkap')absenMap[p.userId][day]='lengkap';else if(p.tipe==='dinas_luar'&&!absenMap[p.userId][day])absenMap[p.userId][day]='dinas';});
+  absenSnap.forEach(d=>{const p=d.data();if(!p.tanggal||p.tanggal<startDate||p.tanggal>endDate)return;if(!absenMap[p.userId])absenMap[p.userId]={};const day=parseInt(p.tanggal.split('-')[2]);if(p.tipe==='masuk')absenMap[p.userId][day]=p.status||'hadir';else if(p.tipe==='pulang'&&p.lembur){absenMap[p.userId][day]='lembur';if(!lemburMap[p.userId])lemburMap[p.userId]={};lemburMap[p.userId][day]=p.lemburJam||0;if(p.jamKerjaActual){if(!jamKerjaMap[p.userId])jamKerjaMap[p.userId]={};jamKerjaMap[p.userId][day]=p.jamKerjaActual;}}else if(p.tipe==='pulang'&&p.jamKerjaActual){if(!jamKerjaMap[p.userId])jamKerjaMap[p.userId]={};jamKerjaMap[p.userId][day]=p.jamKerjaActual;if(p.status==='kurang_jam')absenMap[p.userId][day]='kurang_jam';else if(p.status==='lengkap')absenMap[p.userId][day]='lengkap';}else if(p.tipe==='pulang'&&p.status==='kurang_jam')absenMap[p.userId][day]='kurang_jam';else if(p.tipe==='pulang'&&p.status==='lengkap')absenMap[p.userId][day]='lengkap';else if(p.tipe==='dinas_luar'&&!absenMap[p.userId][day])absenMap[p.userId][day]='dinas';});
 
   let h='<div class="table-wrap"><table><thead><tr><th style="min-width:120px">Nama</th>';
   for(let i=1;i<=days;i++)h+=`<th style="width:28px;text-align:center;font-size:.65rem">${i}</th>`;
