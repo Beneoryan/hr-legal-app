@@ -3130,9 +3130,6 @@ async function renderPortal(){const main=document.getElementById('mainContent');
   document.getElementById('pAbsen').textContent=absenSnap.size+' hari';
   document.getElementById('pCuti').textContent=Math.max(0,12-cutiSnap.size)+' hari';
   document.getElementById('pInbox').textContent=inboxSnap.size;
-  // Load portal info sections
-  loadPortalInfoSections();
-  loadPortalInviteInfo();
 }
 
 async function loadPortalPengumuman(){try{const snap=await db.collection('hrd_pengumuman').get();const el=document.getElementById('portalPengumumanBody');const ct=document.getElementById('portalPengumumanCount');if(ct)ct.textContent=snap.size;if(!el)return;if(snap.empty){el.innerHTML='<p class="text-sm" style="color:#999">Belum ada</p>';return;}let h='';const items=[];snap.forEach(d=>items.push({id:d.id,...d.data()}));items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));items.slice(0,5).forEach(p=>{h+=`<div style="padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="viewPengumuman('${p.id}')"><div class="fw-700 text-sm">${escHtml(p.judul||'')}</div><div class="text-xs" style="color:#999">${formatDate(p.createdAt)}</div></div>`;});el.innerHTML=h;}catch(e){console.error('loadPortalPengumuman:',e);}}
