@@ -1004,7 +1004,7 @@ async function submitAbsenDinas() {
 // ── REKAP GRID ────────────────────────────────────────────────
 // ══════════════════════════════════════════════════════════════
 
-function renderRekapAbsensi(container){container.innerHTML=`<div class="card"><div class="card-header"><div class="card-title">📊 Rekap Absensi</div><div class="flex gap-8"><input class="form-control" type="month" id="rekapBulan" value="${monthStr()}" onchange="loadRekapGrid()"><button class="btn btn-sm btn-info" onclick="loadRekapGrid()">🔍</button></div></div><div id="rekapGrid">Loading...</div><div class="mt-16" id="rekapSummary"></div></div>`;loadRekapGrid();}
+function renderRekapAbsensi(container){container.innerHTML=`<div class="card"><div class="card-header"><div class="card-title">📊 Rekap Absensi</div><div class="flex gap-8"><input class="form-control" type="month" id="rekapBulan" value="${monthStr()}" onchange="loadRekapGrid()"><button class="btn btn-sm btn-info" onclick="loadRekapGrid()">🔍</button><button class="btn btn-sm btn-success" onclick="modalGenerateAbsensi()">⚡ Generate Periode</button></div></div><div id="rekapGrid">Loading...</div><div class="mt-16" id="rekapSummary"></div></div>`;loadRekapGrid();}
 
 async function loadRekapGrid(){
   const bulan=document.getElementById('rekapBulan')?.value||monthStr();
@@ -1264,4 +1264,60 @@ function viewAbsenDinas(id){
       <div class="grid-2 mb-16"><div><b>Nama:</b> ${escHtml(p.nama)}</div><div><b>Tanggal:</b> ${formatDate(p.tanggal)}</div><div><b>Waktu:</b> ${p.waktu||'-'}</div><div><b>Tujuan:</b> ${escHtml(p.tujuanDinas||'-')}</div><div><b>GPS:</b> ${p.lat?.toFixed(5)||'-'}, ${p.lng?.toFixed(5)||'-'}</div><div><b>Akurasi:</b> ${p.accuracy?p.accuracy.toFixed(0)+'m':'-'}</div></div>
       ${p.keteranganDinas?`<div><b>Keterangan:</b><div class="text-sm mt-8">${escHtml(p.keteranganDinas)}</div></div>`:''}`);
   });
+}
+
+// ── GENERATE ABSENSI PERIODE ──────────────────────────────────
+function modalGenerateAbsensi(){
+  openModal(`<div class="modal-title">⚡ Generate Absensi Periode</div>
+    <p class="text-sm mb-16" style="color:#666">Generate kehadiran (Clock In + Clock Out) untuk semua karyawan aktif pada hari kerja (Senin-Jumat) dalam periode yang ditentukan.</p>
+    <div class="grid-2">
+      <div class="form-group"><label>Tanggal Mulai</label><input class="form-control" type="date" id="genAbsStart" value="2026-04-20"></div>
+      <div class="form-group"><label>Tanggal Selesai</label><input class="form-control" type="date" id="genAbsEnd" value="2026-05-20"></div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group"><label>Jam Masuk</label><input class="form-control" type="time" id="genAbsJamIn" value="08:00"></div>
+      <div class="form-group"><label>Jam Pulang</label><input class="form-control" type="time" id="genAbsJamOut" value="17:00"></div>
+    </div>
+    <div class="form-group"><label>Status</label><select class="form-control" id="genAbsStatus"><option value="hadir">Hadir</option><option value="tepat_waktu">Tepat Waktu</option><option value="lengkap">Lengkap</option></select></div>
+    <div style="background:#fff3e0;padding:10px;border-radius:6px;margin-bottom:16px;font-size:.78rem;border-left:4px solid var(--warning)">⚠️ Ini akan menambahkan data absensi untuk SEMUA karyawan aktif di setiap hari kerja dalam periode. Weekend (Sabtu-Minggu) akan di-skip. Data yang sudah ada TIDAK akan ditimpa.</div>
+    <button class="btn btn-success" onclick="doGenerateAbsensi()">⚡ Generate Sekarang</button>`,true);
+}
+
+async function doGenerateAbsensi(){
+  const startDate=document.getElementById('genAbsStart').value;
+  const endDate=document.getElementById('genAbsEnd').value;
+  const jamIn=document.getElementById('genAbsJamIn').value||'08:00';
+  const jamOut=document.getElementById('genAbsJamOut').value||'17:00';
+  const status=document.getElementById('genAbsStatus').value||'hadir';
+  if(!startDate||!endDate)return toast('Isi tanggal mulai dan selesai','warning');
+  if(!confirm(`Generate absensi dari ${startDate} s/d ${endDate} untuk semua karyawan aktif?\nHari kerja saja (Senin-Jumat).`))return;
+  toast('Memproses generate...','info');
+  // Load karyawan aktif
+  const kSnap=await db.collection('hrd_karyawan').where('status','==','aktif').get();
+  const karyawan=[];kSnap.forEach(d=>karyawan.push({id:d.id,...d.data()}));
+  // Load existing absensi to avoid duplicates
+  const existSnap=await db.collection('hrd_absensi').get();
+  const existSet=new Set();
+  existSnap.forEach(d=>{const p=d.data();existSet.add(`${(p.nama||'').toLowerCase()}_${p.tanggal}_${p.tipe}`);});
+  // Generate for each work day
+  let count=0;
+  const start=new Date(startDate);const end=new Date(endDate);
+  for(let dt=new Date(start);dt<=end;dt.setDate(dt.getDate()+1)){
+    const day=dt.getDay();
+    if(day===0||day===6)continue; // Skip weekend
+    const tgl=dt.toISOString().split('T')[0];
+    for(const k of karyawan){
+      const namaLow=(k.nama||'').toLowerCase();
+      // Skip if already exists
+      if(existSet.has(`${namaLow}_${tgl}_masuk`))continue;
+      // Add Clock In
+      await db.collection('hrd_absensi').add({userId:k.id,nama:k.nama,tanggal:tgl,waktu:jamIn,tipe:'masuk',status,departemen:k.departemen||'',manual:true,editedBy:currentUser.nama,createdAt:new Date().toISOString()});
+      // Add Clock Out
+      await db.collection('hrd_absensi').add({userId:k.id,nama:k.nama,tanggal:tgl,waktu:jamOut,tipe:'pulang',status:'lengkap',departemen:k.departemen||'',manual:true,editedBy:currentUser.nama,createdAt:new Date().toISOString()});
+      count++;
+    }
+  }
+  closeModalDirect();
+  toast(`✅ ${count} hari absensi di-generate untuk ${karyawan.length} karyawan`,'success');
+  loadRekapGrid();
 }
