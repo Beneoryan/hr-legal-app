@@ -3099,44 +3099,7 @@ async function renderPortal(){const main=document.getElementById('mainContent');
   const avatarHtml=avatarUrl?`<img src="${avatarUrl}" style="width:60px;height:60px;border-radius:50%;object-fit:cover">`:`<div style="width:60px;height:60px;font-size:1.5rem;background:var(--primary);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center">${u.nama.charAt(0)}</div>`;
   main.innerHTML=`<div class="page-title"><span>🏠 Portal Saya</span></div><div class="card" style="border-left:4px solid var(--accent)"><div class="flex gap-16" style="align-items:center">${avatarHtml}<div><div class="fw-700" style="font-size:1.1rem">${escHtml(u.nama)}</div><div class="text-sm" style="color:#999">${escHtml(u.departemen||'-')} • ${escHtml(u.posisi||u.role)}</div><div class="text-xs" style="color:#999">NIP: ${escHtml(u.nip||'-')}</div></div></div></div><div class="stats-grid"><div class="stat-card" style="cursor:pointer" onclick="navigateTo('portal-absensi')"><div class="stat-icon">📍</div><div class="stat-value" id="pAbsen">-</div><div class="stat-label">Kehadiran Bulan Ini</div></div><div class="stat-card" style="cursor:pointer" onclick="navigateTo('portal-cuti')"><div class="stat-icon">🏖️</div><div class="stat-value" id="pCuti">-</div><div class="stat-label">Sisa Cuti</div></div><div class="stat-card" style="cursor:pointer" onclick="navigateTo('inbox')"><div class="stat-icon">📥</div><div class="stat-value" id="pInbox">-</div><div class="stat-label">Inbox Meeting</div></div></div>
   <!-- KOLOM PENGUMUMAN, BROADCAST, MEETING & INVITE -->
-  <div class="card" id="portalInfoSections">
-    <div class="card-title mb-16">📋 Informasi & Komunikasi</div>
-    <!-- Pengumuman Accordion -->
-    <div class="portal-accordion mb-8">
-      <div class="portal-accordion-header" onclick="togglePortalSection('pengumuman')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#e3f2fd;border-radius:8px;cursor:pointer;font-weight:700;font-size:.9rem">
-        <span>📢 Pengumuman</span><span id="portalPengumumanCount" class="badge badge-info" style="font-size:.7rem">0</span>
-      </div>
-      <div id="portalPengumumanBody" style="padding:12px 16px;border:1px solid #e3f2fd;border-top:none;border-radius:0 0 8px 8px"></div>
-    </div>
-    <!-- Broadcast Accordion -->
-    <div class="portal-accordion mb-8">
-      <div class="portal-accordion-header" onclick="togglePortalSection('broadcast')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#f3e5f5;border-radius:8px;cursor:pointer;font-weight:700;font-size:.9rem">
-        <span>📡 Broadcast</span><span id="portalBroadcastCount" class="badge" style="background:#ce93d8;color:#fff;font-size:.7rem">0</span>
-      </div>
-      <div id="portalBroadcastBody" style="padding:12px 16px;border:1px solid #f3e5f5;border-top:none;border-radius:0 0 8px 8px"></div>
-    </div>
-    <!-- Meeting Accordion -->
-    <div class="portal-accordion mb-8">
-      <div class="portal-accordion-header" onclick="togglePortalSection('meeting')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#e8f5e9;border-radius:8px;cursor:pointer;font-weight:700;font-size:.9rem">
-        <span>📅 Meeting</span><span id="portalMeetingCount" class="badge badge-success" style="font-size:.7rem">0</span>
-      </div>
-      <div id="portalMeetingBody" style="padding:12px 16px;border:1px solid #e8f5e9;border-top:none;border-radius:0 0 8px 8px"></div>
-    </div>
-    <!-- Invite Accordion -->
-    <div class="portal-accordion mb-8">
-      <div class="portal-accordion-header" onclick="togglePortalSection('invite')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#fff3e0;border-radius:8px;cursor:pointer;font-weight:700;font-size:.9rem">
-        <span>✉️ Undangan / Invite</span><span id="portalInviteCount" class="badge badge-warning" style="font-size:.7rem">0</span>
-      </div>
-      <div id="portalInviteBody" style="padding:12px 16px;border:1px solid #fff3e0;border-top:none;border-radius:0 0 8px 8px"></div>
-    </div>
-    <!-- Obrolan Quick Access -->
-    <div class="portal-accordion mb-8">
-      <div onclick="navigateTo('chat')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#e8eaf6;border-radius:8px;cursor:pointer;font-weight:700;font-size:.9rem">
-        <span>💬 Obrolan</span><span class="badge" style="background:var(--primary);color:#fff;font-size:.7rem">→</span>
-      </div>
-    </div>
-  </div>
-  <!-- AKSI CEPAT -->
+  <!-- AKSI CEPAT + KOMUNIKASI -->
   <div class="card">
     <div class="card-title mb-12">⚡ Aksi Cepat</div>
     <div class="flex flex-wrap gap-8">
@@ -3148,9 +3111,17 @@ async function renderPortal(){const main=document.getElementById('mainContent');
       <button class="btn btn-sm" style="background:#7b1fa2;color:#fff" onclick="navigateTo('portal-gaji')">💰 Slip Gaji</button>
       <button class="btn btn-sm" style="background:#00796b;color:#fff" onclick="navigateTo('portal-kpi')">📈 KPI</button>
       <button class="btn btn-sm" style="background:#e65100;color:#fff" onclick="navigateTo('portal-jobdesk')">📋 Jobdesk</button>
-      <button class="btn btn-sm" style="background:#1565c0;color:#fff" onclick="navigateTo('chat')">💬 Obrolan</button>
       <button class="btn btn-sm" style="background:#4e342e;color:#fff" onclick="navigateTo('portal-disc')">🧠 DISC Test</button>
       <button class="btn btn-sm" style="background:#37474f;color:#fff" onclick="navigateTo('portal-setting')">⚙️ Setting</button>
+    </div>
+    <div class="card-title mb-12 mt-16">📋 Informasi & Komunikasi</div>
+    <div class="flex flex-wrap gap-8">
+      <button class="btn btn-sm" style="background:#1565c0;color:#fff" onclick="navigateTo('portal-pengumuman')">📢 Pengumuman</button>
+      <button class="btn btn-sm" style="background:#7b1fa2;color:#fff" onclick="navigateTo('portal-broadcast')">📡 Broadcast</button>
+      <button class="btn btn-sm" style="background:#2e7d32;color:#fff" onclick="navigateTo('portal-meeting')">📅 Meeting</button>
+      <button class="btn btn-sm" style="background:#e65100;color:#fff" onclick="navigateTo('portal-invite')">✉️ Undangan</button>
+      <button class="btn btn-sm" style="background:#1565c0;color:#fff" onclick="navigateTo('chat')">💬 Obrolan</button>
+      <button class="btn btn-sm" style="background:#c62828;color:#fff" onclick="navigateTo('notifikasi')">🔔 Notifikasi</button>
     </div>
   </div>
   <div class="card"><div class="card-title">📲 Download / Install Aplikasi</div><p class="text-sm mb-8" style="color:#666">Install aplikasi ini di perangkat Anda untuk akses lebih cepat.</p>${renderDownloadAppSection()}</div>`;
