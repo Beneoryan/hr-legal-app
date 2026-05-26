@@ -3185,7 +3185,7 @@ async function loadPortalInfoSections(){
     let bcH='';
     if(bcSnap.empty)bcH='<p class="text-sm" style="color:#999">Belum ada broadcast</p>';
     else{const items=[];bcSnap.forEach(d=>items.push({id:d.id,...d.data()}));items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));items.forEach(p=>{bcH+=`<div style="padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="viewBroadcast('${p.id}')"><div class="fw-700 text-sm">${escHtml((p.pesan||'').substring(0,80))}${(p.pesan||'').length>80?'...':''}</div><div class="text-xs" style="color:#999">${formatDate(p.createdAt)} — ${escHtml(p.pengirim||'')} → ${escHtml(p.targetLabel||'Semua')}</div></div>`;});}
-    const bcBody=document.getElementById('portalBroadcastBody');if(bcBody)bcBody.innerHTML=bcH;
+    const bcBody=document.getElementById('portalBroadcastBody');if(bcBody){bcBody.innerHTML=bcH;if(bcSnap.size>0)bcBody.style.display='block';}
     // Meeting
     const mtCount=document.getElementById('portalMeetingCount');
     if(mtCount)mtCount.textContent=mtSnap.size;
@@ -3367,7 +3367,7 @@ function toggleAccordion(el){
 // ── PORTAL OVERTIME ───────────────────────────────────────────
 async function renderPortalOvertime(){
   const main=document.getElementById('mainContent');
-  main.innerHTML=`<div class="page-title"><span>⏰ Overtime Saya</span><button class="btn btn-primary btn-sm" onclick="modalOvertime()">+ Ajukan Overtime</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Jam</th><th>Durasi</th><th>Alasan</th><th>Status</th></tr></thead><tbody id="tblPortalOT"></tbody></table></div></div>`;
+  main.innerHTML=`<div class="page-title"><span>⏰ Overtime Saya</span><button class="btn btn-primary btn-sm" onclick="modalOvertime()">+ Ajukan Overtime</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Jam</th><th>Durasi</th><th>Alasan</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="tblPortalOT"></tbody></table></div></div>`;
   const snap=await db.collection('hrd_overtime').where('userId','==',currentUser.id).get();
   const items=[];snap.forEach(d=>items.push({id:d.id,...d.data()}));
   items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
@@ -3375,9 +3375,30 @@ async function renderPortalOvertime(){
   if(!items.length)h='<tr><td colspan="5" class="text-center">Belum ada pengajuan overtime</td></tr>';
   else items.forEach(p=>{
     const badge=p.status==='approved'?'badge-success':p.status==='rejected'?'badge-danger':'badge-warning';
-    h+=`<tr><td>${formatDate(p.tanggal)}</td><td>${p.jamMulai||'-'} - ${p.jamSelesai||'-'}</td><td class="fw-700">${p.durasi||0} jam</td><td class="text-sm">${escHtml((p.alasan||'').substring(0,50))}</td><td><span class="badge ${badge}">${p.status}</span></td></tr>`;
+    h+=`<tr><td>${formatDate(p.tanggal)}</td><td>${p.jamMulai||'-'} - ${p.jamSelesai||'-'}</td><td class="fw-700">${p.durasi||0} jam</td><td class="text-sm">${escHtml((p.alasan||'').substring(0,50))}</td><td><span class="badge ${badge}">${p.status}</span></td><td><button class="btn btn-xs btn-info" onclick="viewOvertimeDetail('${p.id}')">👁️</button> <button class="btn btn-xs btn-primary" onclick="editOvertimePortal('${p.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_overtime','${p.id}','portal-overtime')">🗑️</button></td></tr>`;
   });
   document.getElementById('tblPortalOT').innerHTML=h;
+}
+
+function viewOvertimeDetail(id){
+  db.collection('hrd_overtime').doc(id).get().then(d=>{const p=d.data();
+    openModal(`<div class="modal-title">⏰ Detail Overtime</div>
+      <div class="grid-2 mb-16"><div><b>Nama:</b> ${escHtml(p.nama)}</div><div><b>Status:</b> <span class="badge badge-${p.status==='approved'?'success':p.status==='rejected'?'danger':'warning'}">${p.status}</span></div><div><b>Tanggal:</b> ${formatDate(p.tanggal)}</div><div><b>Jam:</b> ${p.jamMulai||'-'} - ${p.jamSelesai||'-'}</div><div><b>Durasi:</b> ${p.durasi||0} jam</div>${p.approvedBy?`<div><b>Diproses:</b> ${escHtml(p.approvedBy)}</div>`:''}</div>
+      ${p.alasan?`<div class="mb-16"><b>Alasan:</b><div class="text-sm mt-8" style="background:#f8f9ff;padding:10px;border-radius:6px">${escHtml(p.alasan)}</div></div>`:''}`);
+  });
+}
+async function editOvertimePortal(id){
+  const d=await db.collection('hrd_overtime').doc(id).get();const p=d.data();
+  openModal(`<div class="modal-title">✏️ Edit Overtime</div>
+    <div class="grid-2"><div class="form-group"><label>Tanggal</label><input class="form-control" type="date" id="eotTgl" value="${p.tanggal||''}"></div><div class="form-group"><label>Alasan</label><input class="form-control" id="eotAlasan" value="${escHtml(p.alasan||'')}"></div></div>
+    <div class="grid-2"><div class="form-group"><label>Jam Mulai</label><input class="form-control" type="time" id="eotStart" value="${p.jamMulai||''}"></div><div class="form-group"><label>Jam Selesai</label><input class="form-control" type="time" id="eotEnd" value="${p.jamSelesai||''}"></div></div>
+    <button class="btn btn-primary" onclick="simpanEditOvertime('${id}')">💾 Simpan</button>`);
+}
+async function simpanEditOvertime(id){
+  const s=document.getElementById('eotStart').value,e=document.getElementById('eotEnd').value;
+  const durasi=s&&e?Math.max(0,((new Date('2000-01-01T'+e)-new Date('2000-01-01T'+s))/3600000)).toFixed(1):0;
+  await db.collection('hrd_overtime').doc(id).update({tanggal:document.getElementById('eotTgl').value,alasan:document.getElementById('eotAlasan').value,jamMulai:s,jamSelesai:e,durasi:parseFloat(durasi),updatedAt:new Date().toISOString()});
+  closeModalDirect();toast('Overtime diupdate','success');renderPortalOvertime();
 }
 
 function renderPortalAbsensi(){
