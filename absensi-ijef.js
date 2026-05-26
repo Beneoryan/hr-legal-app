@@ -1028,10 +1028,10 @@ async function loadRekapGrid(){
   const absenMap={};
   const jamKerjaMap={};
   const lemburMap={};
-  absenSnap.forEach(d=>{const p=d.data();if(!p.tanggal||p.tanggal<startDate||p.tanggal>endDate)return;const uid=p.userId||'';const pNama=p.nama||'';const day=parseInt(p.tanggal.split('-')[2]);
+  absenSnap.forEach(d=>{const p=d.data();if(!p.tanggal||p.tanggal<startDate||p.tanggal>endDate)return;const uid=p.userId||'';const pNama=(p.nama||'').toLowerCase();const day=parseInt(p.tanggal.split('-')[2]);
     // Index by userId
     if(uid){if(!absenMap[uid])absenMap[uid]={};if(p.tipe==='masuk')absenMap[uid][day]=p.status||'hadir';else if(p.tipe==='pulang'&&p.lembur){absenMap[uid][day]='lembur';if(!lemburMap[uid])lemburMap[uid]={};lemburMap[uid][day]=p.lemburJam||0;}else if(p.tipe==='pulang'&&(p.status==='kurang_jam'||p.status==='lengkap'))absenMap[uid][day]=p.status;else if(p.tipe==='pulang'&&p.jamKerjaActual){if(!jamKerjaMap[uid])jamKerjaMap[uid]={};jamKerjaMap[uid][day]=p.jamKerjaActual;}else if(p.tipe==='dinas_luar'&&!absenMap[uid][day])absenMap[uid][day]='dinas';}
-    // Also index by nama (for matching in grid)
+    // Index by lowercase nama
     if(pNama){if(!absenMap[pNama])absenMap[pNama]={};if(p.tipe==='masuk'&&!absenMap[pNama][day])absenMap[pNama][day]=p.status||'hadir';else if(p.tipe==='dinas_luar'&&!absenMap[pNama][day])absenMap[pNama][day]='dinas';else if(p.tipe==='pulang'&&p.lembur&&!absenMap[pNama][day])absenMap[pNama][day]='lembur';else if(p.tipe==='pulang'&&p.status==='lengkap'&&!absenMap[pNama][day])absenMap[pNama][day]='lengkap';else if(p.tipe==='pulang'&&p.status==='kurang_jam'&&!absenMap[pNama][day])absenMap[pNama][day]='kurang_jam';}
   });
 
@@ -1041,10 +1041,11 @@ async function loadRekapGrid(){
   let totalH=0,totalT=0,totalD=0,totalK=0,totalL=0,totalLembur=0,totalLemburJam=0;
 
   filteredUsers.forEach(u=>{
-    // Merge absenMap from all possible keys (id, nama)
-    const userAbsen={...(absenMap[u.id]||{}),...(absenMap[u.nama]||{}),...(absenMap[(u.nama||'').toLowerCase()]||{})};
-    const userJamKerja={...(jamKerjaMap[u.id]||{}),...(jamKerjaMap[u.nama]||{})};
-    const userLemburMap2={...(lemburMap[u.id]||{}),...(lemburMap[u.nama]||{})};
+    // Merge absenMap from all possible keys (id, nama lowercase)
+    const namaLow=(u.nama||'').toLowerCase();
+    const userAbsen={...(absenMap[u.id]||{}),...(absenMap[namaLow]||{})};
+    const userJamKerja={...(jamKerjaMap[u.id]||{}),...(jamKerjaMap[namaLow]||{})};
+    const userLemburMap2={...(lemburMap[u.id]||{}),...(lemburMap[namaLow]||{})};
     h+=`<tr><td class="text-sm fw-700">${escHtml(u.nama)}</td>`;
     let ut=0;
     let userLemburJam=0;
