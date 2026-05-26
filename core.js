@@ -143,7 +143,7 @@ function buildNavItems(isPortalUser) {
   if (isPortalUser) {
     // STAFF & LEADER portal
     let nav='';
-    nav+=navGroup('🏠 Utama',[['portal','🏠','Beranda'],['portal-absensi','📍','Absensi'],['portal-cuti','🏖️','Cuti & Izin'],['portal-overtime','⏰','Overtime']]);
+    nav+=navGroup('🏠 Utama',[['portal','🏠','Beranda'],['portal-absensi','📍','Absensi'],['portal-cuti','🏖️','Cuti & Izin'],['portal-overtime','⏰','Overtime'],['portal-perjalanan-dinas','✈️','Perjalanan Dinas']]);
     nav+=navGroup('💰 Keuangan',[['portal-gaji','💰','Slip Gaji'],['portal-reimburse','🧾','Reimburse'],['portal-kasbon','💳','Kasbon & Loan']]);
     nav+=navGroup('💼 Pekerjaan',[['portal-jobdesk','📋','Jobdesk'],['portal-disc','🧠','DISC Test'],['portal-kpi','📈','KPI Saya']]);
     nav+=navGroup('🏢 Organisasi',[['portal-struktur','🌳','Struktur Org'],['portal-libur','📅','Hari Libur'],['portal-peraturan','📜','Peraturan']]);
@@ -160,7 +160,7 @@ function buildNavItems(isPortalUser) {
   nav+=navGroup('👥 Karyawan',[['karyawan','👥','Data Karyawan'],['struktur-org','🌳','Struktur Org'],['jobdesk-mgmt','📋','Kelola Jobdesk'],['onboarding','🚀','Onboarding'],['offboarding','📦','Offboarding']]);
   // Manager+ gets Rekrutmen
   if(hasAccess(3)) nav+=navGroup('🔍 Rekrutmen',[['lowongan','📝','Lowongan'],['pipeline','🔄','Pipeline Kanban'],['kandidat','🧑‍💼','Kandidat']]);
-  nav+=navGroup('📍 Kehadiran',[['absensi','📍','Absensi IJEF'],['cuti','🏖️','Cuti/Izin/WFH'],['overtime','⏰','Overtime'],['hari-libur','📅','Hari Libur'],['penalty','⚠️','Penalty Point']]);
+  nav+=navGroup('📍 Kehadiran',[['absensi','📍','Absensi IJEF'],['cuti','🏖️','Cuti/Izin/WFH'],['overtime','⏰','Overtime'],['perjalanan-dinas','✈️','Perjalanan Dinas'],['hari-libur','📅','Hari Libur'],['penalty','⚠️','Penalty Point']]);
   nav+=navGroup('💰 Keuangan',[['penggajian','💰','Penggajian'],['tax-calc','🧮','Tax & BPJS'],['insentif','🏆','Insentif'],['reimbursement','🧾','Reimbursement'],['kasbon','💳','Kasbon & Loan'],['tunjangan','🎁','Tunjangan']]);
   nav+=navGroup('📈 Kinerja',[['kpi','📈','KPI & Penilaian'],['pelatihan','🎓','Pelatihan'],['disc-test','🧠','DISC Test']]);
   // Manager+ gets Legal & Aset
@@ -217,6 +217,7 @@ function navigateTo(page) {
     'portal-pengumuman':renderPortalPengumuman,'portal-broadcast':renderPortalBroadcast,
     'portal-meeting':renderPortalMeeting,'portal-invite':renderPortalInvite,'portal-overtime':renderPortalOvertime,
     'portal-setting':renderPortalSetting,'portal-share':renderPortalShare,
+    'perjalanan-dinas':renderPerjalananDinas,'portal-perjalanan-dinas':renderPortalPerjalananDinas,
   };
   const fn=routes[page];
   if(fn)fn(); else main.innerHTML=`<div class="empty-state"><div class="icon">🚧</div><p>Halaman "${page}" dalam pengembangan</p></div>`;

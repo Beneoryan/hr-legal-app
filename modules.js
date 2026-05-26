@@ -4186,3 +4186,550 @@ async function resetEntireSystem(){
   await batch.commit();
   toast('Sistem berhasil direset. Hanya akun admin yang tersisa.','success');
 }
+
+
+// ══════════════════════════════════════════════════════════════
+// ── PROSEDUR PERJALANAN DINAS — Terintegrasi ──────────────────
+// ══════════════════════════════════════════════════════════════
+
+function renderPerjalananDinas(){
+  const main=document.getElementById('mainContent');
+  main.innerHTML=`<div class="page-title"><span>✈️ Prosedur Perjalanan Dinas</span><button class="btn btn-primary btn-sm" onclick="modalAjukanSPPD()">+ Ajukan SPPD</button></div>
+    <div class="tabs" id="sppdTabs">
+      <div class="tab active" onclick="showSPPDTab('daftar')">📋 Daftar SPPD</div>
+      <div class="tab" onclick="showSPPDTab('prosedur')">📖 Prosedur</div>
+      <div class="tab" onclick="showSPPDTab('uang-muka')">💰 Uang Muka</div>
+      <div class="tab" onclick="showSPPDTab('laporan')">📝 Laporan Perjalanan</div>
+      <div class="tab" onclick="showSPPDTab('reimbursement')">🧾 Reimburse Dinas</div>
+    </div>
+    <div id="sppdContent"></div>`;
+  showSPPDTab('daftar');
+}
+
+function renderPortalPerjalananDinas(){
+  window._portalDinasMode=true;
+  renderPerjalananDinas();
+}
+
+
+async function showSPPDTab(tab){
+  document.querySelectorAll('#sppdTabs .tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('#sppdTabs .tab').forEach(t=>{
+    if(tab==='daftar'&&t.textContent.includes('Daftar'))t.classList.add('active');
+    else if(tab==='prosedur'&&t.textContent.includes('Prosedur'))t.classList.add('active');
+    else if(tab==='uang-muka'&&t.textContent.includes('Uang Muka'))t.classList.add('active');
+    else if(tab==='laporan'&&t.textContent.includes('Laporan'))t.classList.add('active');
+    else if(tab==='reimbursement'&&t.textContent.includes('Reimburse'))t.classList.add('active');
+  });
+  const el=document.getElementById('sppdContent');
+  if(tab==='daftar') await loadSPPDDaftar(el);
+  else if(tab==='prosedur') loadSPPDProsedur(el);
+  else if(tab==='uang-muka') await loadSPPDUangMuka(el);
+  else if(tab==='laporan') await loadSPPDLaporan(el);
+  else if(tab==='reimbursement') await loadSPPDReimbursement(el);
+}
+
+
+async function loadSPPDDaftar(el){
+  const isPortal=window._portalDinasMode&&!hasAccess(3);
+  const snap=await db.collection('hrd_perjalanan_dinas').orderBy('createdAt','desc').get().catch(()=>db.collection('hrd_perjalanan_dinas').get());
+  let h=`<div class="card"><div class="card-header"><div class="card-title">📋 Daftar Surat Perintah Perjalanan Dinas (SPPD)</div></div>
+    <div class="table-wrap"><table><thead><tr><th>No. SPPD</th><th>Nama</th><th>Tujuan</th><th>Tanggal</th><th>Durasi</th><th>Status</th><th>Aksi</th></tr></thead><tbody>`;
+  let hasData=false;
+  const docs=[];snap.forEach(d=>docs.push({id:d.id,...d.data()}));
+  docs.forEach(p=>{
+    if(isPortal&&p.userId!==currentUser.id&&(p.nama||'').toLowerCase()!==currentUser.nama.toLowerCase())return;
+    hasData=true;
+    const durasi=p.tanggalMulai&&p.tanggalSelesai?Math.ceil((new Date(p.tanggalSelesai)-new Date(p.tanggalMulai))/(1000*60*60*24)+1)+' hari':'-';
+    const badge=p.status==='approved'?'badge-success':p.status==='rejected'?'badge-danger':p.status==='selesai'?'badge-info':'badge-warning';
+    h+=`<tr><td class="fw-700">${escHtml(p.noSPPD||'-')}</td><td>${escHtml(p.nama)}</td><td>${escHtml(p.tujuan||'-')}</td><td>${formatDate(p.tanggalMulai)}</td><td>${durasi}</td><td><span class="badge ${badge}">${p.status||'pending'}</span></td><td>`;
+    h+=`<button class="btn btn-xs btn-info" onclick="viewSPPD('${p.id}')">👁️</button> `;
+    if(hasAccess(3)&&p.status==='pending')h+=`<button class="btn btn-xs btn-success" onclick="approveSPPD('${p.id}')">✅</button> <button class="btn btn-xs btn-danger" onclick="rejectSPPD('${p.id}')">❌</button> `;
+    if(p.status==='approved')h+=`<button class="btn btn-xs btn-primary" onclick="cetakSPPD('${p.id}')">🖨️</button> `;
+    h+=`</td></tr>`;
+  });
+  if(!hasData)h+='<tr><td colspan="7" class="text-center">Belum ada data SPPD</td></tr>';
+  h+='</tbody></table></div></div>';
+  el.innerHTML=h;
+}
+
+
+function loadSPPDProsedur(el){
+  el.innerHTML=`<div class="card">
+    <div class="card-title mb-16">📖 Prosedur Perjalanan Dinas</div>
+    <div style="background:#f8f9ff;border-radius:12px;padding:20px;border-left:4px solid var(--accent)">
+      <h3 style="margin-bottom:12px;color:var(--primary)">Alur Prosedur Perjalanan Dinas</h3>
+      <div style="display:grid;gap:12px">
+        <div style="display:flex;align-items:flex-start;gap:12px;padding:12px;background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+          <div style="min-width:32px;height:32px;background:var(--accent);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700">1</div>
+          <div><div class="fw-700">Pengajuan SPPD</div><div class="text-sm" style="color:#666">Karyawan mengisi form pengajuan perjalanan dinas (tujuan, tanggal, keperluan, estimasi biaya). Sistem generate nomor SPPD otomatis.</div></div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:12px;padding:12px;background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+          <div style="min-width:32px;height:32px;background:var(--accent);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700">2</div>
+          <div><div class="fw-700">Approval Atasan & HRD</div><div class="text-sm" style="color:#666">SPPD diproses oleh atasan langsung dan HRD. Notifikasi otomatis dikirim ke approver.</div></div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:12px;padding:12px;background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+          <div style="min-width:32px;height:32px;background:var(--accent);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700">3</div>
+          <div><div class="fw-700">Pencairan Uang Muka</div><div class="text-sm" style="color:#666">Setelah SPPD disetujui, karyawan bisa mengajukan uang muka perjalanan (transport, akomodasi, dll).</div></div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:12px;padding:12px;background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+          <div style="min-width:32px;height:32px;background:var(--accent);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700">4</div>
+          <div><div class="fw-700">Pelaksanaan Dinas</div><div class="text-sm" style="color:#666">Karyawan melaksanakan perjalanan dinas. Absen dinas luar via selfie+GPS (terintegrasi modul Absensi).</div></div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:12px;padding:12px;background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+          <div style="min-width:32px;height:32px;background:var(--accent);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700">5</div>
+          <div><div class="fw-700">Laporan Perjalanan Dinas</div><div class="text-sm" style="color:#666">Setelah kembali, karyawan membuat laporan perjalanan dinas (hasil, pencapaian, catatan).</div></div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:12px;padding:12px;background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+          <div style="min-width:32px;height:32px;background:var(--accent);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700">6</div>
+          <div><div class="fw-700">Reimbursement & Pertanggungjawaban</div><div class="text-sm" style="color:#666">Karyawan submit bukti pengeluaran. Selisih uang muka vs aktual akan dikembalikan/dibayarkan.</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="mt-16" style="padding:12px;background:#e8f5e9;border-radius:8px;border-left:4px solid var(--success)">
+      <div class="fw-700 text-sm mb-8">📌 Ketentuan Umum:</div>
+      <ul class="text-sm" style="padding-left:16px;line-height:1.8;color:#333">
+        <li>SPPD harus diajukan minimal <b>3 hari kerja</b> sebelum keberangkatan</li>
+        <li>Uang muka maksimal <b>80%</b> dari estimasi biaya</li>
+        <li>Laporan perjalanan dinas wajib diserahkan <b>3 hari</b> setelah kembali</li>
+        <li>Bukti pengeluaran (kwitansi/invoice) wajib dilampirkan untuk reimbursement</li>
+        <li>Perjalanan dinas yang dibatalkan harus dikonfirmasi ke HRD</li>
+      </ul>
+    </div>
+  </div>`;
+}
+
+
+function modalAjukanSPPD(){
+  const noSPPD='SPPD/'+new Date().getFullYear()+'/'+String(Date.now()).slice(-6);
+  openModal(`<div class="modal-title">✈️ Ajukan Surat Perintah Perjalanan Dinas</div>
+    <div style="background:#f0f4ff;padding:10px;border-radius:8px;margin-bottom:16px"><span class="fw-700">No. SPPD:</span> ${noSPPD}</div>
+    <div class="grid-2">
+      <div class="form-group"><label>Nama Karyawan</label><input class="form-control" id="sppdNama" value="${escHtml(currentUser.nama)}"></div>
+      <div class="form-group"><label>Departemen</label><input class="form-control" id="sppdDept" value="${escHtml(currentUser.departemen||'')}"></div>
+    </div>
+    <div class="form-group"><label>Tujuan / Kota Tujuan</label><input class="form-control" id="sppdTujuan" placeholder="Jakarta, Surabaya, dll"></div>
+    <div class="form-group"><label>Nama Klien / Instansi</label><input class="form-control" id="sppdKlien" placeholder="Nama klien atau instansi yang dikunjungi"></div>
+    <div class="grid-2">
+      <div class="form-group"><label>Tanggal Mulai</label><input class="form-control" type="date" id="sppdMulai"></div>
+      <div class="form-group"><label>Tanggal Selesai</label><input class="form-control" type="date" id="sppdSelesai"></div>
+    </div>
+    <div class="form-group"><label>Keperluan / Tujuan Dinas</label><textarea class="form-control" id="sppdKeperluan" placeholder="Jelaskan tujuan dan keperluan perjalanan dinas"></textarea></div>
+    <div class="grid-2">
+      <div class="form-group"><label>Transportasi</label><select class="form-control" id="sppdTransport"><option value="Pesawat">Pesawat</option><option value="Kereta">Kereta</option><option value="Bus">Bus</option><option value="Mobil Dinas">Mobil Dinas</option><option value="Kendaraan Pribadi">Kendaraan Pribadi</option><option value="Lainnya">Lainnya</option></select></div>
+      <div class="form-group"><label>Akomodasi</label><select class="form-control" id="sppdAkomodasi"><option value="Hotel">Hotel</option><option value="Guest House">Guest House</option><option value="Rumah Keluarga">Rumah Keluarga</option><option value="Tidak Perlu">Tidak Perlu</option><option value="Lainnya">Lainnya</option></select></div>
+    </div>
+    <div class="fw-700 text-sm mb-8 mt-8 color-primary">💰 Estimasi Biaya</div>
+    <div class="grid-2">
+      <div class="form-group"><label>Transport (Rp)</label><input class="form-control" type="number" id="sppdBiayaTransport" value="0"></div>
+      <div class="form-group"><label>Akomodasi (Rp)</label><input class="form-control" type="number" id="sppdBiayaAkomodasi" value="0"></div>
+      <div class="form-group"><label>Makan & Uang Saku (Rp)</label><input class="form-control" type="number" id="sppdBiayaMakan" value="0"></div>
+      <div class="form-group"><label>Lain-lain (Rp)</label><input class="form-control" type="number" id="sppdBiayaLain" value="0"></div>
+    </div>
+    <div class="form-group"><label>Catatan Tambahan</label><textarea class="form-control" id="sppdCatatan" placeholder="Catatan khusus (opsional)"></textarea></div>
+    <button class="btn btn-primary" style="width:100%;padding:12px" onclick="simpanSPPD('${noSPPD}')">📝 Ajukan SPPD</button>`,true);
+}
+
+
+async function simpanSPPD(noSPPD){
+  const data={
+    noSPPD,
+    nama:document.getElementById('sppdNama').value,
+    departemen:document.getElementById('sppdDept').value,
+    tujuan:document.getElementById('sppdTujuan').value,
+    klien:document.getElementById('sppdKlien').value,
+    tanggalMulai:document.getElementById('sppdMulai').value,
+    tanggalSelesai:document.getElementById('sppdSelesai').value,
+    keperluan:document.getElementById('sppdKeperluan').value,
+    transportasi:document.getElementById('sppdTransport').value,
+    akomodasi:document.getElementById('sppdAkomodasi').value,
+    biayaTransport:parseInt(document.getElementById('sppdBiayaTransport').value)||0,
+    biayaAkomodasi:parseInt(document.getElementById('sppdBiayaAkomodasi').value)||0,
+    biayaMakan:parseInt(document.getElementById('sppdBiayaMakan').value)||0,
+    biayaLain:parseInt(document.getElementById('sppdBiayaLain').value)||0,
+    catatan:document.getElementById('sppdCatatan').value,
+    status:'pending',
+    userId:currentUser.id,
+    createdAt:new Date().toISOString()
+  };
+  data.totalEstimasi=data.biayaTransport+data.biayaAkomodasi+data.biayaMakan+data.biayaLain;
+  if(!data.tujuan)return toast('Tujuan wajib diisi','warning');
+  if(!data.tanggalMulai||!data.tanggalSelesai)return toast('Tanggal mulai dan selesai wajib','warning');
+  if(!data.keperluan)return toast('Keperluan wajib diisi','warning');
+  await db.collection('hrd_perjalanan_dinas').add(data);
+  // Juga tambahkan ke hrd_dinas_luar agar terintegrasi dengan modul absensi
+  await db.collection('hrd_dinas_luar').add({
+    nama:data.nama,tanggal:data.tanggalMulai,tujuan:data.tujuan,
+    keperluan:data.keperluan,jamBerangkat:'',jamKembali:'',
+    status:'pending',userId:currentUser.id,noSPPD,
+    createdAt:new Date().toISOString()
+  });
+  await sendNotification('admin','SPPD Baru',`${data.nama} mengajukan perjalanan dinas ke ${data.tujuan}`);
+  closeModalDirect();
+  toast('✅ SPPD berhasil diajukan!','success');
+  showSPPDTab('daftar');
+}
+
+
+async function approveSPPD(id){
+  if(!confirm('Setujui SPPD ini?'))return;
+  const doc=await db.collection('hrd_perjalanan_dinas').doc(id).get();
+  const p=doc.data();
+  await db.collection('hrd_perjalanan_dinas').doc(id).update({status:'approved',approvedBy:currentUser.nama,approvedAt:new Date().toISOString()});
+  // Update linked dinas_luar juga
+  const linkSnap=await db.collection('hrd_dinas_luar').where('noSPPD','==',p.noSPPD).get();
+  linkSnap.forEach(d=>d.ref.update({status:'approved',approvedBy:currentUser.nama,approvedAt:new Date().toISOString()}));
+  await sendNotification(p.userId||p.nama,'SPPD Disetujui',`SPPD ${p.noSPPD} ke ${p.tujuan} telah disetujui oleh ${currentUser.nama}`);
+  toast('✅ SPPD disetujui','success');
+  showSPPDTab('daftar');
+}
+
+async function rejectSPPD(id){
+  const alasan=prompt('Alasan penolakan:');
+  if(!alasan)return;
+  const doc=await db.collection('hrd_perjalanan_dinas').doc(id).get();
+  const p=doc.data();
+  await db.collection('hrd_perjalanan_dinas').doc(id).update({status:'rejected',rejectedBy:currentUser.nama,rejectedAt:new Date().toISOString(),alasanTolak:alasan});
+  const linkSnap=await db.collection('hrd_dinas_luar').where('noSPPD','==',p.noSPPD).get();
+  linkSnap.forEach(d=>d.ref.update({status:'rejected'}));
+  await sendNotification(p.userId||p.nama,'SPPD Ditolak',`SPPD ${p.noSPPD} ditolak: ${alasan}`);
+  toast('SPPD ditolak','info');
+  showSPPDTab('daftar');
+}
+
+
+async function viewSPPD(id){
+  const doc=await db.collection('hrd_perjalanan_dinas').doc(id).get();
+  const p=doc.data();
+  const durasi=p.tanggalMulai&&p.tanggalSelesai?Math.ceil((new Date(p.tanggalSelesai)-new Date(p.tanggalMulai))/(1000*60*60*24)+1)+' hari':'-';
+  const badge=p.status==='approved'?'badge-success':p.status==='rejected'?'badge-danger':p.status==='selesai'?'badge-info':'badge-warning';
+  openModal(`<div class="modal-title">📋 Detail SPPD — ${escHtml(p.noSPPD)}</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><span class="badge ${badge}" style="font-size:.85rem;padding:6px 14px">${p.status?.toUpperCase()}</span><span class="text-sm" style="color:#999">${formatDate(p.createdAt)}</span></div>
+    <div class="grid-2 mb-16">
+      <div><b>Nama:</b> ${escHtml(p.nama)}</div>
+      <div><b>Departemen:</b> ${escHtml(p.departemen||'-')}</div>
+      <div><b>Tujuan:</b> ${escHtml(p.tujuan)}</div>
+      <div><b>Klien/Instansi:</b> ${escHtml(p.klien||'-')}</div>
+      <div><b>Tanggal:</b> ${formatDate(p.tanggalMulai)} - ${formatDate(p.tanggalSelesai)}</div>
+      <div><b>Durasi:</b> ${durasi}</div>
+      <div><b>Transportasi:</b> ${escHtml(p.transportasi||'-')}</div>
+      <div><b>Akomodasi:</b> ${escHtml(p.akomodasi||'-')}</div>
+    </div>
+    <div class="mb-16"><b>Keperluan:</b><div class="text-sm mt-4" style="background:#f8f9ff;padding:10px;border-radius:6px">${escHtml(p.keperluan||'-')}</div></div>
+    <div class="fw-700 mb-8">💰 Estimasi Biaya:</div>
+    <div class="grid-2 mb-16" style="background:#f8f9ff;padding:12px;border-radius:8px">
+      <div>Transport: ${formatCurrency(p.biayaTransport)}</div>
+      <div>Akomodasi: ${formatCurrency(p.biayaAkomodasi)}</div>
+      <div>Makan & Saku: ${formatCurrency(p.biayaMakan)}</div>
+      <div>Lain-lain: ${formatCurrency(p.biayaLain)}</div>
+      <div class="fw-700" style="grid-column:span 2;border-top:1px solid var(--border);padding-top:8px;margin-top:4px">Total: ${formatCurrency(p.totalEstimasi)}</div>
+    </div>
+    ${p.catatan?`<div class="mb-16"><b>Catatan:</b><div class="text-sm mt-4">${escHtml(p.catatan)}</div></div>`:''}
+    ${p.approvedBy?`<div class="text-sm" style="color:var(--success)">✅ Disetujui oleh: ${escHtml(p.approvedBy)} (${formatDate(p.approvedAt)})</div>`:''}
+    ${p.rejectedBy?`<div class="text-sm" style="color:var(--danger)">❌ Ditolak oleh: ${escHtml(p.rejectedBy)} — ${escHtml(p.alasanTolak||'')}</div>`:''}
+    ${p.status==='approved'?`<div class="flex gap-8 mt-16"><button class="btn btn-primary btn-sm" onclick="closeModalDirect();modalUangMukaDinas('${id}')">💰 Ajukan Uang Muka</button><button class="btn btn-info btn-sm" onclick="closeModalDirect();modalLaporanDinas('${id}')">📝 Buat Laporan</button></div>`:''}`,true);
+}
+
+
+function cetakSPPD(id){
+  db.collection('hrd_perjalanan_dinas').doc(id).get().then(doc=>{
+    const p=doc.data();
+    const durasi=p.tanggalMulai&&p.tanggalSelesai?Math.ceil((new Date(p.tanggalSelesai)-new Date(p.tanggalMulai))/(1000*60*60*24)+1)+' hari':'-';
+    const win=window.open('','_blank');
+    win.document.write(`<html><head><title>SPPD ${p.noSPPD}</title><style>body{font-family:serif;padding:40px;max-width:800px;margin:auto}h2{text-align:center}table{width:100%;border-collapse:collapse;margin:20px 0}td{padding:8px;border:1px solid #333;font-size:14px}.no-border td{border:none}.sign{display:flex;justify-content:space-between;margin-top:60px;text-align:center}.sign div{width:200px}@media print{button{display:none}}</style></head><body>
+      <h2>SURAT PERINTAH PERJALANAN DINAS</h2>
+      <p style="text-align:center">No: ${escHtml(p.noSPPD)}</p>
+      <table><tr><td width="30%"><b>Nama</b></td><td>${escHtml(p.nama)}</td></tr><tr><td><b>Departemen</b></td><td>${escHtml(p.departemen||'-')}</td></tr><tr><td><b>Tujuan</b></td><td>${escHtml(p.tujuan)}</td></tr><tr><td><b>Klien/Instansi</b></td><td>${escHtml(p.klien||'-')}</td></tr><tr><td><b>Tanggal</b></td><td>${formatDate(p.tanggalMulai)} s/d ${formatDate(p.tanggalSelesai)} (${durasi})</td></tr><tr><td><b>Transportasi</b></td><td>${escHtml(p.transportasi||'-')}</td></tr><tr><td><b>Akomodasi</b></td><td>${escHtml(p.akomodasi||'-')}</td></tr><tr><td><b>Keperluan</b></td><td>${escHtml(p.keperluan||'-')}</td></tr><tr><td><b>Estimasi Biaya</b></td><td>${formatCurrency(p.totalEstimasi)}</td></tr></table>
+      <div class="sign"><div><p>Yang Bersangkutan,</p><br><br><br><p><b>${escHtml(p.nama)}</b></p></div><div><p>Disetujui,</p><br><br><br><p><b>${escHtml(p.approvedBy||'___________')}</b></p></div></div>
+      <button onclick="window.print()" style="margin-top:30px;padding:10px 20px;cursor:pointer">🖨️ Cetak</button></body></html>`);
+  });
+}
+
+
+// ── UANG MUKA PERJALANAN DINAS ────────────────────────────────
+
+async function loadSPPDUangMuka(el){
+  const isPortal=window._portalDinasMode&&!hasAccess(3);
+  const snap=await db.collection('hrd_uang_muka_dinas').get();
+  let h=`<div class="card"><div class="card-header"><div class="card-title">💰 Uang Muka Perjalanan Dinas</div><button class="btn btn-primary btn-sm" onclick="modalUangMukaDinasNew()">+ Ajukan Uang Muka</button></div>
+    <div class="table-wrap"><table><thead><tr><th>No. SPPD</th><th>Nama</th><th>Jumlah</th><th>Status</th><th>Aksi</th></tr></thead><tbody>`;
+  let hasData=false;
+  snap.forEach(d=>{const p=d.data();
+    if(isPortal&&p.userId!==currentUser.id)return;
+    hasData=true;
+    const badge=p.status==='dicairkan'?'badge-success':p.status==='ditolak'?'badge-danger':'badge-warning';
+    h+=`<tr><td class="fw-700">${escHtml(p.noSPPD||'-')}</td><td>${escHtml(p.nama)}</td><td>${formatCurrency(p.jumlah)}</td><td><span class="badge ${badge}">${p.status}</span></td><td><button class="btn btn-xs btn-info" onclick="viewUangMukaDinas('${d.id}')">👁️</button> ${hasAccess(3)&&p.status==='pending'?`<button class="btn btn-xs btn-success" onclick="cairkanUangMuka('${d.id}')">💸</button>`:''}</td></tr>`;
+  });
+  if(!hasData)h+='<tr><td colspan="5" class="text-center">Belum ada pengajuan uang muka</td></tr>';
+  h+='</tbody></table></div></div>';
+  el.innerHTML=h;
+}
+
+async function modalUangMukaDinas(sppdId){
+  const doc=await db.collection('hrd_perjalanan_dinas').doc(sppdId).get();
+  const p=doc.data();
+  const maxUM=Math.floor((p.totalEstimasi||0)*0.8);
+  openModal(`<div class="modal-title">💰 Ajukan Uang Muka Perjalanan Dinas</div>
+    <div style="background:#f0f4ff;padding:10px;border-radius:8px;margin-bottom:16px"><b>SPPD:</b> ${escHtml(p.noSPPD)} — ${escHtml(p.tujuan)}<br><b>Estimasi Total:</b> ${formatCurrency(p.totalEstimasi)} | <b>Maks Uang Muka (80%):</b> ${formatCurrency(maxUM)}</div>
+    <div class="form-group"><label>Jumlah Uang Muka (Rp)</label><input class="form-control" type="number" id="umJumlah" value="${maxUM}" max="${maxUM}"></div>
+    <div class="form-group"><label>Rincian Penggunaan</label><textarea class="form-control" id="umRincian" placeholder="Transport: Rp..., Hotel: Rp..., dll"></textarea></div>
+    <div class="form-group"><label>Metode Transfer</label><select class="form-control" id="umMetode"><option value="Transfer Bank">Transfer Bank</option><option value="Cash">Cash</option><option value="E-Wallet">E-Wallet</option></select></div>
+    <button class="btn btn-primary" onclick="simpanUangMukaDinas('${sppdId}','${p.noSPPD}')">💰 Ajukan</button>`);
+}
+
+async function modalUangMukaDinasNew(){
+  const snap=await db.collection('hrd_perjalanan_dinas').where('status','==','approved').get();
+  let options='<option value="">-- Pilih SPPD --</option>';
+  snap.forEach(d=>{const p=d.data();
+    if(p.userId===currentUser.id||hasAccess(3))options+=`<option value="${d.id}" data-total="${p.totalEstimasi||0}" data-nosppd="${p.noSPPD}">${p.noSPPD} — ${p.tujuan}</option>`;
+  });
+  openModal(`<div class="modal-title">💰 Ajukan Uang Muka Perjalanan Dinas</div>
+    <div class="form-group"><label>Pilih SPPD</label><select class="form-control" id="umSPPDSelect" onchange="updateUMMax()">${options}</select></div>
+    <div id="umMaxInfo" class="mb-8"></div>
+    <div class="form-group"><label>Jumlah Uang Muka (Rp)</label><input class="form-control" type="number" id="umJumlah" value="0"></div>
+    <div class="form-group"><label>Rincian Penggunaan</label><textarea class="form-control" id="umRincian" placeholder="Transport: Rp..., Hotel: Rp..., dll"></textarea></div>
+    <div class="form-group"><label>Metode Transfer</label><select class="form-control" id="umMetode"><option value="Transfer Bank">Transfer Bank</option><option value="Cash">Cash</option><option value="E-Wallet">E-Wallet</option></select></div>
+    <button class="btn btn-primary" onclick="simpanUangMukaDinasFromSelect()">💰 Ajukan</button>`);
+}
+
+
+function updateUMMax(){
+  const sel=document.getElementById('umSPPDSelect');
+  const opt=sel.options[sel.selectedIndex];
+  const total=parseInt(opt?.getAttribute('data-total'))||0;
+  const max=Math.floor(total*0.8);
+  document.getElementById('umMaxInfo').innerHTML=total?`<span class="text-sm" style="color:#666">Estimasi: ${formatCurrency(total)} | Maks UM (80%): <b>${formatCurrency(max)}</b></span>`:'';
+  document.getElementById('umJumlah').value=max;
+  document.getElementById('umJumlah').max=max;
+}
+
+async function simpanUangMukaDinasFromSelect(){
+  const sel=document.getElementById('umSPPDSelect');
+  const sppdId=sel.value;
+  const noSPPD=sel.options[sel.selectedIndex]?.getAttribute('data-nosppd')||'';
+  if(!sppdId)return toast('Pilih SPPD dulu','warning');
+  await simpanUangMukaDinas(sppdId,noSPPD);
+}
+
+async function simpanUangMukaDinas(sppdId,noSPPD){
+  const jumlah=parseInt(document.getElementById('umJumlah').value)||0;
+  const rincian=document.getElementById('umRincian').value;
+  const metode=document.getElementById('umMetode').value;
+  if(!jumlah)return toast('Jumlah harus lebih dari 0','warning');
+  await db.collection('hrd_uang_muka_dinas').add({
+    sppdId,noSPPD,nama:currentUser.nama,userId:currentUser.id,
+    jumlah,rincian,metode,status:'pending',
+    createdAt:new Date().toISOString()
+  });
+  await sendNotification('admin','Uang Muka Dinas',`${currentUser.nama} mengajukan uang muka ${formatCurrency(jumlah)} untuk ${noSPPD}`);
+  closeModalDirect();toast('✅ Uang muka diajukan','success');showSPPDTab('uang-muka');
+}
+
+async function cairkanUangMuka(id){
+  if(!confirm('Cairkan uang muka ini?'))return;
+  await db.collection('hrd_uang_muka_dinas').doc(id).update({status:'dicairkan',dicairkanOleh:currentUser.nama,dicairkanAt:new Date().toISOString()});
+  const doc=await db.collection('hrd_uang_muka_dinas').doc(id).get();
+  const p=doc.data();
+  await sendNotification(p.userId,'Uang Muka Dicairkan',`Uang muka ${formatCurrency(p.jumlah)} untuk ${p.noSPPD} telah dicairkan`);
+  toast('💸 Uang muka dicairkan','success');showSPPDTab('uang-muka');
+}
+
+function viewUangMukaDinas(id){
+  db.collection('hrd_uang_muka_dinas').doc(id).get().then(doc=>{const p=doc.data();
+    openModal(`<div class="modal-title">💰 Detail Uang Muka Dinas</div>
+      <div class="grid-2 mb-16"><div><b>No. SPPD:</b> ${escHtml(p.noSPPD)}</div><div><b>Nama:</b> ${escHtml(p.nama)}</div><div><b>Jumlah:</b> ${formatCurrency(p.jumlah)}</div><div><b>Metode:</b> ${escHtml(p.metode||'-')}</div><div><b>Status:</b> <span class="badge badge-${p.status==='dicairkan'?'success':'warning'}">${p.status}</span></div><div><b>Tanggal:</b> ${formatDate(p.createdAt)}</div></div>
+      ${p.rincian?`<div><b>Rincian:</b><div class="text-sm mt-4" style="background:#f8f9ff;padding:10px;border-radius:6px">${escHtml(p.rincian)}</div></div>`:''}
+      ${p.dicairkanOleh?`<div class="mt-8 text-sm color-success">💸 Dicairkan oleh: ${escHtml(p.dicairkanOleh)} (${formatDate(p.dicairkanAt)})</div>`:''}`);
+  });
+}
+
+
+// ── LAPORAN PERJALANAN DINAS ──────────────────────────────────
+
+async function loadSPPDLaporan(el){
+  const isPortal=window._portalDinasMode&&!hasAccess(3);
+  const snap=await db.collection('hrd_laporan_dinas').get();
+  let h=`<div class="card"><div class="card-header"><div class="card-title">📝 Laporan Perjalanan Dinas</div><button class="btn btn-primary btn-sm" onclick="modalLaporanDinasNew()">+ Buat Laporan</button></div>
+    <div class="table-wrap"><table><thead><tr><th>No. SPPD</th><th>Nama</th><th>Tujuan</th><th>Hasil</th><th>Tanggal Laporan</th><th>Aksi</th></tr></thead><tbody>`;
+  let hasData=false;
+  snap.forEach(d=>{const p=d.data();
+    if(isPortal&&p.userId!==currentUser.id)return;
+    hasData=true;
+    h+=`<tr><td class="fw-700">${escHtml(p.noSPPD||'-')}</td><td>${escHtml(p.nama)}</td><td>${escHtml(p.tujuan||'-')}</td><td class="text-sm">${escHtml((p.hasil||'').substring(0,50))}${(p.hasil||'').length>50?'...':''}</td><td>${formatDate(p.createdAt)}</td><td><button class="btn btn-xs btn-info" onclick="viewLaporanDinas('${d.id}')">👁️</button></td></tr>`;
+  });
+  if(!hasData)h+='<tr><td colspan="6" class="text-center">Belum ada laporan</td></tr>';
+  h+='</tbody></table></div></div>';
+  el.innerHTML=h;
+}
+
+async function modalLaporanDinas(sppdId){
+  const doc=await db.collection('hrd_perjalanan_dinas').doc(sppdId).get();
+  const p=doc.data();
+  openModal(`<div class="modal-title">📝 Laporan Perjalanan Dinas</div>
+    <div style="background:#f0f4ff;padding:10px;border-radius:8px;margin-bottom:16px"><b>SPPD:</b> ${escHtml(p.noSPPD)} — ${escHtml(p.tujuan)}<br><b>Tanggal:</b> ${formatDate(p.tanggalMulai)} - ${formatDate(p.tanggalSelesai)}</div>
+    <div class="form-group"><label>Hasil / Pencapaian</label><textarea class="form-control" id="lpdHasil" style="min-height:100px" placeholder="Jelaskan hasil dan pencapaian perjalanan dinas"></textarea></div>
+    <div class="form-group"><label>Aktivitas yang Dilakukan</label><textarea class="form-control" id="lpdAktivitas" placeholder="Rincian aktivitas selama dinas"></textarea></div>
+    <div class="form-group"><label>Kendala / Catatan</label><textarea class="form-control" id="lpdKendala" placeholder="Kendala yang dihadapi (jika ada)"></textarea></div>
+    <div class="form-group"><label>Tindak Lanjut</label><textarea class="form-control" id="lpdTindakLanjut" placeholder="Rencana tindak lanjut setelah dinas"></textarea></div>
+    <button class="btn btn-primary" onclick="simpanLaporanDinas('${sppdId}','${escHtml(p.noSPPD)}','${escHtml(p.tujuan)}')">📝 Simpan Laporan</button>`,true);
+}
+
+async function modalLaporanDinasNew(){
+  const snap=await db.collection('hrd_perjalanan_dinas').where('status','==','approved').get();
+  let options='<option value="">-- Pilih SPPD --</option>';
+  snap.forEach(d=>{const p=d.data();
+    if(p.userId===currentUser.id||hasAccess(3))options+=`<option value="${d.id}" data-nosppd="${p.noSPPD}" data-tujuan="${p.tujuan}">${p.noSPPD} — ${p.tujuan}</option>`;
+  });
+  openModal(`<div class="modal-title">📝 Buat Laporan Perjalanan Dinas</div>
+    <div class="form-group"><label>Pilih SPPD</label><select class="form-control" id="lpdSPPDSelect">${options}</select></div>
+    <div class="form-group"><label>Hasil / Pencapaian</label><textarea class="form-control" id="lpdHasil" style="min-height:100px" placeholder="Jelaskan hasil dan pencapaian"></textarea></div>
+    <div class="form-group"><label>Aktivitas yang Dilakukan</label><textarea class="form-control" id="lpdAktivitas" placeholder="Rincian aktivitas"></textarea></div>
+    <div class="form-group"><label>Kendala / Catatan</label><textarea class="form-control" id="lpdKendala" placeholder="Kendala (opsional)"></textarea></div>
+    <div class="form-group"><label>Tindak Lanjut</label><textarea class="form-control" id="lpdTindakLanjut" placeholder="Rencana tindak lanjut"></textarea></div>
+    <button class="btn btn-primary" onclick="simpanLaporanDinasFromSelect()">📝 Simpan Laporan</button>`,true);
+}
+
+
+async function simpanLaporanDinasFromSelect(){
+  const sel=document.getElementById('lpdSPPDSelect');
+  const sppdId=sel.value;
+  const noSPPD=sel.options[sel.selectedIndex]?.getAttribute('data-nosppd')||'';
+  const tujuan=sel.options[sel.selectedIndex]?.getAttribute('data-tujuan')||'';
+  if(!sppdId)return toast('Pilih SPPD dulu','warning');
+  await simpanLaporanDinas(sppdId,noSPPD,tujuan);
+}
+
+async function simpanLaporanDinas(sppdId,noSPPD,tujuan){
+  const hasil=document.getElementById('lpdHasil').value;
+  const aktivitas=document.getElementById('lpdAktivitas').value;
+  const kendala=document.getElementById('lpdKendala').value;
+  const tindakLanjut=document.getElementById('lpdTindakLanjut').value;
+  if(!hasil)return toast('Hasil/Pencapaian wajib diisi','warning');
+  await db.collection('hrd_laporan_dinas').add({
+    sppdId,noSPPD,tujuan,nama:currentUser.nama,userId:currentUser.id,
+    hasil,aktivitas,kendala,tindakLanjut,
+    createdAt:new Date().toISOString()
+  });
+  // Update status SPPD menjadi selesai
+  await db.collection('hrd_perjalanan_dinas').doc(sppdId).update({status:'selesai',laporanAt:new Date().toISOString()});
+  await sendNotification('admin','Laporan Dinas',`${currentUser.nama} telah submit laporan perjalanan dinas ${noSPPD}`);
+  closeModalDirect();toast('📝 Laporan dinas disimpan','success');showSPPDTab('laporan');
+}
+
+function viewLaporanDinas(id){
+  db.collection('hrd_laporan_dinas').doc(id).get().then(doc=>{const p=doc.data();
+    openModal(`<div class="modal-title">📝 Laporan Perjalanan Dinas</div>
+      <div class="grid-2 mb-16"><div><b>No. SPPD:</b> ${escHtml(p.noSPPD)}</div><div><b>Nama:</b> ${escHtml(p.nama)}</div><div><b>Tujuan:</b> ${escHtml(p.tujuan||'-')}</div><div><b>Tanggal:</b> ${formatDate(p.createdAt)}</div></div>
+      <div class="mb-12"><b>Hasil / Pencapaian:</b><div class="text-sm mt-4" style="background:#e8f5e9;padding:12px;border-radius:6px;white-space:pre-wrap">${escHtml(p.hasil||'-')}</div></div>
+      ${p.aktivitas?`<div class="mb-12"><b>Aktivitas:</b><div class="text-sm mt-4" style="background:#f8f9ff;padding:12px;border-radius:6px;white-space:pre-wrap">${escHtml(p.aktivitas)}</div></div>`:''}
+      ${p.kendala?`<div class="mb-12"><b>Kendala:</b><div class="text-sm mt-4" style="background:#fff3e0;padding:12px;border-radius:6px;white-space:pre-wrap">${escHtml(p.kendala)}</div></div>`:''}
+      ${p.tindakLanjut?`<div class="mb-12"><b>Tindak Lanjut:</b><div class="text-sm mt-4" style="background:#e3f2fd;padding:12px;border-radius:6px;white-space:pre-wrap">${escHtml(p.tindakLanjut)}</div></div>`:''}`,true);
+  });
+}
+
+
+// ── REIMBURSEMENT PERJALANAN DINAS ────────────────────────────
+
+async function loadSPPDReimbursement(el){
+  const isPortal=window._portalDinasMode&&!hasAccess(3);
+  const snap=await db.collection('hrd_reimburse_dinas').get();
+  let h=`<div class="card"><div class="card-header"><div class="card-title">🧾 Reimbursement Perjalanan Dinas</div><button class="btn btn-primary btn-sm" onclick="modalReimburseDinasNew()">+ Ajukan Reimburse</button></div>
+    <p class="text-sm mb-16" style="color:#666">Pertanggungjawaban biaya perjalanan dinas. Selisih uang muka vs pengeluaran aktual akan dikembalikan/dibayarkan.</p>
+    <div class="table-wrap"><table><thead><tr><th>No. SPPD</th><th>Nama</th><th>Uang Muka</th><th>Aktual</th><th>Selisih</th><th>Status</th><th>Aksi</th></tr></thead><tbody>`;
+  let hasData=false;
+  snap.forEach(d=>{const p=d.data();
+    if(isPortal&&p.userId!==currentUser.id)return;
+    hasData=true;
+    const selisih=(p.totalAktual||0)-(p.uangMuka||0);
+    const selisihLabel=selisih>0?`<span style="color:var(--danger)">+${formatCurrency(selisih)}</span>`:`<span style="color:var(--success)">${formatCurrency(selisih)}</span>`;
+    const badge=p.status==='approved'?'badge-success':p.status==='rejected'?'badge-danger':'badge-warning';
+    h+=`<tr><td class="fw-700">${escHtml(p.noSPPD||'-')}</td><td>${escHtml(p.nama)}</td><td>${formatCurrency(p.uangMuka)}</td><td>${formatCurrency(p.totalAktual)}</td><td>${selisihLabel}</td><td><span class="badge ${badge}">${p.status}</span></td><td><button class="btn btn-xs btn-info" onclick="viewReimburseDinas('${d.id}')">👁️</button> ${hasAccess(3)&&p.status==='pending'?`<button class="btn btn-xs btn-success" onclick="approveReimburseDinas('${d.id}')">✅</button>`:''}</td></tr>`;
+  });
+  if(!hasData)h+='<tr><td colspan="7" class="text-center">Belum ada reimbursement</td></tr>';
+  h+='</tbody></table></div></div>';
+  el.innerHTML=h;
+}
+
+async function modalReimburseDinasNew(){
+  const snap=await db.collection('hrd_perjalanan_dinas').where('status','==','selesai').get();
+  let options='<option value="">-- Pilih SPPD (Selesai) --</option>';
+  snap.forEach(d=>{const p=d.data();
+    if(p.userId===currentUser.id||hasAccess(3))options+=`<option value="${d.id}" data-nosppd="${p.noSPPD}" data-total="${p.totalEstimasi||0}">${p.noSPPD} — ${p.tujuan}</option>`;
+  });
+  openModal(`<div class="modal-title">🧾 Ajukan Reimbursement Perjalanan Dinas</div>
+    <div class="form-group"><label>Pilih SPPD</label><select class="form-control" id="rdSPPDSelect" onchange="loadUangMukaForReimburse()">${options}</select></div>
+    <div id="rdUangMukaInfo" class="mb-8"></div>
+    <div class="fw-700 text-sm mb-8 color-primary">💰 Pengeluaran Aktual</div>
+    <div class="grid-2">
+      <div class="form-group"><label>Transport (Rp)</label><input class="form-control" type="number" id="rdTransport" value="0"></div>
+      <div class="form-group"><label>Akomodasi (Rp)</label><input class="form-control" type="number" id="rdAkomodasi" value="0"></div>
+      <div class="form-group"><label>Makan & Uang Saku (Rp)</label><input class="form-control" type="number" id="rdMakan" value="0"></div>
+      <div class="form-group"><label>Lain-lain (Rp)</label><input class="form-control" type="number" id="rdLain" value="0"></div>
+    </div>
+    <div class="form-group"><label>Keterangan Bukti</label><textarea class="form-control" id="rdKeterangan" placeholder="Daftar bukti/kwitansi yang dilampirkan"></textarea></div>
+    <button class="btn btn-primary" onclick="simpanReimburseDinas()">🧾 Ajukan Reimburse</button>`,true);
+}
+
+
+async function loadUangMukaForReimburse(){
+  const sel=document.getElementById('rdSPPDSelect');
+  const sppdId=sel.value;
+  const noSPPD=sel.options[sel.selectedIndex]?.getAttribute('data-nosppd')||'';
+  const el=document.getElementById('rdUangMukaInfo');
+  if(!sppdId){el.innerHTML='';return;}
+  const umSnap=await db.collection('hrd_uang_muka_dinas').where('noSPPD','==',noSPPD).where('status','==','dicairkan').get();
+  let totalUM=0;umSnap.forEach(d=>totalUM+=d.data().jumlah||0);
+  el.innerHTML=`<div class="text-sm" style="background:#e8f5e9;padding:8px 12px;border-radius:6px">💰 Uang Muka Dicairkan: <b>${formatCurrency(totalUM)}</b></div>`;
+  window._rdUangMuka=totalUM;
+}
+
+async function simpanReimburseDinas(){
+  const sel=document.getElementById('rdSPPDSelect');
+  const sppdId=sel.value;
+  const noSPPD=sel.options[sel.selectedIndex]?.getAttribute('data-nosppd')||'';
+  if(!sppdId)return toast('Pilih SPPD dulu','warning');
+  const transport=parseInt(document.getElementById('rdTransport').value)||0;
+  const akomodasi=parseInt(document.getElementById('rdAkomodasi').value)||0;
+  const makan=parseInt(document.getElementById('rdMakan').value)||0;
+  const lain=parseInt(document.getElementById('rdLain').value)||0;
+  const totalAktual=transport+akomodasi+makan+lain;
+  const keterangan=document.getElementById('rdKeterangan').value;
+  const uangMuka=window._rdUangMuka||0;
+  if(!totalAktual)return toast('Isi pengeluaran aktual','warning');
+  await db.collection('hrd_reimburse_dinas').add({
+    sppdId,noSPPD,nama:currentUser.nama,userId:currentUser.id,
+    uangMuka,totalAktual,
+    biayaTransport:transport,biayaAkomodasi:akomodasi,biayaMakan:makan,biayaLain:lain,
+    selisih:totalAktual-uangMuka,keterangan,status:'pending',
+    createdAt:new Date().toISOString()
+  });
+  await sendNotification('admin','Reimburse Dinas',`${currentUser.nama} mengajukan reimbursement dinas ${noSPPD}: ${formatCurrency(totalAktual)}`);
+  closeModalDirect();toast('🧾 Reimbursement diajukan','success');showSPPDTab('reimbursement');
+}
+
+async function approveReimburseDinas(id){
+  if(!confirm('Setujui reimbursement ini?'))return;
+  await db.collection('hrd_reimburse_dinas').doc(id).update({status:'approved',approvedBy:currentUser.nama,approvedAt:new Date().toISOString()});
+  const doc=await db.collection('hrd_reimburse_dinas').doc(id).get();
+  const p=doc.data();
+  await sendNotification(p.userId,'Reimburse Dinas Disetujui',`Reimbursement ${p.noSPPD} sebesar ${formatCurrency(p.totalAktual)} telah disetujui`);
+  toast('✅ Reimbursement disetujui','success');showSPPDTab('reimbursement');
+}
+
+function viewReimburseDinas(id){
+  db.collection('hrd_reimburse_dinas').doc(id).get().then(doc=>{const p=doc.data();
+    const selisih=(p.totalAktual||0)-(p.uangMuka||0);
+    const selisihLabel=selisih>0?`Kurang Bayar: ${formatCurrency(selisih)} (perusahaan bayar ke karyawan)`:`Kelebihan: ${formatCurrency(Math.abs(selisih))} (karyawan kembalikan ke perusahaan)`;
+    openModal(`<div class="modal-title">🧾 Detail Reimbursement Dinas</div>
+      <div class="grid-2 mb-16"><div><b>No. SPPD:</b> ${escHtml(p.noSPPD)}</div><div><b>Nama:</b> ${escHtml(p.nama)}</div><div><b>Status:</b> <span class="badge badge-${p.status==='approved'?'success':'warning'}">${p.status}</span></div><div><b>Tanggal:</b> ${formatDate(p.createdAt)}</div></div>
+      <div class="mb-16" style="background:#f8f9ff;padding:14px;border-radius:8px">
+        <div class="fw-700 mb-8">💰 Rincian Biaya:</div>
+        <div class="grid-2"><div>Transport: ${formatCurrency(p.biayaTransport)}</div><div>Akomodasi: ${formatCurrency(p.biayaAkomodasi)}</div><div>Makan & Saku: ${formatCurrency(p.biayaMakan)}</div><div>Lain-lain: ${formatCurrency(p.biayaLain)}</div></div>
+        <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px"><b>Total Aktual:</b> ${formatCurrency(p.totalAktual)}</div>
+        <div><b>Uang Muka:</b> ${formatCurrency(p.uangMuka)}</div>
+        <div class="fw-700 mt-8" style="color:${selisih>0?'var(--danger)':'var(--success)'}">${selisihLabel}</div>
+      </div>
+      ${p.keterangan?`<div><b>Keterangan Bukti:</b><div class="text-sm mt-4">${escHtml(p.keterangan)}</div></div>`:''}
+      ${p.approvedBy?`<div class="mt-8 text-sm color-success">✅ Disetujui oleh: ${escHtml(p.approvedBy)}</div>`:''}`);
+  });
+}
