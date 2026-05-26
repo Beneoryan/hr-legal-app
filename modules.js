@@ -3106,28 +3106,28 @@ async function renderPortal(){const main=document.getElementById('mainContent');
       <div class="portal-accordion-header" onclick="togglePortalSection('pengumuman')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#e3f2fd;border-radius:8px;cursor:pointer;font-weight:700;font-size:.9rem">
         <span>📢 Pengumuman</span><span id="portalPengumumanCount" class="badge badge-info" style="font-size:.7rem">0</span>
       </div>
-      <div id="portalPengumumanBody" style="display:none;padding:12px 16px;border:1px solid #e3f2fd;border-top:none;border-radius:0 0 8px 8px"></div>
+      <div id="portalPengumumanBody" style="padding:12px 16px;border:1px solid #e3f2fd;border-top:none;border-radius:0 0 8px 8px"></div>
     </div>
     <!-- Broadcast Accordion -->
     <div class="portal-accordion mb-8">
       <div class="portal-accordion-header" onclick="togglePortalSection('broadcast')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#f3e5f5;border-radius:8px;cursor:pointer;font-weight:700;font-size:.9rem">
         <span>📡 Broadcast</span><span id="portalBroadcastCount" class="badge" style="background:#ce93d8;color:#fff;font-size:.7rem">0</span>
       </div>
-      <div id="portalBroadcastBody" style="display:none;padding:12px 16px;border:1px solid #f3e5f5;border-top:none;border-radius:0 0 8px 8px"></div>
+      <div id="portalBroadcastBody" style="padding:12px 16px;border:1px solid #f3e5f5;border-top:none;border-radius:0 0 8px 8px"></div>
     </div>
     <!-- Meeting Accordion -->
     <div class="portal-accordion mb-8">
       <div class="portal-accordion-header" onclick="togglePortalSection('meeting')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#e8f5e9;border-radius:8px;cursor:pointer;font-weight:700;font-size:.9rem">
         <span>📅 Meeting</span><span id="portalMeetingCount" class="badge badge-success" style="font-size:.7rem">0</span>
       </div>
-      <div id="portalMeetingBody" style="display:none;padding:12px 16px;border:1px solid #e8f5e9;border-top:none;border-radius:0 0 8px 8px"></div>
+      <div id="portalMeetingBody" style="padding:12px 16px;border:1px solid #e8f5e9;border-top:none;border-radius:0 0 8px 8px"></div>
     </div>
     <!-- Invite Accordion -->
     <div class="portal-accordion mb-8">
       <div class="portal-accordion-header" onclick="togglePortalSection('invite')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#fff3e0;border-radius:8px;cursor:pointer;font-weight:700;font-size:.9rem">
         <span>✉️ Undangan / Invite</span><span id="portalInviteCount" class="badge badge-warning" style="font-size:.7rem">0</span>
       </div>
-      <div id="portalInviteBody" style="display:none;padding:12px 16px;border:1px solid #fff3e0;border-top:none;border-radius:0 0 8px 8px"></div>
+      <div id="portalInviteBody" style="padding:12px 16px;border:1px solid #fff3e0;border-top:none;border-radius:0 0 8px 8px"></div>
     </div>
     <!-- Obrolan Quick Access -->
     <div class="portal-accordion mb-8">
@@ -3185,7 +3185,7 @@ async function loadPortalInfoSections(){
     let bcH='';
     if(bcSnap.empty)bcH='<p class="text-sm" style="color:#999">Belum ada broadcast</p>';
     else{const items=[];bcSnap.forEach(d=>items.push({id:d.id,...d.data()}));items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));items.forEach(p=>{bcH+=`<div style="padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="viewBroadcast('${p.id}')"><div class="fw-700 text-sm">${escHtml((p.pesan||'').substring(0,80))}${(p.pesan||'').length>80?'...':''}</div><div class="text-xs" style="color:#999">${formatDate(p.createdAt)} — ${escHtml(p.pengirim||'')} → ${escHtml(p.targetLabel||'Semua')}</div></div>`;});}
-    const bcBody=document.getElementById('portalBroadcastBody');if(bcBody){bcBody.innerHTML=bcH;if(bcSnap.size>0)bcBody.style.display='block';}
+    const bcBody=document.getElementById('portalBroadcastBody');if(bcBody){bcBody.innerHTML=bcH;}
     // Meeting
     const mtCount=document.getElementById('portalMeetingCount');
     if(mtCount)mtCount.textContent=mtSnap.size;
