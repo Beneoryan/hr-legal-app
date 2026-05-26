@@ -1041,10 +1041,10 @@ async function loadRekapGrid(){
   let totalH=0,totalT=0,totalD=0,totalK=0,totalL=0,totalLembur=0,totalLemburJam=0;
 
   filteredUsers.forEach(u=>{
-    // Check absenMap by id OR by nama (for manual entries)
-    const userAbsen=absenMap[u.id]||absenMap[u.nama]||absenMap[(u.nama||'').toLowerCase()]||{};
-    const userJamKerja=jamKerjaMap[u.id]||jamKerjaMap[u.nama]||{};
-    const userLemburMap2=lemburMap[u.id]||lemburMap[u.nama]||{};
+    // Merge absenMap from all possible keys (id, nama)
+    const userAbsen={...(absenMap[u.id]||{}),...(absenMap[u.nama]||{}),...(absenMap[(u.nama||'').toLowerCase()]||{})};
+    const userJamKerja={...(jamKerjaMap[u.id]||{}),...(jamKerjaMap[u.nama]||{})};
+    const userLemburMap2={...(lemburMap[u.id]||{}),...(lemburMap[u.nama]||{})};
     h+=`<tr><td class="text-sm fw-700">${escHtml(u.nama)}</td>`;
     let ut=0;
     let userLemburJam=0;
