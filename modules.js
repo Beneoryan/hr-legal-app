@@ -994,8 +994,8 @@ async function generateAllGaji(){
 
     // Tunjangan
     let tunj=0;tunjList.forEach(t=>{const p=(t.penerima||'Semua').toLowerCase();if(p==='semua'||p.includes(namaLow))tunj+=t.nominal||0;});
-    // Tunjangan cuti (1x gaji pokok per tahun, dibagi 12)
-    const tunjCuti=Math.round(gaji/12);
+    // Tunjangan cuti TIDAK di-generate otomatis (dikelola manual di menu Tunjangan)
+    const tunjCuti=0;
 
     // Insentif
     const insentif=insentifMap[namaLow]||0;
@@ -1219,7 +1219,8 @@ async function generateDefaultTunjangan(){
   const defaults=[
     {nama:'Tunjangan Transport',jenis:'tetap',nominal:500000,penerima:'Semua'},
     {nama:'Tunjangan Makan',jenis:'tetap',nominal:300000,penerima:'Semua'},
-    {nama:'Tunjangan Komunikasi',jenis:'tidak_tetap',nominal:200000,penerima:'Semua'}
+    {nama:'Tunjangan Komunikasi',jenis:'tidak_tetap',nominal:200000,penerima:'Semua'},
+    {nama:'Tunjangan Cuti',jenis:'tetap',nominal:0,penerima:'Semua',keterangan:'Sesuai ketentuan pemerintah: 1x gaji pokok per tahun. Isi nominal per karyawan atau biarkan 0 jika belum berlaku.'}
   ];
   for(const t of defaults){
     await db.collection('hrd_tunjangan').add({...t,createdAt:new Date().toISOString()});
