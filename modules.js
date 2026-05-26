@@ -587,14 +587,17 @@ const HARI_LIBUR_NASIONAL_2026 = [
   { tanggal: '2026-04-03', nama: 'Wafat Isa Al Masih', tipe: 'nasional' },
   { tanggal: '2026-05-01', nama: 'Hari Buruh Internasional', tipe: 'nasional' },
   { tanggal: '2026-05-14', nama: 'Kenaikan Isa Al Masih', tipe: 'nasional' },
-  { tanggal: '2026-05-26', nama: 'Hari Raya Idul Adha 1447 H', tipe: 'nasional' },
+  { tanggal: '2026-05-27', nama: 'Hari Raya Idul Adha 1447 H', tipe: 'nasional' },
+  { tanggal: '2026-05-28', nama: 'Cuti Bersama Idul Adha', tipe: 'cuti_bersama' },
+  { tanggal: '2026-05-29', nama: 'Cuti Bersama Idul Adha', tipe: 'cuti_bersama' },
   { tanggal: '2026-05-31', nama: 'Hari Raya Waisak 2570 BE', tipe: 'nasional' },
   { tanggal: '2026-06-01', nama: 'Hari Lahir Pancasila', tipe: 'nasional' },
   { tanggal: '2026-06-17', nama: 'Tahun Baru Islam 1448 H', tipe: 'nasional' },
   { tanggal: '2026-08-17', nama: 'Hari Kemerdekaan RI', tipe: 'nasional' },
   { tanggal: '2026-08-26', nama: 'Maulid Nabi Muhammad SAW', tipe: 'nasional' },
+  { tanggal: '2026-12-24', nama: 'Cuti Bersama Natal', tipe: 'cuti_bersama' },
   { tanggal: '2026-12-25', nama: 'Hari Natal', tipe: 'nasional' },
-  { tanggal: '2026-12-26', nama: 'Cuti Bersama Natal', tipe: 'cuti_bersama' }
+  { tanggal: '2026-12-31', nama: 'Cuti Bersama Tahun Baru', tipe: 'cuti_bersama' }
 ];
 
 let hariLiburCalendarMonth = null;
@@ -819,10 +822,16 @@ async function syncHariLiburNasional() {
 
   toast('Memproses sinkronisasi...', 'info');
 
-  // Delete existing national holidays for this year
-  const existingSnap = await db.collection('hrd_hari_libur').where('tahun','==',year).where('tipe','in',['nasional','cuti_bersama']).get();
+  // Delete ALL existing national/cuti_bersama holidays for this year (by date range)
+  const startYear=`${year}-01-01`,endYear=`${year}-12-31`;
+  const existingSnap = await db.collection('hrd_hari_libur').get();
   const batch1 = [];
-  existingSnap.forEach(d => batch1.push(d.ref.delete()));
+  existingSnap.forEach(d => {
+    const data=d.data();
+    const tgl=data.tanggal||'';
+    const tipe=data.tipe||'';
+    if(tgl>=startYear&&tgl<=endYear&&(tipe==='nasional'||tipe==='cuti_bersama'))batch1.push(d.ref.delete());
+  });
   await Promise.all(batch1);
 
   // Add all national holidays
