@@ -1028,11 +1028,12 @@ async function loadRekapGrid(){
   const absenMap={};
   const jamKerjaMap={};
   const lemburMap={};
-  absenSnap.forEach(d=>{const p=d.data();if(!p.tanggal||p.tanggal<startDate||p.tanggal>endDate)return;const uid=p.userId||'';if(!uid)return;if(!absenMap[uid])absenMap[uid]={};const day=parseInt(p.tanggal.split('-')[2]);if(p.tipe==='masuk')absenMap[uid][day]=p.status||'hadir';else if(p.tipe==='pulang'&&p.lembur){absenMap[uid][day]='lembur';if(!lemburMap[uid])lemburMap[uid]={};lemburMap[uid][day]=p.lemburJam||0;if(p.jamKerjaActual){if(!jamKerjaMap[uid])jamKerjaMap[uid]={};jamKerjaMap[uid][day]=p.jamKerjaActual;}}else if(p.tipe==='pulang'&&p.jamKerjaActual){if(!jamKerjaMap[uid])jamKerjaMap[uid]={};jamKerjaMap[uid][day]=p.jamKerjaActual;if(p.status==='kurang_jam')absenMap[uid][day]='kurang_jam';else if(p.status==='lengkap')absenMap[uid][day]='lengkap';}else if(p.tipe==='pulang'&&p.status==='kurang_jam')absenMap[uid][day]='kurang_jam';else if(p.tipe==='pulang'&&p.status==='lengkap')absenMap[uid][day]='lengkap';else if(p.tipe==='dinas_luar'&&!absenMap[uid][day])absenMap[uid][day]='dinas';});
-  // Also map by nama for manual entries that might use different userId
-  const namaToIdMap={};users.forEach(u=>{namaToIdMap[(u.nama||'').toLowerCase()]=u.id;});
-  absenSnap.forEach(d=>{const p=d.data();if(!p.tanggal||p.tanggal<startDate||p.tanggal>endDate)return;if(!p.nama)return;const mappedId=namaToIdMap[(p.nama||'').toLowerCase()];if(!mappedId||absenMap[mappedId])return;// Already mapped by userId
-  if(!absenMap[mappedId])absenMap[mappedId]={};const day=parseInt(p.tanggal.split('-')[2]);if(p.tipe==='masuk'&&!absenMap[mappedId][day])absenMap[mappedId][day]=p.status||'hadir';else if(p.tipe==='dinas_luar'&&!absenMap[mappedId][day])absenMap[mappedId][day]='dinas';});
+  absenSnap.forEach(d=>{const p=d.data();if(!p.tanggal||p.tanggal<startDate||p.tanggal>endDate)return;const uid=p.userId||'';const pNama=p.nama||'';const day=parseInt(p.tanggal.split('-')[2]);
+    // Index by userId
+    if(uid){if(!absenMap[uid])absenMap[uid]={};if(p.tipe==='masuk')absenMap[uid][day]=p.status||'hadir';else if(p.tipe==='pulang'&&p.lembur){absenMap[uid][day]='lembur';if(!lemburMap[uid])lemburMap[uid]={};lemburMap[uid][day]=p.lemburJam||0;}else if(p.tipe==='pulang'&&(p.status==='kurang_jam'||p.status==='lengkap'))absenMap[uid][day]=p.status;else if(p.tipe==='pulang'&&p.jamKerjaActual){if(!jamKerjaMap[uid])jamKerjaMap[uid]={};jamKerjaMap[uid][day]=p.jamKerjaActual;}else if(p.tipe==='dinas_luar'&&!absenMap[uid][day])absenMap[uid][day]='dinas';}
+    // Also index by nama (for matching in grid)
+    if(pNama){if(!absenMap[pNama])absenMap[pNama]={};if(p.tipe==='masuk'&&!absenMap[pNama][day])absenMap[pNama][day]=p.status||'hadir';else if(p.tipe==='dinas_luar'&&!absenMap[pNama][day])absenMap[pNama][day]='dinas';else if(p.tipe==='pulang'&&p.lembur&&!absenMap[pNama][day])absenMap[pNama][day]='lembur';else if(p.tipe==='pulang'&&p.status==='lengkap'&&!absenMap[pNama][day])absenMap[pNama][day]='lengkap';else if(p.tipe==='pulang'&&p.status==='kurang_jam'&&!absenMap[pNama][day])absenMap[pNama][day]='kurang_jam';}
+  });
 
   let h='<div class="table-wrap"><table><thead><tr><th style="min-width:120px">Nama</th>';
   for(let i=1;i<=days;i++)h+=`<th style="width:28px;text-align:center;font-size:.65rem">${i}</th>`;
@@ -1040,13 +1041,17 @@ async function loadRekapGrid(){
   let totalH=0,totalT=0,totalD=0,totalK=0,totalL=0,totalLembur=0,totalLemburJam=0;
 
   filteredUsers.forEach(u=>{
+    // Check absenMap by id OR by nama (for manual entries)
+    const userAbsen=absenMap[u.id]||absenMap[u.nama]||absenMap[(u.nama||'').toLowerCase()]||{};
+    const userJamKerja=jamKerjaMap[u.id]||jamKerjaMap[u.nama]||{};
+    const userLemburMap2=lemburMap[u.id]||lemburMap[u.nama]||{};
     h+=`<tr><td class="text-sm fw-700">${escHtml(u.nama)}</td>`;
     let ut=0;
     let userLemburJam=0;
     for(let i=1;i<=days;i++){
-      const st=absenMap[u.id]?.[i];
-      const jamKerja=jamKerjaMap[u.id]?.[i];
-      const lemburJam=lemburMap[u.id]?.[i];
+      const st=userAbsen[i];
+      const jamKerja=userJamKerja[i];
+      const lemburJam=userLemburMap2[i];
       // Check cuti/izin first (by userId or nama)
       const cutiStatus=cutiMap[u.id]?.[i]||cutiMap[u.nama]?.[i]||cutiMap[u.nama?.toLowerCase()]?.[i];
       const isOT=otMap[u.id]?.[i]||otMap[u.nama]?.[i];
