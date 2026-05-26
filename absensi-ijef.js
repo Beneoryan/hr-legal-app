@@ -1132,53 +1132,54 @@ async function processAbsenImportText(text){const rows=parseCsvRows(text);if(row
 // ── EDIT ABSEN PER KARYAWAN ───────────────────────────────────
 async function editAbsenKaryawan(userId, nama, bulan) {
   if(!userId||!bulan){toast('Data tidak valid','error');return;}
-  // Store for later use in simpanEditAbsen
   window._editAbsenUserId=userId;
   window._editAbsenNama=nama;
+  window._editAbsenBulan=bulan;
   const days = getMonthDays(bulan);
   const startDate = bulan + '-01', endDate = bulan + '-' + String(days).padStart(2, '0');
-  let masuk = 0, pulang = 0, dinas = 0, lembur = 0;
+  let masuk=0,pulang=0,dinas=0,lembur=0;
+  let records=[];
   try{
-    // Try to find user account linked to this karyawan to get correct userId
-    const userSnap=await db.collection('hrd_users').where('linkedKaryawan','==',userId).limit(1).get();
-    let actualUserId=userId;
-    if(!userSnap.empty)actualUserId=userSnap.docs[0].id;
-    else{const byNameSnap=await db.collection('hrd_users').where('nama','==',nama).limit(1).get();if(!byNameSnap.empty)actualUserId=byNameSnap.docs[0].id;}
-    window._editAbsenActualUserId=actualUserId;
-    // Load absensi by both IDs
     const snap = await db.collection('hrd_absensi').get();
     snap.forEach(d => {
       const p = d.data();
-      if(p.tanggal>=startDate&&p.tanggal<=endDate&&(p.userId===userId||p.userId===actualUserId||p.nama?.toLowerCase()===nama.toLowerCase())){
+      if(p.tanggal>=startDate&&p.tanggal<=endDate&&(p.userId===userId||p.nama===nama||(p.nama||'').toLowerCase()===nama.toLowerCase())){
+        records.push({id:d.id,...p});
         if (p.tipe === 'masuk') masuk++;
         if (p.tipe === 'pulang') pulang++;
         if (p.tipe === 'dinas_luar') dinas++;
         if (p.tipe === 'pulang' && p.lembur) lembur += (p.lemburJam || 0);
       }
     });
-  }catch(e){console.error('editAbsenKaryawan error:',e);}
+  }catch(e){}
+  records.sort((a,b)=>(a.tanggal||'').localeCompare(b.tanggal||''));
+  // Build records list
+  let recHtml='';
+  if(records.length){
+    recHtml='<div class="fw-700 text-sm mb-8 mt-16">📋 Riwayat Absensi Bulan Ini:</div><div class="table-wrap" style="max-height:200px;overflow-y:auto"><table><thead><tr><th>Tgl</th><th>Tipe</th><th>Waktu</th><th>Status</th><th>Aksi</th></tr></thead><tbody>';
+    records.forEach(r=>{recHtml+=`<tr><td>${r.tanggal?.split('-')[2]||'-'}</td><td>${r.tipe}</td><td>${r.waktu||'-'}</td><td>${r.status||'-'}</td><td><button class="btn btn-xs btn-danger" onclick="hapusSatuAbsen('${r.id}')">🗑️</button></td></tr>`;});
+    recHtml+='</tbody></table></div>';
+  }
 
   openModal(`<div class="modal-title">✏️ Edit Absensi — ${escHtml(nama)}</div>
-    <div class="text-sm mb-16" style="color:#666">Periode: ${bulan} (${getMonthDays(bulan)} hari)</div>
+    <div class="text-sm mb-16" style="color:#666">Periode: ${bulan} (${days} hari) | ID: ${userId}</div>
     <div class="stats-grid mb-16">
       <div class="stat-card"><div class="stat-value">${masuk}</div><div class="stat-label">Clock In</div></div>
       <div class="stat-card"><div class="stat-value">${pulang}</div><div class="stat-label">Clock Out</div></div>
       <div class="stat-card"><div class="stat-value">${dinas}</div><div class="stat-label">Dinas Luar</div></div>
       <div class="stat-card"><div class="stat-value">${lembur.toFixed(1)}</div><div class="stat-label">Lembur (jam)</div></div>
     </div>
-    <div class="fw-700 text-sm mb-8 color-primary">➕ Tambah/Edit Absensi Manual</div>
+    ${recHtml}
+    <div class="fw-700 text-sm mb-8 mt-16 color-primary">➕ Tambah Absensi Manual</div>
     <div class="grid-2">
       <div class="form-group"><label>Tanggal</label><input class="form-control" type="date" id="editAbsTgl" value="${todayStr()}"></div>
       <div class="form-group"><label>Tipe</label><select class="form-control" id="editAbsTipe"><option value="masuk">Clock In</option><option value="pulang">Clock Out</option><option value="dinas_luar">Dinas Luar</option></select></div>
     </div>
     <div class="grid-2">
       <div class="form-group"><label>Waktu</label><input class="form-control" type="time" id="editAbsWaktu" value="08:00"></div>
-      <div class="form-group"><label>Status</label><select class="form-control" id="editAbsStatus"><option value="tepat_waktu">Tepat Waktu</option><option value="hadir">Hadir</option><option value="terlambat">Terlambat</option><option value="lengkap">Lengkap</option><option value="kurang_jam">Kurang Jam</option></select></div>
+      <div class="form-group"><label>Status</label><select class="form-control" id="editAbsStatus"><option value="hadir">Hadir</option><option value="tepat_waktu">Tepat Waktu</option><option value="terlambat">Terlambat</option><option value="lengkap">Lengkap</option><option value="kurang_jam">Kurang Jam</option></select></div>
     </div>
-    <div class="flex gap-8 mt-16">
-      <button class="btn btn-primary" onclick="simpanEditAbsen()">💾 Simpan</button>
-      <button class="btn btn-danger" onclick="hapusAbsenHari()">🗑️ Hapus Absen Tanggal Ini</button>
-    </div>`, true);
+    <button class="btn btn-primary mt-8" onclick="simpanEditAbsen()">💾 Simpan</button>`, true);
 }
 
 async function simpanEditAbsen() {
@@ -1188,7 +1189,7 @@ async function simpanEditAbsen() {
   const status = document.getElementById('editAbsStatus').value;
   if (!tgl) return toast('Pilih tanggal', 'warning');
   if (!waktu) return toast('Isi waktu', 'warning');
-  const userId=window._editAbsenActualUserId||window._editAbsenUserId;
+  const userId=window._editAbsenUserId;
   const nama=window._editAbsenNama||'';
   try{
     await db.collection('hrd_absensi').add({
@@ -1205,16 +1206,23 @@ async function simpanEditAbsen() {
   }
 }
 
+async function hapusSatuAbsen(docId){
+  if(!confirm('Hapus record absensi ini?'))return;
+  await db.collection('hrd_absensi').doc(docId).delete();
+  toast('Record dihapus','success');
+  closeModalDirect();
+  setTimeout(()=>loadRekapGrid(),300);
+}
+
 async function hapusAbsenHari() {
   const tgl = document.getElementById('editAbsTgl').value;
   if (!tgl) return toast('Pilih tanggal', 'warning');
   if (!confirm(`Hapus semua absensi ${tgl} untuk karyawan ini?`)) return;
-  const userId=window._editAbsenActualUserId||window._editAbsenUserId;
+  const userId=window._editAbsenUserId;
   const nama=window._editAbsenNama||'';
-  // Search by userId AND nama
   const snap = await db.collection('hrd_absensi').get();
   const toDelete=[];
-  snap.forEach(d=>{const p=d.data();if(p.tanggal===tgl&&(p.userId===userId||p.nama?.toLowerCase()===nama.toLowerCase()))toDelete.push(d.ref);});
+  snap.forEach(d=>{const p=d.data();if(p.tanggal===tgl&&(p.userId===userId||p.nama===nama||(p.nama||'').toLowerCase()===nama.toLowerCase()))toDelete.push(d.ref);});
   if(!toDelete.length)return toast('Tidak ada data di tanggal ini','info');
   const batch=db.batch();toDelete.forEach(ref=>batch.delete(ref));
   await batch.commit();
