@@ -3166,11 +3166,12 @@ async function renderPortal(){const main=document.getElementById('mainContent');
 // ── PORTAL INFO SECTIONS — Accordion Data Loader ──────────────
 async function loadPortalInfoSections(){
   try{
-    const[pgSnap,bcSnap,mtSnap,invSnap]=await Promise.all([
+    const[pgSnap,bcSnap,mtSnap,invSnap,notifSnap]=await Promise.all([
       db.collection('hrd_pengumuman').get(),
       db.collection('hrd_broadcast').get(),
       db.collection('hrd_meeting').get(),
-      db.collection('hrd_meeting_invites').where('targetUser','==',currentUser.id).get()
+      db.collection('hrd_meeting_invites').where('targetUser','==',currentUser.id).get(),
+      db.collection('hrd_notifikasi').where('targetUser','==',currentUser.id).where('read','==',false).get()
     ]);
     // Pengumuman
     const pgCount=document.getElementById('portalPengumumanCount');
@@ -3200,6 +3201,22 @@ async function loadPortalInfoSections(){
     if(invSnap.empty)invH='<p class="text-sm" style="color:#999">Belum ada undangan</p>';
     else{const items=[];invSnap.forEach(d=>items.push({id:d.id,...d.data()}));items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));items.forEach(p=>{invH+=`<div style="padding:10px 0;border-bottom:1px solid var(--border)"><div class="fw-700 text-sm">${escHtml(p.meetingTitle||p.judul||'Undangan Meeting')}</div><div class="text-xs" style="color:#999">📅 ${formatDate(p.tanggal||p.createdAt)} — Dari: ${escHtml(p.invitedBy||'')}</div><div class="text-xs mt-4">${p.status==='accepted'?'<span class="badge badge-success">Diterima</span>':p.status==='declined'?'<span class="badge badge-danger">Ditolak</span>':`<span class="badge badge-warning">Pending</span> <button class="btn btn-xs btn-success" onclick="respondInvite('${p.id}','accepted')">✅ Terima</button> <button class="btn btn-xs btn-danger" onclick="respondInvite('${p.id}','declined')">❌ Tolak</button>`}${p.onlineRoomId?` <button class="btn btn-xs btn-success" onclick="joinOnlineMeeting('${p.onlineRoomId}')">🎥 Join</button>`:''}</div></div>`;});}
     const invBody=document.getElementById('portalInviteBody');if(invBody)invBody.innerHTML=invH;
+    // Notifikasi - show in pengumuman section if broadcast notifs exist
+    if(notifSnap.size>0){
+      const pgBody2=document.getElementById('portalPengumumanBody');
+      let notifH='';
+      notifSnap.forEach(d=>{const n=d.data();notifH+=`<div style="padding:8px 0;border-bottom:1px solid var(--border)"><div class="fw-700 text-sm">${escHtml(n.title||'')}</div><div class="text-xs" style="color:#555">${escHtml(n.message||'')}</div><div class="text-xs" style="color:#999">${formatDateTime(n.createdAt)}</div></div>`;});
+      // Also put in broadcast body if it has broadcast notifs
+      const bcBody2=document.getElementById('portalBroadcastBody');
+      if(bcBody2&&!bcSnap.size){
+        let bcNotifH='';
+        notifSnap.forEach(d=>{const n=d.data();if((n.title||'').toLowerCase().includes('broadcast'))bcNotifH+=`<div style="padding:8px 0;border-bottom:1px solid var(--border)"><div class="fw-700 text-sm">${escHtml(n.title||'')}</div><div class="text-xs" style="color:#555">${escHtml(n.message||'')}</div><div class="text-xs" style="color:#999">${formatDateTime(n.createdAt)}</div></div>`;});
+        if(bcNotifH)bcBody2.innerHTML=bcNotifH;
+      }
+      // Update pengumuman count to include notifs
+      const pgCount2=document.getElementById('portalPengumumanCount');
+      if(pgCount2)pgCount2.textContent=pgSnap.size+notifSnap.size;
+    }
   }catch(e){console.error('loadPortalInfoSections error:',e);}
 }
 
