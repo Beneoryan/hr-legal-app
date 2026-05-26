@@ -1058,8 +1058,8 @@ async function loadRekapGrid(){
       const isOT=otMap[u.id]?.[i]||otMap[u.nama]?.[i];
       const isLibur=liburSet.has(i);
       let color='#eee',text='-',title='';
-      if(isLibur){color='#9e9e9e';text='H';title=' title="Hari Libur"';}
-      else if(cutiStatus){color='#00bcd4';text='C';title=` title="${cutiStatus}"`;ut++;}
+      if(isLibur&&!st){color='#9e9e9e';text='H';title=' title="Hari Libur"';}
+      else if(cutiStatus&&!st){color='#00bcd4';text='C';title=` title="${cutiStatus}"`;ut++;}
       else if(st==='lembur'||isOT){color='#7b1fa2';text='L';ut++;totalLembur++;if(lemburJam){userLemburJam+=lemburJam;totalLemburJam+=lemburJam;}}
       else if(st==='tepat_waktu'||st==='hadir'){color='#4caf50';text='✓';ut++;totalH++;}
       else if(st==='terlambat'){color='#ff9800';text='T';ut++;totalT++;}
