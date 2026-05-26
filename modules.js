@@ -3159,10 +3159,8 @@ async function renderPortal(){const main=document.getElementById('mainContent');
   document.getElementById('pAbsen').textContent=absenSnap.size+' hari';
   document.getElementById('pCuti').textContent=Math.max(0,12-cutiSnap.size)+' hari';
   document.getElementById('pInbox').textContent=inboxSnap.size;
-  // Load portal info sections individually (each independent, no blocking)
-  loadPortalPengumuman();
-  loadPortalBroadcastInfo();
-  loadPortalMeetingInfo();
+  // Load portal info sections
+  loadPortalInfoSections();
   loadPortalInviteInfo();
 }
 
