@@ -920,7 +920,24 @@ async function hapusSelectedGaji(){const ids=[];document.querySelectorAll('.gaji
 async function hapusSemuaGaji(){if(!confirm('⚠️ HAPUS SEMUA slip gaji periode ini?'))return;if(!confirm('Konfirmasi: Yakin hapus SEMUA?'))return;const bulan=document.getElementById('filterBulanGaji')?.value||monthStr();const snap=await db.collection('hrd_penggajian').where('periode','==',bulan).get();const batch=db.batch();snap.forEach(d=>batch.delete(d.ref));await batch.commit();toast(`${snap.size} slip dihapus`,'success');loadGaji();}
 
 async function generateAllGaji(){
-  if(!confirm('Generate slip gaji untuk SEMUA karyawan aktif periode ini?\n\nPerhitungan: Tgl 20 bulan lalu s/d Tgl 20 bulan ini.\nTerintegrasi: Kehadiran, Lembur, Cuti, Tunjangan, PPH21.'))return;
+  openModal(`<div class="modal-title">⚡ Generate Slip Gaji Semua Karyawan</div>
+    <p class="text-sm mb-16" style="color:#666">Perhitungan: Tgl 20 bulan lalu s/d Tgl 20 bulan ini. Terintegrasi dengan kehadiran & lembur.</p>
+    <div class="fw-700 text-sm mb-8">Komponen yang disertakan:</div>
+    <div style="background:#f8f9ff;padding:12px;border-radius:8px;margin-bottom:16px">
+      <label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer;font-size:.85rem"><input type="checkbox" id="genIncTunjCuti"> Tunjangan Cuti (1/12 gaji pokok)</label>
+      <label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer;font-size:.85rem"><input type="checkbox" id="genIncBPJSKes" checked> BPJS Kesehatan (1% karyawan)</label>
+      <label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer;font-size:.85rem"><input type="checkbox" id="genIncBPJSTK" checked> BPJS TK/JHT (2% karyawan)</label>
+      <label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer;font-size:.85rem"><input type="checkbox" id="genIncPPH" checked> PPH 21 (progresif UU HPP)</label>
+    </div>
+    <button class="btn btn-success" onclick="doGenerateAllGaji()">⚡ Generate Sekarang</button>`);
+}
+async function doGenerateAllGaji(){
+  const incTunjCuti=document.getElementById('genIncTunjCuti')?.checked||false;
+  const incBPJSKes=document.getElementById('genIncBPJSKes')?.checked||false;
+  const incBPJSTK=document.getElementById('genIncBPJSTK')?.checked||false;
+  const incPPH=document.getElementById('genIncPPH')?.checked||false;
+  closeModalDirect();
+  if(!confirm('Konfirmasi: Generate slip gaji untuk semua karyawan aktif?'))return;
   try{
   const bulan=document.getElementById('filterBulanGaji')?.value||monthStr();
   const[year,month]=bulan.split('-').map(Number);
@@ -995,24 +1012,27 @@ async function generateAllGaji(){
     // Tunjangan
     let tunj=0;tunjList.forEach(t=>{const p=(t.penerima||'Semua').toLowerCase();if(p==='semua'||p.includes(namaLow))tunj+=t.nominal||0;});
     // Tunjangan cuti TIDAK di-generate otomatis (dikelola manual di menu Tunjangan)
-    const tunjCuti=0;
+    const tunjCuti=incTunjCuti?Math.round(gaji/12):0;
 
     // Insentif
     const insentif=insentifMap[namaLow]||0;
     // Reimbursement & Loan
     const reimb=reimbMap[namaLow]||0;const loan=kasbonMap[namaLow]||0;
-    // BPJS (sesuai ketentuan pemerintah)
-    const bpjsKes=Math.round(gaji*0.01); // 1% karyawan
-    const bpjsTK=Math.round(gaji*0.02);  // 2% karyawan (JHT)
-    // PPH21 Progressive (UU HPP 2022)
+    // BPJS (sesuai ketentuan pemerintah) - conditional based on checkbox
+    const bpjsKes=incBPJSKes?Math.round(gaji*0.01):0;
+    const bpjsTK=incBPJSTK?Math.round(gaji*0.02):0;
+    // PPH21 Progressive (UU HPP 2022) - conditional
     const bruto=gaji+tunj+tunjCuti+insentif+reimb+lemburNominal-potonganAbsen;
-    const penghasilanNetto=Math.max(0,(gaji+tunj+tunjCuti-bpjsKes-bpjsTK)*12-54000000); // PTKP TK/0 = 54jt
-    let pphT=0;
-    if(penghasilanNetto<=60000000)pphT=penghasilanNetto*0.05;
-    else if(penghasilanNetto<=250000000)pphT=3000000+(penghasilanNetto-60000000)*0.15;
-    else if(penghasilanNetto<=500000000)pphT=3000000+28500000+(penghasilanNetto-250000000)*0.25;
-    else pphT=3000000+28500000+62500000+(penghasilanNetto-500000000)*0.30;
-    const pph21=Math.max(0,Math.round(pphT/12));
+    let pph21=0;
+    if(incPPH){
+      const penghasilanNetto=Math.max(0,(gaji+tunj+tunjCuti-bpjsKes-bpjsTK)*12-54000000);
+      let pphT=0;
+      if(penghasilanNetto<=60000000)pphT=penghasilanNetto*0.05;
+      else if(penghasilanNetto<=250000000)pphT=3000000+(penghasilanNetto-60000000)*0.15;
+      else if(penghasilanNetto<=500000000)pphT=3000000+28500000+(penghasilanNetto-250000000)*0.25;
+      else pphT=3000000+28500000+62500000+(penghasilanNetto-500000000)*0.30;
+      pph21=Math.max(0,Math.round(pphT/12));
+    }
     // THP
     const totalPotongan=bpjsKes+bpjsTK+loan+pph21+potonganAbsen;
     const thp=bruto-bpjsKes-bpjsTK-loan-pph21;
