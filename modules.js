@@ -3180,58 +3180,59 @@ async function loadPortalInviteInfo(){try{const snap=await db.collection('hrd_me
 // ── PORTAL INFO SECTIONS — Accordion Data Loader ──────────────
 async function loadPortalInfoSections(){
   try{
-    const[pgSnap,bcSnap,mtSnap,invSnap,notifSnap]=await Promise.all([
-      db.collection('hrd_pengumuman').get(),
-      db.collection('hrd_broadcast').get(),
-      db.collection('hrd_meeting').get(),
-      db.collection('hrd_meeting_invites').where('targetUser','==',currentUser.id).get(),
-      db.collection('hrd_notifikasi').where('targetUser','==',currentUser.id).where('read','==',false).get()
-    ]);
+    // Use simple queries (no composite index needed)
+    const pgSnap=await db.collection('hrd_pengumuman').get();
+    const bcSnap=await db.collection('hrd_broadcast').get();
+    const mtSnap=await db.collection('hrd_meeting').get();
+    const invSnap=await db.collection('hrd_meeting_invites').get();
+    const notifSnap=await db.collection('hrd_notifikasi').get();
+    
+    // Filter invites for current user
+    const myInvites=[];invSnap.forEach(d=>{const p=d.data();if(p.targetUser===currentUser.id)myInvites.push({id:d.id,...p});});
+    // Filter notifs for current user (unread)
+    const myNotifs=[];notifSnap.forEach(d=>{const p=d.data();if((p.targetUser===currentUser.id||p.targetUser===currentUser.role)&&!p.read)myNotifs.push({id:d.id,...p});});
+
     // Pengumuman
     const pgCount=document.getElementById('portalPengumumanCount');
     if(pgCount)pgCount.textContent=pgSnap.size;
     let pgH='';
     if(pgSnap.empty)pgH='<p class="text-sm" style="color:#999">Belum ada pengumuman</p>';
-    else{const items=[];pgSnap.forEach(d=>items.push({id:d.id,...d.data()}));items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));items.forEach(p=>{pgH+=`<div style="padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="viewPengumuman('${p.id}')"><div class="fw-700 text-sm">${escHtml(p.judul||'')}</div><div class="text-xs" style="color:#999">${formatDate(p.createdAt)} — ${escHtml(p.dibuatOleh||'')}</div></div>`;});}
+    else{const items=[];pgSnap.forEach(d=>items.push({id:d.id,...d.data()}));items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));items.slice(0,5).forEach(p=>{pgH+=`<div style="padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="viewPengumuman('${p.id}')"><div class="fw-700 text-sm">${escHtml(p.judul||'')}</div><div class="text-xs" style="color:#999">${formatDate(p.createdAt)}</div></div>`;});}
     const pgBody=document.getElementById('portalPengumumanBody');if(pgBody)pgBody.innerHTML=pgH;
-    // Broadcast
+    
+    // Broadcast + Notifikasi broadcast
     const bcCount=document.getElementById('portalBroadcastCount');
-    if(bcCount)bcCount.textContent=bcSnap.size;
+    let bcItems=[];bcSnap.forEach(d=>bcItems.push({id:d.id,...d.data()}));
+    // Add broadcast notifications
+    myNotifs.forEach(n=>{if((n.title||'').toLowerCase().includes('broadcast'))bcItems.push({id:n.id,pesan:n.message,pengirim:n.title?.replace('📡 ',''),createdAt:n.createdAt,fromNotif:true});});
+    bcItems.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+    if(bcCount)bcCount.textContent=bcItems.length;
     let bcH='';
-    if(bcSnap.empty)bcH='<p class="text-sm" style="color:#999">Belum ada broadcast</p>';
-    else{const items=[];bcSnap.forEach(d=>items.push({id:d.id,...d.data()}));items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));items.forEach(p=>{bcH+=`<div style="padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="viewBroadcast('${p.id}')"><div class="fw-700 text-sm">${escHtml((p.pesan||'').substring(0,80))}${(p.pesan||'').length>80?'...':''}</div><div class="text-xs" style="color:#999">${formatDate(p.createdAt)} — ${escHtml(p.pengirim||'')} → ${escHtml(p.targetLabel||'Semua')}</div></div>`;});}
-    const bcBody=document.getElementById('portalBroadcastBody');if(bcBody){bcBody.innerHTML=bcH;}
+    if(!bcItems.length)bcH='<p class="text-sm" style="color:#999">Belum ada broadcast</p>';
+    else bcItems.slice(0,5).forEach(p=>{bcH+=`<div style="padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="${p.fromNotif?'':`viewBroadcast('${p.id}')`}"><div class="fw-700 text-sm">${escHtml((p.pesan||p.message||'').substring(0,80))}</div><div class="text-xs" style="color:#999">${formatDate(p.createdAt)} — ${escHtml(p.pengirim||'')}</div></div>`;});
+    const bcBody=document.getElementById('portalBroadcastBody');if(bcBody)bcBody.innerHTML=bcH;
+    
     // Meeting
     const mtCount=document.getElementById('portalMeetingCount');
     if(mtCount)mtCount.textContent=mtSnap.size;
     let mtH='';
     if(mtSnap.empty)mtH='<p class="text-sm" style="color:#999">Belum ada meeting</p>';
-    else{const items=[];mtSnap.forEach(d=>items.push({id:d.id,...d.data()}));items.sort((a,b)=>(b.tanggal||'').localeCompare(a.tanggal||''));items.forEach(p=>{const isPast=p.tanggal<todayStr();mtH+=`<div style="padding:10px 0;border-bottom:1px solid var(--border)"><div class="fw-700 text-sm">${escHtml(p.judul||p.agenda||'Meeting')}</div><div class="text-xs" style="color:#999">📅 ${formatDate(p.tanggal)} ${p.jam||''} — ${escHtml(p.lokasi||'')}</div><div class="text-xs mt-4">${isPast?'<span class="badge" style="background:#eee;color:#999">Selesai</span>':'<span class="badge badge-success">Upcoming</span>'}</div></div>`;});}
+    else{const items=[];mtSnap.forEach(d=>items.push({id:d.id,...d.data()}));items.sort((a,b)=>(b.tanggal||'').localeCompare(a.tanggal||''));items.slice(0,5).forEach(p=>{mtH+=`<div style="padding:8px 0;border-bottom:1px solid var(--border)"><div class="fw-700 text-sm">${escHtml(p.judul||'Meeting')}</div><div class="text-xs" style="color:#999">📅 ${formatDate(p.tanggal)} ${p.waktu||''}</div></div>`;});}
     const mtBody=document.getElementById('portalMeetingBody');if(mtBody)mtBody.innerHTML=mtH;
+    
     // Invite
     const invCount=document.getElementById('portalInviteCount');
-    if(invCount)invCount.textContent=invSnap.size;
+    if(invCount)invCount.textContent=myInvites.length;
     let invH='';
-    if(invSnap.empty)invH='<p class="text-sm" style="color:#999">Belum ada undangan</p>';
-    else{const items=[];invSnap.forEach(d=>items.push({id:d.id,...d.data()}));items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));items.forEach(p=>{invH+=`<div style="padding:10px 0;border-bottom:1px solid var(--border)"><div class="fw-700 text-sm">${escHtml(p.meetingTitle||p.judul||'Undangan Meeting')}</div><div class="text-xs" style="color:#999">📅 ${formatDate(p.tanggal||p.createdAt)} — Dari: ${escHtml(p.invitedBy||'')}</div><div class="text-xs mt-4">${p.status==='accepted'?'<span class="badge badge-success">Diterima</span>':p.status==='declined'?'<span class="badge badge-danger">Ditolak</span>':`<span class="badge badge-warning">Pending</span> <button class="btn btn-xs btn-success" onclick="respondInvite('${p.id}','accepted')">✅ Terima</button> <button class="btn btn-xs btn-danger" onclick="respondInvite('${p.id}','declined')">❌ Tolak</button>`}${p.onlineRoomId?` <button class="btn btn-xs btn-success" onclick="joinOnlineMeeting('${p.onlineRoomId}')">🎥 Join</button>`:''}</div></div>`;});}
+    if(!myInvites.length)invH='<p class="text-sm" style="color:#999">Belum ada undangan</p>';
+    else myInvites.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')).slice(0,5).forEach(p=>{invH+=`<div style="padding:8px 0;border-bottom:1px solid var(--border)"><div class="fw-700 text-sm">${escHtml(p.meetingTitle||p.judul||'Undangan')}</div><div class="text-xs" style="color:#999">${formatDate(p.createdAt)} — ${escHtml(p.fromName||'')}</div></div>`;});
     const invBody=document.getElementById('portalInviteBody');if(invBody)invBody.innerHTML=invH;
-    // Notifikasi - show in pengumuman section if broadcast notifs exist
-    if(notifSnap.size>0){
-      const pgBody2=document.getElementById('portalPengumumanBody');
-      let notifH='';
-      notifSnap.forEach(d=>{const n=d.data();notifH+=`<div style="padding:8px 0;border-bottom:1px solid var(--border)"><div class="fw-700 text-sm">${escHtml(n.title||'')}</div><div class="text-xs" style="color:#555">${escHtml(n.message||'')}</div><div class="text-xs" style="color:#999">${formatDateTime(n.createdAt)}</div></div>`;});
-      // Also put in broadcast body if it has broadcast notifs
-      const bcBody2=document.getElementById('portalBroadcastBody');
-      if(bcBody2&&!bcSnap.size){
-        let bcNotifH='';
-        notifSnap.forEach(d=>{const n=d.data();if((n.title||'').toLowerCase().includes('broadcast'))bcNotifH+=`<div style="padding:8px 0;border-bottom:1px solid var(--border)"><div class="fw-700 text-sm">${escHtml(n.title||'')}</div><div class="text-xs" style="color:#555">${escHtml(n.message||'')}</div><div class="text-xs" style="color:#999">${formatDateTime(n.createdAt)}</div></div>`;});
-        if(bcNotifH)bcBody2.innerHTML=bcNotifH;
-      }
-      // Update pengumuman count to include notifs
-      const pgCount2=document.getElementById('portalPengumumanCount');
-      if(pgCount2)pgCount2.textContent=pgSnap.size+notifSnap.size;
-    }
-  }catch(e){console.error('loadPortalInfoSections error:',e);}
+  }catch(e){
+    console.error('loadPortalInfoSections error:',e);
+    // Fallback: show error message in first section
+    const pgBody=document.getElementById('portalPengumumanBody');
+    if(pgBody)pgBody.innerHTML=`<p class="text-sm" style="color:var(--accent)">⚠️ Gagal memuat data: ${e.message||'Unknown error'}</p>`;
+  }
 }
 
 function togglePortalSection(section){
