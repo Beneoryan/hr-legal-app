@@ -4259,7 +4259,7 @@ const BENEFIT_CONFIG_BY_GRADE = {
 function resolveGradeKey(grade) {
   if (!grade) return 'STAFF';
   const g = grade.toUpperCase().trim();
-  if (g.includes('BOD') || g.includes('DIRECTOR')) return 'BOD';
+  if (g.includes('BOD') || g.includes('DIRECTOR') || g.includes('GENERAL MANAGER') || g === 'GM') return 'BOD';
   // Check HEAD/MANAGER before SENIOR to avoid "SENIOR MANAGER" matching SENIOR
   if (g.includes('HEAD') || g.includes('MANAGER')) return 'HEAD';
   if (g.includes('SENIOR') || g.includes('SUPERVISOR') || g.includes('LEADER')) return 'SENIOR';
