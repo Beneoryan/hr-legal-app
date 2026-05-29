@@ -4318,21 +4318,52 @@ async function getUserGrade() {
 
   try {
     let gradeFound = null;
+    let posisiFound = null;
+
     if (currentUser.linkedKaryawan) {
       const doc = await db.collection('hrd_karyawan').doc(currentUser.linkedKaryawan).get();
-      if (doc.exists && doc.data().gradeJabatan) {
-        gradeFound = doc.data().gradeJabatan;
+      if (doc.exists) {
+        gradeFound = doc.data().gradeJabatan || null;
+        posisiFound = doc.data().posisi || null;
       }
     }
-    if (!gradeFound) {
+    if (!gradeFound && !posisiFound) {
       const snap = await db.collection('hrd_karyawan').where('nama', '==', currentUser.nama).get();
       if (!snap.empty) {
         const data = snap.docs[0].data();
         gradeFound = data.gradeJabatan || null;
+        posisiFound = data.posisi || null;
       }
     }
+
+    // Posisi-based override: if posisi clearly indicates a higher grade, use that instead
+    const posisi = (posisiFound || currentUser.posisi || '').toUpperCase();
+    if (posisi.includes('GENERAL MANAGER') || posisi === 'GM') {
+      currentUser.gradeJabatan = 'GENERAL MANAGER';
+      currentUser._gradeFetched = true;
+      return currentUser.gradeJabatan;
+    }
+    if (posisi.includes('DIREKTUR') || posisi.includes('DIRECTOR')) {
+      currentUser.gradeJabatan = 'BOD';
+      currentUser._gradeFetched = true;
+      return currentUser.gradeJabatan;
+    }
+
+    // Use Firestore gradeJabatan if available (for non-override cases)
     if (gradeFound) {
       currentUser.gradeJabatan = gradeFound;
+      currentUser._gradeFetched = true;
+      return currentUser.gradeJabatan;
+    }
+
+    // Additional posisi-based inference for other grades
+    if (posisi.includes('HEAD') || posisi.includes('MANAGER')) {
+      currentUser.gradeJabatan = 'MANAGER';
+      currentUser._gradeFetched = true;
+      return currentUser.gradeJabatan;
+    }
+    if (posisi.includes('SUPERVISOR') || posisi.includes('SENIOR') || posisi.includes('LEADER')) {
+      currentUser.gradeJabatan = 'SENIOR';
       currentUser._gradeFetched = true;
       return currentUser.gradeJabatan;
     }
@@ -4340,7 +4371,7 @@ async function getUserGrade() {
     console.warn('getUserGrade error:', e);
   }
 
-  // Fallback: infer grade from posisi
+  // Fallback: infer from currentUser.posisi directly
   if (currentUser.posisi) {
     const posisi = currentUser.posisi.toUpperCase();
     if (posisi.includes('GENERAL MANAGER') || posisi.includes('GM')) {
