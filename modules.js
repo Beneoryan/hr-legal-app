@@ -3097,12 +3097,12 @@ async function renderPortal(){const main=document.getElementById('mainContent');
     if(!avatarUrl)avatarUrl=currentUser.profilePic||'';
   }catch(e){}
   const avatarHtml=avatarUrl?`<img src="${avatarUrl}" style="width:60px;height:60px;border-radius:50%;object-fit:cover">`:`<div style="width:60px;height:60px;font-size:1.5rem;background:var(--primary);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center">${u.nama.charAt(0)}</div>`;
-  main.innerHTML=`<div class="page-title"><span>🏠 Portal Saya</span></div><div class="card" style="border-left:4px solid var(--accent)"><div class="flex gap-16" style="align-items:center">${avatarHtml}<div><div class="fw-700" style="font-size:1.1rem">${escHtml(u.nama)}</div><div class="text-sm" style="color:#999">${escHtml(u.departemen||'-')} • ${escHtml(u.posisi||u.role)}</div><div class="text-xs" style="color:#999">NIP: ${escHtml(u.nip||'-')}</div></div></div></div><div class="stats-grid"><div class="stat-card" style="cursor:pointer" onclick="navigateTo('portal-absensi')"><div class="stat-icon">📍</div><div class="stat-value" id="pAbsen">-</div><div class="stat-label">Kehadiran Bulan Ini</div></div><div class="stat-card" style="cursor:pointer" onclick="navigateTo('portal-cuti')"><div class="stat-icon">🏖️</div><div class="stat-value" id="pCuti">-</div><div class="stat-label">Sisa Cuti</div></div><div class="stat-card" style="cursor:pointer" onclick="navigateTo('inbox')"><div class="stat-icon">📥</div><div class="stat-value" id="pInbox">-</div><div class="stat-label">Inbox Meeting</div></div></div>
+  main.innerHTML=`<div class="page-title"><span>🏠 Portal Saya</span></div><div class="card" style="border-left:4px solid var(--accent)"><div class="flex gap-16" style="align-items:center">${avatarHtml}<div><div class="fw-700" style="font-size:1.1rem">${escHtml(u.nama)}</div><div class="text-sm" style="color:#999">${escHtml(u.departemen||'-')} • ${escHtml(u.posisi||u.role)}</div><div class="text-xs" style="color:#999">NIP: ${escHtml(u.nip||'-')}</div></div></div></div><div class="stats-grid"><div class="stat-card" style="cursor:pointer;-webkit-tap-highlight-color:rgba(198,40,40,.2);touch-action:manipulation" onclick="navigateTo('portal-absensi')"><div class="stat-icon">📍</div><div class="stat-value" id="pAbsen">-</div><div class="stat-label">Kehadiran Bulan Ini</div></div><div class="stat-card" style="cursor:pointer;-webkit-tap-highlight-color:rgba(198,40,40,.2);touch-action:manipulation" onclick="navigateTo('portal-cuti')"><div class="stat-icon">🏖️</div><div class="stat-value" id="pCuti">-</div><div class="stat-label">Sisa Cuti</div></div><div class="stat-card" style="cursor:pointer;-webkit-tap-highlight-color:rgba(198,40,40,.2);touch-action:manipulation" onclick="navigateTo('inbox')"><div class="stat-icon">📥</div><div class="stat-value" id="pInbox">-</div><div class="stat-label">Inbox Meeting</div></div></div>
   <!-- KOLOM PENGUMUMAN, BROADCAST, MEETING & INVITE -->
   <!-- AKSI CEPAT + KOMUNIKASI -->
   <div class="card">
     <div class="card-title mb-12">⚡ Aksi Cepat</div>
-    <div class="flex flex-wrap gap-8">
+    <div class="flex flex-wrap gap-8" style="touch-action:manipulation;-webkit-tap-highlight-color:rgba(198,40,40,.2)">
       <button class="btn btn-primary btn-sm" onclick="navigateTo('portal-absensi')">📍 Absensi</button>
       <button class="btn btn-info btn-sm" onclick="navigateTo('portal-cuti')">🏖️ Ajukan Cuti</button>
       <button class="btn btn-sm" style="background:#ff6f00;color:#fff" onclick="navigateTo('portal-overtime')">⏰ Overtime</button>
@@ -3402,9 +3402,9 @@ async function simpanEditOvertime(id){
 }
 
 function renderPortalAbsensi(){
-  // For karyawan: use the same absensi page but portal-mode flag
+  // For karyawan: render absensi content directly without changing currentPage away from portal-absensi
   window._portalAbsensiMode=true;
-  navigateTo('absensi');
+  renderAbsensiIJEF();
 }
 async function renderPortalCuti(){
   const main=document.getElementById('mainContent');

@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "fix",
   "description": "Fix Portal Karyawan clickability issues - sidebar navigation collapse bug and portal-absensi redirect loop",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "1. In core.js, fix the navigateTo() function to re-expand the nav-group containing the active page after navigation. Currently, when a user clicks a nav-item in a different (collapsed) group, the group stays collapsed because only the .active class is toggled but nav-group-items display is not updated. After setting the active class, find the nav-item's parent .nav-group-items and ensure its display is 'block' and the arrow has class 'open'.",
     "2. In modules.js, fix renderPortalAbsensi() (line 3404-3407). Currently it does: window._portalAbsensiMode=true; navigateTo('absensi'); This causes currentPage to become 'absensi' which is NOT a portal-* page, so the sidebar nav-group 'Utama' loses its active state and collapses. Fix: instead of redirecting to 'absensi', render the absensi content directly within the portal context. Keep currentPage as 'portal-absensi' and call renderAbsensiIJEF() directly after setting _portalAbsensiMode=true.",
