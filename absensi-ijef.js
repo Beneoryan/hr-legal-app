@@ -889,12 +889,19 @@ async function loadDinasTab(tab) {
       hasData=true;
       // Build detailed benefit breakdown for Rincian Biaya column
       let rincian='-';
-      if(p.totalEstimasi||p.uangHarian||p.maxTransport||p.maxHotel||p.maxMakan){
+      if(p.totalEstimasi||p.biayaHarian||p.biayaTransportPP||p.biayaPenginapan||p.biayaMakan||p.uangHarian||p.maxTransport||p.maxHotel||p.maxMakan){
         rincian=`<div style="font-size:11px;line-height:1.6;white-space:nowrap">`;
-        if(p.uangHarian)rincian+=`<div>Uang Harian: <b>${formatCurrency(p.uangHarian)}</b></div>`;
-        if(p.maxTransport)rincian+=`<div>Transport: <b>${formatCurrency(p.maxTransport)}</b></div>`;
-        if(p.maxHotel)rincian+=`<div>Hotel: <b>${formatCurrency(p.maxHotel)}</b></div>`;
-        if(p.maxMakan)rincian+=`<div>Makan: <b>${formatCurrency(p.maxMakan)}</b></div>`;
+        if(p.biayaHarian||p.uangHarian)rincian+=`<div>Uang Harian: <b>${formatCurrency(p.biayaHarian||p.uangHarian)}</b></div>`;
+        if(p.biayaTransportPP!=null)rincian+=`<div>Transport PP: <b>${formatCurrency(p.biayaTransportPP)}</b></div>`;
+        else if(p.maxTransport)rincian+=`<div>Transport: <b>${formatCurrency(p.maxTransport)}</b></div>`;
+        if(p.biayaTransportLokal)rincian+=`<div>Transport Lokal: <b>${formatCurrency(p.biayaTransportLokal)}</b></div>`;
+        if(p.biayaPenginapan!=null){
+          rincian+=`<div>Penginapan: <b>${formatCurrency(p.biayaPenginapan)}</b>${p.jumlahMalam===0?' <span style="color:#e65100">(tdk menginap)</span>':''}</div>`;
+        } else if(p.maxHotel)rincian+=`<div>Hotel: <b>${formatCurrency(p.maxHotel)}</b></div>`;
+        if(p.biayaMakan!=null)rincian+=`<div>Makan: <b>${formatCurrency(p.biayaMakan)}</b></div>`;
+        else if(p.maxMakan)rincian+=`<div>Makan: <b>${formatCurrency(p.maxMakan)}</b></div>`;
+        if(p.biayaUangSaku)rincian+=`<div>Uang Saku: <b>${formatCurrency(p.biayaUangSaku)}</b></div>`;
+        if(p.biayaLain)rincian+=`<div>Lain-lain: <b>${formatCurrency(p.biayaLain)}</b></div>`;
         if(p.totalEstimasi)rincian+=`<div style="border-top:1px solid #ccc;margin-top:2px;padding-top:2px;font-weight:700;color:var(--primary)">Total: ${formatCurrency(p.totalEstimasi)}</div>`;
         rincian+=`</div>`;
       }
@@ -916,23 +923,34 @@ async function loadDinasTab(tab) {
 async function modalDinasLuar() {
   const grade = await getUserGrade();
   const cfg = await getGradeConfig(grade);
-  openModal(`<div class="modal-title">📝 Ajukan Dinas Luar</div>
+  openModal(`<div class="modal-title">📝 Ajukan Dinas Luar (SPPD)</div>
     <div style="background:#e8f5e9;padding:12px;border-radius:8px;margin-bottom:16px;border-left:4px solid var(--success)">
       <div class="fw-700 text-sm mb-4">🎯 Grade Anda: <span class="badge badge-info">${escHtml(grade || 'STAFF')}</span> (${escHtml(cfg.label)})</div>
-      <div class="text-sm" style="color:#555">Batas: Uang Harian ${formatCurrency(cfg.uangHarian)} | Max Transport ${formatCurrency(cfg.maxTransport)} | Max Hotel/mlm ${formatCurrency(cfg.maxHotel)} (${escHtml(cfg.kelasHotel)}) | Max Makan/hr ${formatCurrency(cfg.maxMakan)} | Total Max/Hari ${formatCurrency(cfg.totalMaxPerDay)}</div>
+      <div class="text-sm" style="color:#555;line-height:1.6">
+        <div>Uang Harian: ${formatCurrency(cfg.uangHarian)}/hari | Transport PP: max ${formatCurrency(cfg.maxTransport)}</div>
+        <div>Hotel: max ${formatCurrency(cfg.maxHotel)}/malam (${escHtml(cfg.kelasHotel)}) | Makan: max ${formatCurrency(cfg.maxMakan)}/hari</div>
+        <div>Uang Saku: ${formatCurrency(cfg.uangSaku)}/hari | Total Max/Hari: ${formatCurrency(cfg.totalMaxPerDay)}</div>
+      </div>
     </div>
     <div class="grid-2"><div class="form-group"><label>Nama</label><input class="form-control" id="dlNama" value="${escHtml(currentUser.nama)}"></div><div class="form-group"><label>Departemen</label><input class="form-control" id="dlDept" value="${escHtml(currentUser.departemen||'')}" readonly></div></div>
     <div class="grid-2"><div class="form-group"><label>Tanggal Mulai</label><input class="form-control" type="date" id="dlTgl" value="${todayStr()}" onchange="hitungEstimasiDinas()"></div><div class="form-group"><label>Tanggal Selesai</label><input class="form-control" type="date" id="dlTglSelesai" value="${todayStr()}" onchange="hitungEstimasiDinas()"></div></div>
     <div id="dlEstimasiInfo" class="mb-8"></div>
-    <div class="fw-700 text-sm mb-8 mt-8 color-primary">💰 Estimasi Biaya</div>
+    <div class="fw-700 text-sm mb-8 mt-8 color-primary">💰 Rincian Biaya SPPD</div>
+    <div class="form-group"><label>Uang Harian / Tunjangan Harian (Rp)</label><input class="form-control" type="number" id="dlBiayaHarian" value="0" oninput="hitungTotalDinas()"><div id="dlHelperHarian" class="text-sm" style="color:#888;margin-top:2px"></div></div>
     <div class="grid-2">
-      <div class="form-group"><label>Transport (Rp)</label><input class="form-control" type="number" id="dlBiayaTransport" value="0" onchange="cekBatasGradeDinas()"></div>
-      <div class="form-group"><label>Akomodasi/Hotel (Rp)</label><input class="form-control" type="number" id="dlBiayaAkomodasi" value="0" onchange="cekBatasGradeDinas()"></div>
-      <div class="form-group"><label>Makan & Uang Saku (Rp)</label><input class="form-control" type="number" id="dlBiayaMakan" value="0" onchange="cekBatasGradeDinas()"></div>
-      <div class="form-group"><label>Uang Harian (Rp)</label><input class="form-control" type="number" id="dlBiayaHarian" value="0" onchange="cekBatasGradeDinas()"></div>
-      <div class="form-group"><label>Lain-lain (Rp)</label><input class="form-control" type="number" id="dlBiayaLain" value="0"></div>
+      <div class="form-group"><label>Biaya Transport PP (Rp)</label><input class="form-control" type="number" id="dlBiayaTransportPP" value="0" oninput="hitungTotalDinas()"><div id="dlHelperTransportPP" class="text-sm" style="color:#888;margin-top:2px">Berangkat + Pulang</div></div>
+      <div class="form-group"><label>Biaya Transport Lokal (Rp)</label><input class="form-control" type="number" id="dlBiayaTransportLokal" value="0" oninput="hitungTotalDinas()"><div class="text-sm" style="color:#888;margin-top:2px">Di lokasi tujuan (taxi, ojol, dll)</div></div>
     </div>
+    <div class="form-group"><label>Biaya Penginapan / Hotel (Rp)</label><input class="form-control" type="number" id="dlBiayaPenginapan" value="0" oninput="hitungTotalDinas()"><div id="dlHelperHotel" class="text-sm" style="color:#888;margin-top:2px"></div></div>
+    <div class="grid-2">
+      <div class="form-group"><label>Biaya Makan (Rp)</label><input class="form-control" type="number" id="dlBiayaMakan" value="0" oninput="hitungTotalDinas()"><div id="dlHelperMakan" class="text-sm" style="color:#888;margin-top:2px"></div></div>
+      <div class="form-group"><label>Uang Saku (Rp)</label><input class="form-control" type="number" id="dlBiayaUangSaku" value="0" oninput="hitungTotalDinas()"><div id="dlHelperSaku" class="text-sm" style="color:#888;margin-top:2px"></div></div>
+    </div>
+    <div class="form-group"><label>Biaya Lain-lain (Rp)</label><input class="form-control" type="number" id="dlBiayaLain" value="0" oninput="hitungTotalDinas()"><div class="text-sm" style="color:#888;margin-top:2px">Parkir, tol, materai, dll</div></div>
     <div id="dlWarningGrade" class="mb-8"></div>
+    <div id="dlTotalSection" style="background:#f0f4ff;padding:12px;border-radius:8px;margin-bottom:16px;border:2px solid var(--primary)">
+      <div class="fw-700" style="font-size:1rem;color:var(--primary)">💰 Total Estimasi Biaya: <span id="dlTotalBiaya">Rp 0</span></div>
+    </div>
     <div class="form-group"><label>Tujuan / Lokasi</label><input class="form-control" id="dlTujuan" placeholder="Nama klien / alamat tujuan"></div>
     <div class="form-group"><label>Keperluan</label><textarea class="form-control" id="dlKeperluan" placeholder="Jelaskan keperluan dinas luar"></textarea></div>
     <div class="grid-2"><div class="form-group"><label>Jam Berangkat</label><input class="form-control" type="time" id="dlJamGo"></div><div class="form-group"><label>Estimasi Kembali</label><input class="form-control" type="time" id="dlJamBack"></div></div>
@@ -949,16 +967,65 @@ function hitungEstimasiDinas(){
   const grade=currentUser.gradeJabatan||'STAFF';
   const cfg=getGradeConfigSync(grade);
   const malam=Math.max(hari-1,0);
-  const estTransport=cfg.maxTransport;
-  const estAkomodasi=cfg.maxHotel*malam;
-  const estMakan=(cfg.maxMakan+cfg.uangSaku)*hari;
+
+  // Auto-fill detailed fields
   const estHarian=cfg.uangHarian*hari;
-  document.getElementById('dlBiayaTransport').value=estTransport;
-  document.getElementById('dlBiayaAkomodasi').value=estAkomodasi;
-  document.getElementById('dlBiayaMakan').value=estMakan;
+  const estTransportPP=cfg.maxTransport;
+  const estTransportLokal=0;
+  const estPenginapan=cfg.maxHotel*malam;
+  const estMakan=cfg.maxMakan*hari;
+  const estSaku=cfg.uangSaku*hari;
+  const estLain=0;
+
   document.getElementById('dlBiayaHarian').value=estHarian;
+  document.getElementById('dlBiayaTransportPP').value=estTransportPP;
+  document.getElementById('dlBiayaTransportLokal').value=estTransportLokal;
+  document.getElementById('dlBiayaPenginapan').value=estPenginapan;
+  document.getElementById('dlBiayaMakan').value=estMakan;
+  document.getElementById('dlBiayaUangSaku').value=estSaku;
+  document.getElementById('dlBiayaLain').value=estLain;
+
+  // Helper texts with formula breakdown
+  const helperHarian=document.getElementById('dlHelperHarian');
+  if(helperHarian) helperHarian.innerHTML=`${hari} hari @ ${formatCurrency(cfg.uangHarian)}/hari`;
+
+  const helperTransportPP=document.getElementById('dlHelperTransportPP');
+  if(helperTransportPP) helperTransportPP.innerHTML=`Max transport PP: ${formatCurrency(cfg.maxTransport)} (Berangkat + Pulang)`;
+
+  const helperHotel=document.getElementById('dlHelperHotel');
+  if(helperHotel){
+    if(malam===0){
+      helperHotel.innerHTML='<span style="color:#e65100;font-weight:600">⚠️ Tidak menginap (pulang hari yang sama) - 0 malam</span>';
+    } else {
+      helperHotel.innerHTML=`${malam} malam @ ${formatCurrency(cfg.maxHotel)}/malam (${escHtml(cfg.kelasHotel)})`;
+    }
+  }
+
+  const helperMakan=document.getElementById('dlHelperMakan');
+  if(helperMakan) helperMakan.innerHTML=`${hari} hari @ ${formatCurrency(cfg.maxMakan)}/hari`;
+
+  const helperSaku=document.getElementById('dlHelperSaku');
+  if(helperSaku) helperSaku.innerHTML=`${hari} hari @ ${formatCurrency(cfg.uangSaku)}/hari`;
+
+  // Info summary
   const infoEl=document.getElementById('dlEstimasiInfo');
-  if(infoEl)infoEl.innerHTML=`<div class="text-sm" style="background:#fff3cd;padding:8px;border-radius:6px;color:#856404">📊 Auto-kalkulasi: ${hari} hari, ${malam} malam | Estimasi grade ${escHtml(grade)}: Transport ${formatCurrency(estTransport)}, Hotel ${formatCurrency(estAkomodasi)}, Makan+Saku ${formatCurrency(estMakan)}, Uang Harian ${formatCurrency(estHarian)}</div>`;
+  if(infoEl) infoEl.innerHTML=`<div class="text-sm" style="background:#fff3cd;padding:8px;border-radius:6px;color:#856404">📊 Durasi: <b>${hari} hari, ${malam} malam</b> | Grade: ${escHtml(grade)}${malam===0?' | <b>Tidak menginap</b>':''}</div>`;
+
+  hitungTotalDinas();
+  cekBatasGradeDinas();
+}
+
+function hitungTotalDinas(){
+  const biayaHarian=parseInt(document.getElementById('dlBiayaHarian')?.value)||0;
+  const biayaTransportPP=parseInt(document.getElementById('dlBiayaTransportPP')?.value)||0;
+  const biayaTransportLokal=parseInt(document.getElementById('dlBiayaTransportLokal')?.value)||0;
+  const biayaPenginapan=parseInt(document.getElementById('dlBiayaPenginapan')?.value)||0;
+  const biayaMakan=parseInt(document.getElementById('dlBiayaMakan')?.value)||0;
+  const biayaUangSaku=parseInt(document.getElementById('dlBiayaUangSaku')?.value)||0;
+  const biayaLain=parseInt(document.getElementById('dlBiayaLain')?.value)||0;
+  const total=biayaHarian+biayaTransportPP+biayaTransportLokal+biayaPenginapan+biayaMakan+biayaUangSaku+biayaLain;
+  const totalEl=document.getElementById('dlTotalBiaya');
+  if(totalEl) totalEl.textContent=formatCurrency(total);
   cekBatasGradeDinas();
 }
 
@@ -973,15 +1040,21 @@ function cekBatasGradeDinas(){
   const cfg=getGradeConfigSync(grade);
   const malam=Math.max(hari-1,0);
   const warnings=[];
-  const transport=parseInt(document.getElementById('dlBiayaTransport').value)||0;
-  const akomodasi=parseInt(document.getElementById('dlBiayaAkomodasi').value)||0;
-  const makan=parseInt(document.getElementById('dlBiayaMakan').value)||0;
-  const harian=parseInt(document.getElementById('dlBiayaHarian').value)||0;
-  if(transport>cfg.maxTransport)warnings.push('Transport melebihi batas grade (max '+formatCurrency(cfg.maxTransport)+')');
-  if(malam>0&&akomodasi>cfg.maxHotel*malam)warnings.push('Akomodasi melebihi batas grade (max '+formatCurrency(cfg.maxHotel*malam)+' untuk '+malam+' malam)');
-  if(makan>(cfg.maxMakan+cfg.uangSaku)*hari)warnings.push('Makan & Saku melebihi batas grade (max '+formatCurrency((cfg.maxMakan+cfg.uangSaku)*hari)+' untuk '+hari+' hari)');
-  if(harian>cfg.uangHarian*hari)warnings.push('Uang Harian melebihi batas grade (max '+formatCurrency(cfg.uangHarian*hari)+' untuk '+hari+' hari)');
-  if(warnings.length)warnEl.innerHTML='<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:8px;color:#856404" class="text-sm">\u26a0\ufe0f '+warnings.join('<br>\u26a0\ufe0f ')+'</div>';
+
+  const biayaHarian=parseInt(document.getElementById('dlBiayaHarian')?.value)||0;
+  const biayaTransportPP=parseInt(document.getElementById('dlBiayaTransportPP')?.value)||0;
+  const biayaPenginapan=parseInt(document.getElementById('dlBiayaPenginapan')?.value)||0;
+  const biayaMakan=parseInt(document.getElementById('dlBiayaMakan')?.value)||0;
+  const biayaUangSaku=parseInt(document.getElementById('dlBiayaUangSaku')?.value)||0;
+
+  if(biayaHarian>cfg.uangHarian*hari) warnings.push('Uang Harian melebihi batas grade (max '+formatCurrency(cfg.uangHarian*hari)+' untuk '+hari+' hari)');
+  if(biayaTransportPP>cfg.maxTransport) warnings.push('Transport PP melebihi batas grade (max '+formatCurrency(cfg.maxTransport)+')');
+  if(malam>0&&biayaPenginapan>cfg.maxHotel*malam) warnings.push('Penginapan melebihi batas grade (max '+formatCurrency(cfg.maxHotel*malam)+' untuk '+malam+' malam)');
+  if(malam===0&&biayaPenginapan>0) warnings.push('Penginapan diisi namun tidak menginap (0 malam). Harap sesuaikan jika memang pulang hari yang sama.');
+  if(biayaMakan>cfg.maxMakan*hari) warnings.push('Biaya Makan melebihi batas grade (max '+formatCurrency(cfg.maxMakan*hari)+' untuk '+hari+' hari)');
+  if(biayaUangSaku>cfg.uangSaku*hari) warnings.push('Uang Saku melebihi batas grade (max '+formatCurrency(cfg.uangSaku*hari)+' untuk '+hari+' hari)');
+
+  if(warnings.length) warnEl.innerHTML='<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:8px;color:#856404" class="text-sm">\u26a0\ufe0f '+warnings.join('<br>\u26a0\ufe0f ')+'</div>';
   else warnEl.innerHTML='';
 }
 
@@ -992,22 +1065,47 @@ async function simpanDinasLuar() {
   const data = {nama:document.getElementById('dlNama').value,tanggal:document.getElementById('dlTgl').value,tanggalSelesai:tanggalSelesai,tujuan:document.getElementById('dlTujuan').value,keperluan:document.getElementById('dlKeperluan').value,jamBerangkat:document.getElementById('dlJamGo').value,jamKembali:document.getElementById('dlJamBack').value,status:'pending',userId:currentUser.id,createdAt:new Date().toISOString()};
   if(!data.tujuan)return toast('Tujuan wajib','warning');
 
-  // Read user-entered values from input fields
-  const biayaTransport = parseInt(document.getElementById('dlBiayaTransport').value)||0;
-  const biayaAkomodasi = parseInt(document.getElementById('dlBiayaAkomodasi').value)||0;
-  const biayaMakan = parseInt(document.getElementById('dlBiayaMakan').value)||0;
-  const biayaHarian = parseInt(document.getElementById('dlBiayaHarian').value)||0;
-  const biayaLain = parseInt(document.getElementById('dlBiayaLain').value)||0;
-  const totalEstimasi = biayaTransport + biayaAkomodasi + biayaMakan + biayaHarian + biayaLain;
+  // Calculate duration
+  const hari = Math.ceil((new Date(tanggalSelesai)-new Date(data.tanggal))/(1000*60*60*24)+1);
+  const malam = Math.max(hari-1,0);
 
-  // Add grade and benefit info to dinas luar record
+  // Read detailed cost fields
+  const biayaHarian = parseInt(document.getElementById('dlBiayaHarian').value)||0;
+  const biayaTransportPP = parseInt(document.getElementById('dlBiayaTransportPP').value)||0;
+  const biayaTransportLokal = parseInt(document.getElementById('dlBiayaTransportLokal').value)||0;
+  const biayaPenginapan = parseInt(document.getElementById('dlBiayaPenginapan').value)||0;
+  const biayaMakan = parseInt(document.getElementById('dlBiayaMakan').value)||0;
+  const biayaUangSaku = parseInt(document.getElementById('dlBiayaUangSaku').value)||0;
+  const biayaLain = parseInt(document.getElementById('dlBiayaLain').value)||0;
+  const totalEstimasi = biayaHarian + biayaTransportPP + biayaTransportLokal + biayaPenginapan + biayaMakan + biayaUangSaku + biayaLain;
+
+  // Confirm if over limit
+  const warnings = [];
+  if(biayaHarian>cfg.uangHarian*hari) warnings.push('Uang Harian');
+  if(biayaTransportPP>cfg.maxTransport) warnings.push('Transport PP');
+  if(malam>0&&biayaPenginapan>cfg.maxHotel*malam) warnings.push('Penginapan');
+  if(biayaMakan>cfg.maxMakan*hari) warnings.push('Makan');
+  if(biayaUangSaku>cfg.uangSaku*hari) warnings.push('Uang Saku');
+  if(warnings.length && !confirm('Beberapa item melebihi batas grade ('+warnings.join(', ')+'). Tetap ajukan?')) return;
+
+  // Add grade and detailed benefit info
   data.gradeJabatan = grade || 'STAFF';
-  data.uangHarian = biayaHarian;
-  data.maxTransport = biayaTransport;
-  data.maxHotel = biayaAkomodasi;
-  data.maxMakan = biayaMakan;
+  data.jumlahHari = hari;
+  data.jumlahMalam = malam;
+  data.biayaHarian = biayaHarian;
+  data.biayaTransportPP = biayaTransportPP;
+  data.biayaTransportLokal = biayaTransportLokal;
+  data.biayaPenginapan = biayaPenginapan;
+  data.biayaMakan = biayaMakan;
+  data.biayaUangSaku = biayaUangSaku;
   data.biayaLain = biayaLain;
   data.totalEstimasi = totalEstimasi;
+
+  // Legacy fields for backward compatibility
+  data.uangHarian = biayaHarian;
+  data.maxTransport = biayaTransportPP + biayaTransportLokal;
+  data.maxHotel = biayaPenginapan;
+  data.maxMakan = biayaMakan + biayaUangSaku;
 
   const dinasLuarRef = await db.collection('hrd_dinas_luar').add(data);
 
@@ -1025,9 +1123,14 @@ async function simpanDinasLuar() {
     userId: currentUser.id,
     gradeJabatan: data.gradeJabatan,
     gradeConfigUsed: cfg.label,
-    biayaTransport: biayaTransport,
-    biayaAkomodasi: biayaAkomodasi,
+    jumlahHari: hari,
+    jumlahMalam: malam,
+    biayaHarian: biayaHarian,
+    biayaTransportPP: biayaTransportPP,
+    biayaTransportLokal: biayaTransportLokal,
+    biayaPenginapan: biayaPenginapan,
     biayaMakan: biayaMakan,
+    biayaUangSaku: biayaUangSaku,
     biayaLain: biayaLain,
     totalEstimasi: totalEstimasi,
     dinasLuarId: dinasLuarRef.id,
@@ -1038,7 +1141,7 @@ async function simpanDinasLuar() {
   // Update dinas luar record with SPPD reference
   await db.collection('hrd_dinas_luar').doc(dinasLuarRef.id).update({sppdId: sppdRef.id, noSPPD: noSPPD});
 
-  await sendNotification('hr','Dinas Luar',`${data.nama} → ${data.tujuan} (SPPD: ${noSPPD})`);
+  await sendNotification('hr','Dinas Luar',`${data.nama} \u2192 ${data.tujuan} (SPPD: ${noSPPD})`);
   closeModalDirect();toast('Pengajuan dinas luar terkirim & SPPD dibuat','success');loadDinasTab('pengajuan');
 }
 
@@ -1374,10 +1477,21 @@ function viewDinasLuar(id){
     let benefitHtml = '';
     if(p.gradeJabatan){
       const cfg = getGradeConfigSync(p.gradeJabatan);
+      const hari = p.jumlahHari || 1;
+      const malam = p.jumlahMalam != null ? p.jumlahMalam : Math.max(hari-1,0);
       benefitHtml = `<div style="background:#e8f5e9;padding:12px;border-radius:8px;margin-bottom:16px;border-left:4px solid var(--success)">
         <div class="fw-700 text-sm mb-4">🎯 Grade: <span class="badge badge-info">${escHtml(p.gradeJabatan)}</span> (${escHtml(cfg.label)})</div>
-        <div class="text-sm" style="color:#555">Uang Harian: ${formatCurrency(p.uangHarian||cfg.uangHarian)} | Max Transport: ${formatCurrency(p.maxTransport||cfg.maxTransport)} | Max Hotel/mlm: ${formatCurrency(p.maxHotel||cfg.maxHotel)} | Max Makan/hr: ${formatCurrency(p.maxMakan||cfg.maxMakan)}</div>
-        ${p.totalEstimasi?`<div class="fw-700 text-sm mt-4" style="color:var(--success)">💰 Total Estimasi: ${formatCurrency(p.totalEstimasi)}</div>`:''}
+        <div class="text-sm mb-4" style="color:#555">Durasi: <b>${hari} hari, ${malam} malam</b>${malam===0?' (Tidak menginap)':''}</div>
+        <table style="width:100%;font-size:0.85rem;border-collapse:collapse">
+          <tr style="border-bottom:1px solid #c8e6c9"><td style="padding:4px 0">Uang Harian / Tunjangan</td><td style="text-align:right;font-weight:600">${formatCurrency(p.biayaHarian||p.uangHarian||0)}</td></tr>
+          <tr style="border-bottom:1px solid #c8e6c9"><td style="padding:4px 0">Transport PP</td><td style="text-align:right;font-weight:600">${formatCurrency(p.biayaTransportPP||p.maxTransport||0)}</td></tr>
+          <tr style="border-bottom:1px solid #c8e6c9"><td style="padding:4px 0">Transport Lokal</td><td style="text-align:right;font-weight:600">${formatCurrency(p.biayaTransportLokal||0)}</td></tr>
+          <tr style="border-bottom:1px solid #c8e6c9"><td style="padding:4px 0">Penginapan / Hotel${malam===0?' <span style="color:#e65100">(Tidak menginap)</span>':''}</td><td style="text-align:right;font-weight:600">${formatCurrency(p.biayaPenginapan||p.maxHotel||0)}</td></tr>
+          <tr style="border-bottom:1px solid #c8e6c9"><td style="padding:4px 0">Biaya Makan</td><td style="text-align:right;font-weight:600">${formatCurrency(p.biayaMakan||p.maxMakan||0)}</td></tr>
+          <tr style="border-bottom:1px solid #c8e6c9"><td style="padding:4px 0">Uang Saku</td><td style="text-align:right;font-weight:600">${formatCurrency(p.biayaUangSaku||0)}</td></tr>
+          <tr style="border-bottom:1px solid #c8e6c9"><td style="padding:4px 0">Lain-lain</td><td style="text-align:right;font-weight:600">${formatCurrency(p.biayaLain||0)}</td></tr>
+          <tr><td style="padding:6px 0;font-weight:700">Total Estimasi</td><td style="text-align:right;font-weight:700;color:var(--success);font-size:1rem">${formatCurrency(p.totalEstimasi||0)}</td></tr>
+        </table>
       </div>`;
     }
     let sppdHtml = '';
