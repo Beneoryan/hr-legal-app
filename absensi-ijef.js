@@ -919,15 +919,25 @@ async function modalDinasLuar() {
   openModal(`<div class="modal-title">📝 Ajukan Dinas Luar</div>
     <div style="background:#e8f5e9;padding:12px;border-radius:8px;margin-bottom:16px;border-left:4px solid var(--success)">
       <div class="fw-700 text-sm mb-4">🎯 Grade Anda: <span class="badge badge-info">${escHtml(grade || 'STAFF')}</span> (${escHtml(cfg.label)})</div>
-      <div class="text-sm" style="color:#555">Uang Harian: ${formatCurrency(cfg.uangHarian)} | Max Transport: ${formatCurrency(cfg.maxTransport)} | Max Hotel/mlm: ${formatCurrency(cfg.maxHotel)} (${escHtml(cfg.kelasHotel)}) | Max Makan/hr: ${formatCurrency(cfg.maxMakan)} | Total Max/Hari: ${formatCurrency(cfg.totalMaxPerDay)}</div>
+      <div class="text-sm" style="color:#555">Batas: Uang Harian ${formatCurrency(cfg.uangHarian)} | Max Transport ${formatCurrency(cfg.maxTransport)} | Max Hotel/mlm ${formatCurrency(cfg.maxHotel)} (${escHtml(cfg.kelasHotel)}) | Max Makan/hr ${formatCurrency(cfg.maxMakan)} | Total Max/Hari ${formatCurrency(cfg.totalMaxPerDay)}</div>
     </div>
     <div class="grid-2"><div class="form-group"><label>Nama</label><input class="form-control" id="dlNama" value="${escHtml(currentUser.nama)}"></div><div class="form-group"><label>Departemen</label><input class="form-control" id="dlDept" value="${escHtml(currentUser.departemen||'')}" readonly></div></div>
     <div class="grid-2"><div class="form-group"><label>Tanggal Mulai</label><input class="form-control" type="date" id="dlTgl" value="${todayStr()}" onchange="hitungEstimasiDinas()"></div><div class="form-group"><label>Tanggal Selesai</label><input class="form-control" type="date" id="dlTglSelesai" value="${todayStr()}" onchange="hitungEstimasiDinas()"></div></div>
     <div id="dlEstimasiInfo" class="mb-8"></div>
+    <div class="fw-700 text-sm mb-8 mt-8 color-primary">💰 Estimasi Biaya</div>
+    <div class="grid-2">
+      <div class="form-group"><label>Transport (Rp)</label><input class="form-control" type="number" id="dlBiayaTransport" value="0" onchange="cekBatasGradeDinas()"></div>
+      <div class="form-group"><label>Akomodasi/Hotel (Rp)</label><input class="form-control" type="number" id="dlBiayaAkomodasi" value="0" onchange="cekBatasGradeDinas()"></div>
+      <div class="form-group"><label>Makan & Uang Saku (Rp)</label><input class="form-control" type="number" id="dlBiayaMakan" value="0" onchange="cekBatasGradeDinas()"></div>
+      <div class="form-group"><label>Uang Harian (Rp)</label><input class="form-control" type="number" id="dlBiayaHarian" value="0" onchange="cekBatasGradeDinas()"></div>
+      <div class="form-group"><label>Lain-lain (Rp)</label><input class="form-control" type="number" id="dlBiayaLain" value="0"></div>
+    </div>
+    <div id="dlWarningGrade" class="mb-8"></div>
     <div class="form-group"><label>Tujuan / Lokasi</label><input class="form-control" id="dlTujuan" placeholder="Nama klien / alamat tujuan"></div>
     <div class="form-group"><label>Keperluan</label><textarea class="form-control" id="dlKeperluan" placeholder="Jelaskan keperluan dinas luar"></textarea></div>
     <div class="grid-2"><div class="form-group"><label>Jam Berangkat</label><input class="form-control" type="time" id="dlJamGo"></div><div class="form-group"><label>Estimasi Kembali</label><input class="form-control" type="time" id="dlJamBack"></div></div>
     <button class="btn btn-primary" style="width:100%;padding:12px" onclick="simpanDinasLuar()">📝 Ajukan Dinas Luar</button>`);
+  hitungEstimasiDinas();
 }
 
 function hitungEstimasiDinas(){
@@ -940,12 +950,39 @@ function hitungEstimasiDinas(){
   const cfg=getGradeConfigSync(grade);
   const malam=Math.max(hari-1,0);
   const estTransport=cfg.maxTransport;
-  const estHotel=cfg.maxHotel*malam;
+  const estAkomodasi=cfg.maxHotel*malam;
   const estMakan=(cfg.maxMakan+cfg.uangSaku)*hari;
   const estHarian=cfg.uangHarian*hari;
-  const totalEst=estTransport+estHotel+estMakan+estHarian;
+  document.getElementById('dlBiayaTransport').value=estTransport;
+  document.getElementById('dlBiayaAkomodasi').value=estAkomodasi;
+  document.getElementById('dlBiayaMakan').value=estMakan;
+  document.getElementById('dlBiayaHarian').value=estHarian;
   const infoEl=document.getElementById('dlEstimasiInfo');
-  if(infoEl)infoEl.innerHTML=`<div class="text-sm" style="background:#fff3cd;padding:8px;border-radius:6px;color:#856404">📊 Estimasi: ${hari} hari, ${malam} malam | Transport ${formatCurrency(estTransport)} + Hotel ${formatCurrency(estHotel)} + Makan+Saku ${formatCurrency(estMakan)} + Uang Harian ${formatCurrency(estHarian)} = <b>${formatCurrency(totalEst)}</b></div>`;
+  if(infoEl)infoEl.innerHTML=`<div class="text-sm" style="background:#fff3cd;padding:8px;border-radius:6px;color:#856404">📊 Auto-kalkulasi: ${hari} hari, ${malam} malam | Estimasi grade ${escHtml(grade)}: Transport ${formatCurrency(estTransport)}, Hotel ${formatCurrency(estAkomodasi)}, Makan+Saku ${formatCurrency(estMakan)}, Uang Harian ${formatCurrency(estHarian)}</div>`;
+  cekBatasGradeDinas();
+}
+
+function cekBatasGradeDinas(){
+  const mulai=document.getElementById('dlTgl')?.value;
+  const selesai=document.getElementById('dlTglSelesai')?.value;
+  const warnEl=document.getElementById('dlWarningGrade');
+  if(!warnEl||!mulai||!selesai)return;
+  const hari=Math.ceil((new Date(selesai)-new Date(mulai))/(1000*60*60*24)+1);
+  if(hari<=0){warnEl.innerHTML='';return;}
+  const grade=currentUser.gradeJabatan||'STAFF';
+  const cfg=getGradeConfigSync(grade);
+  const malam=Math.max(hari-1,0);
+  const warnings=[];
+  const transport=parseInt(document.getElementById('dlBiayaTransport').value)||0;
+  const akomodasi=parseInt(document.getElementById('dlBiayaAkomodasi').value)||0;
+  const makan=parseInt(document.getElementById('dlBiayaMakan').value)||0;
+  const harian=parseInt(document.getElementById('dlBiayaHarian').value)||0;
+  if(transport>cfg.maxTransport)warnings.push('Transport melebihi batas grade (max '+formatCurrency(cfg.maxTransport)+')');
+  if(malam>0&&akomodasi>cfg.maxHotel*malam)warnings.push('Akomodasi melebihi batas grade (max '+formatCurrency(cfg.maxHotel*malam)+' untuk '+malam+' malam)');
+  if(makan>(cfg.maxMakan+cfg.uangSaku)*hari)warnings.push('Makan & Saku melebihi batas grade (max '+formatCurrency((cfg.maxMakan+cfg.uangSaku)*hari)+' untuk '+hari+' hari)');
+  if(harian>cfg.uangHarian*hari)warnings.push('Uang Harian melebihi batas grade (max '+formatCurrency(cfg.uangHarian*hari)+' untuk '+hari+' hari)');
+  if(warnings.length)warnEl.innerHTML='<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:8px;color:#856404" class="text-sm">\u26a0\ufe0f '+warnings.join('<br>\u26a0\ufe0f ')+'</div>';
+  else warnEl.innerHTML='';
 }
 
 async function simpanDinasLuar() {
@@ -955,17 +992,21 @@ async function simpanDinasLuar() {
   const data = {nama:document.getElementById('dlNama').value,tanggal:document.getElementById('dlTgl').value,tanggalSelesai:tanggalSelesai,tujuan:document.getElementById('dlTujuan').value,keperluan:document.getElementById('dlKeperluan').value,jamBerangkat:document.getElementById('dlJamGo').value,jamKembali:document.getElementById('dlJamBack').value,status:'pending',userId:currentUser.id,createdAt:new Date().toISOString()};
   if(!data.tujuan)return toast('Tujuan wajib','warning');
 
-  // Calculate benefit estimation
-  const hari = Math.ceil((new Date(data.tanggalSelesai) - new Date(data.tanggal)) / (1000*60*60*24) + 1);
-  const malam = Math.max(hari - 1, 0);
-  const totalEstimasi = cfg.maxTransport + (cfg.maxHotel * malam) + ((cfg.maxMakan + cfg.uangSaku) * hari) + (cfg.uangHarian * hari);
+  // Read user-entered values from input fields
+  const biayaTransport = parseInt(document.getElementById('dlBiayaTransport').value)||0;
+  const biayaAkomodasi = parseInt(document.getElementById('dlBiayaAkomodasi').value)||0;
+  const biayaMakan = parseInt(document.getElementById('dlBiayaMakan').value)||0;
+  const biayaHarian = parseInt(document.getElementById('dlBiayaHarian').value)||0;
+  const biayaLain = parseInt(document.getElementById('dlBiayaLain').value)||0;
+  const totalEstimasi = biayaTransport + biayaAkomodasi + biayaMakan + biayaHarian + biayaLain;
 
   // Add grade and benefit info to dinas luar record
   data.gradeJabatan = grade || 'STAFF';
-  data.uangHarian = cfg.uangHarian;
-  data.maxTransport = cfg.maxTransport;
-  data.maxHotel = cfg.maxHotel;
-  data.maxMakan = cfg.maxMakan;
+  data.uangHarian = biayaHarian;
+  data.maxTransport = biayaTransport;
+  data.maxHotel = biayaAkomodasi;
+  data.maxMakan = biayaMakan;
+  data.biayaLain = biayaLain;
   data.totalEstimasi = totalEstimasi;
 
   const dinasLuarRef = await db.collection('hrd_dinas_luar').add(data);
@@ -984,10 +1025,10 @@ async function simpanDinasLuar() {
     userId: currentUser.id,
     gradeJabatan: data.gradeJabatan,
     gradeConfigUsed: cfg.label,
-    biayaTransport: cfg.maxTransport,
-    biayaAkomodasi: cfg.maxHotel * malam,
-    biayaMakan: (cfg.maxMakan + cfg.uangSaku) * hari,
-    biayaLain: 0,
+    biayaTransport: biayaTransport,
+    biayaAkomodasi: biayaAkomodasi,
+    biayaMakan: biayaMakan,
+    biayaLain: biayaLain,
     totalEstimasi: totalEstimasi,
     dinasLuarId: dinasLuarRef.id,
     createdAt: new Date().toISOString()
