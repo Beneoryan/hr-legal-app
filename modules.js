@@ -4312,40 +4312,69 @@ function getGradeConfigSync(grade) {
 }
 
 async function getUserGrade() {
-  if (currentUser.gradeJabatan) return currentUser.gradeJabatan;
+  // Always fetch fresh from Firestore (don't trust session cache for grade)
+  // Use a simple flag to avoid repeated Firestore calls within same page load
+  if (currentUser._gradeFetched) return currentUser.gradeJabatan || 'STAFF';
+
   try {
-    let snap;
+    let gradeFound = null;
     if (currentUser.linkedKaryawan) {
       const doc = await db.collection('hrd_karyawan').doc(currentUser.linkedKaryawan).get();
       if (doc.exists && doc.data().gradeJabatan) {
-        currentUser.gradeJabatan = doc.data().gradeJabatan;
-        return currentUser.gradeJabatan;
+        gradeFound = doc.data().gradeJabatan;
       }
     }
-    snap = await db.collection('hrd_karyawan').where('nama', '==', currentUser.nama).get();
-    if (!snap.empty) {
-      const data = snap.docs[0].data();
-      currentUser.gradeJabatan = data.gradeJabatan || 'STAFF';
+    if (!gradeFound) {
+      const snap = await db.collection('hrd_karyawan').where('nama', '==', currentUser.nama).get();
+      if (!snap.empty) {
+        const data = snap.docs[0].data();
+        gradeFound = data.gradeJabatan || null;
+      }
+    }
+    if (gradeFound) {
+      currentUser.gradeJabatan = gradeFound;
+      currentUser._gradeFetched = true;
       return currentUser.gradeJabatan;
     }
   } catch (e) {
     console.warn('getUserGrade error:', e);
   }
-  // Fallback: infer grade from role or posisi
+
+  // Fallback: infer grade from posisi
   if (currentUser.posisi) {
     const posisi = currentUser.posisi.toUpperCase();
-    if (posisi.includes('GENERAL MANAGER') || posisi.includes('GM')) return 'GENERAL MANAGER';
-    if (posisi.includes('DIRECTOR') || posisi.includes('BOD')) return 'BOD';
-    if (posisi.includes('HEAD') || posisi.includes('MANAGER')) return 'MANAGER';
-    if (posisi.includes('SUPERVISOR') || posisi.includes('SENIOR') || posisi.includes('LEADER')) return 'SENIOR';
+    if (posisi.includes('GENERAL MANAGER') || posisi.includes('GM')) {
+      currentUser.gradeJabatan = 'GENERAL MANAGER';
+      currentUser._gradeFetched = true;
+      return currentUser.gradeJabatan;
+    }
+    if (posisi.includes('DIRECTOR') || posisi.includes('BOD')) {
+      currentUser.gradeJabatan = 'BOD';
+      currentUser._gradeFetched = true;
+      return currentUser.gradeJabatan;
+    }
+    if (posisi.includes('HEAD') || posisi.includes('MANAGER')) {
+      currentUser.gradeJabatan = 'MANAGER';
+      currentUser._gradeFetched = true;
+      return currentUser.gradeJabatan;
+    }
+    if (posisi.includes('SUPERVISOR') || posisi.includes('SENIOR') || posisi.includes('LEADER')) {
+      currentUser.gradeJabatan = 'SENIOR';
+      currentUser._gradeFetched = true;
+      return currentUser.gradeJabatan;
+    }
   }
+
   // Fallback from role
   const roleGradeMap = {bod:'BOD', head:'HEAD', manager:'MANAGER', leader:'LEADER', staff:'STAFF', admin:'BOD'};
   if (currentUser.role && roleGradeMap[currentUser.role]) {
     currentUser.gradeJabatan = roleGradeMap[currentUser.role];
+    currentUser._gradeFetched = true;
     return currentUser.gradeJabatan;
   }
+
   currentUser.gradeJabatan = 'STAFF';
+  currentUser._gradeFetched = true;
   return currentUser.gradeJabatan;
 }
 
