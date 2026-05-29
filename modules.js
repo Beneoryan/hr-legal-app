@@ -4418,18 +4418,9 @@ function getGradePeraturanSync(grade) {
 // ── PROSEDUR PERJALANAN DINAS — Terintegrasi ──────────────────
 // ══════════════════════════════════════════════════════════════
 
-function renderPerjalananDinas(){
-  const main=document.getElementById('mainContent');
-  main.innerHTML=`<div class="page-title"><span>✈️ Prosedur Perjalanan Dinas</span><button class="btn btn-primary btn-sm" onclick="modalAjukanSPPD()">+ Ajukan SPPD</button></div>
-    <div class="tabs" id="sppdTabs">
-      <div class="tab active" onclick="showSPPDTab('daftar')">📋 Daftar SPPD</div>
-      <div class="tab" onclick="showSPPDTab('prosedur')">📖 Prosedur</div>
-      <div class="tab" onclick="showSPPDTab('uang-muka')">💰 Uang Muka</div>
-      <div class="tab" onclick="showSPPDTab('laporan')">📝 Laporan Perjalanan</div>
-      <div class="tab" onclick="showSPPDTab('reimbursement')">🧾 Reimburse Dinas</div>
-    </div>
-    <div id="sppdContent"></div>`;
-  showSPPDTab('daftar');
+async function renderPerjalananDinas(){
+  window._portalDinasMode=false;
+  renderPerjalananDinasWithBenefit();
 }
 
 function renderPortalPerjalananDinas(){
