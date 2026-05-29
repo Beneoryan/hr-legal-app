@@ -4259,7 +4259,7 @@ const BENEFIT_CONFIG_BY_GRADE = {
 function resolveGradeKey(grade) {
   if (!grade) return 'STAFF';
   const g = grade.toUpperCase().trim();
-  if (g.includes('BOD') || g.includes('DIRECTOR')) return 'BOD';
+  if (g.includes('BOD') || g.includes('DIRECTOR') || g.includes('GENERAL MANAGER') || g === 'GM') return 'BOD';
   // Check HEAD/MANAGER before SENIOR to avoid "SENIOR MANAGER" matching SENIOR
   if (g.includes('HEAD') || g.includes('MANAGER')) return 'HEAD';
   if (g.includes('SENIOR') || g.includes('SUPERVISOR') || g.includes('LEADER')) return 'SENIOR';
@@ -4330,6 +4330,20 @@ async function getUserGrade() {
     }
   } catch (e) {
     console.warn('getUserGrade error:', e);
+  }
+  // Fallback: infer grade from role or posisi
+  if (currentUser.posisi) {
+    const posisi = currentUser.posisi.toUpperCase();
+    if (posisi.includes('GENERAL MANAGER') || posisi.includes('GM')) return 'GENERAL MANAGER';
+    if (posisi.includes('DIRECTOR') || posisi.includes('BOD')) return 'BOD';
+    if (posisi.includes('HEAD') || posisi.includes('MANAGER')) return 'MANAGER';
+    if (posisi.includes('SUPERVISOR') || posisi.includes('SENIOR') || posisi.includes('LEADER')) return 'SENIOR';
+  }
+  // Fallback from role
+  const roleGradeMap = {bod:'BOD', head:'HEAD', manager:'MANAGER', leader:'LEADER', staff:'STAFF', admin:'BOD'};
+  if (currentUser.role && roleGradeMap[currentUser.role]) {
+    currentUser.gradeJabatan = roleGradeMap[currentUser.role];
+    return currentUser.gradeJabatan;
   }
   currentUser.gradeJabatan = 'STAFF';
   return currentUser.gradeJabatan;
