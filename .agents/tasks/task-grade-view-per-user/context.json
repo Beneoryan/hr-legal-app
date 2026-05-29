@@ -1,0 +1,20 @@
+{
+  "project_type": "Vanilla JS single-page app with Firebase/Firestore backend",
+  "language": "JavaScript (ES6+, no build step)",
+  "build_system": "None - static files served directly. No bundler or transpiler.",
+  "test_framework": "None - no test infrastructure exists",
+  "build_command": "node --check modules.js && node --check core.js && node --check absensi-ijef.js",
+  "test_command": "node --check modules.js && node --check core.js && node --check absensi-ijef.js",
+  "verification_instructions": "Run node --check on all JS files to confirm no syntax errors. Verify with grep that the comparison table is wrapped in hasAccess(3) check.",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "No setup needed - static files with inline Firebase SDK from CDN",
+  "environment_constraints": "INTEGRATIONS_ONLY network - no external package installs possible. Validation limited to AST/syntax checks.",
+  "contribution_requirements": "Direct edits to JS files. No PR template or linting config.",
+  "key_patterns": "hasAccess(3) is used to gate admin/manager+ features. Portal users (staff/leader) use functions prefixed with renderPortal*. The grade system uses getUserGrade() to fetch current user grade, resolveGradeKey() to normalize, getGradeConfig() for benefits, getGradePeraturan() for rules.",
+  "relevant_files": [
+    "modules.js (lines 4551-4566: comparison table in loadSPPDProsedur that must be hidden from non-admin)",
+    "modules.js (lines 3475-3495: renderPortalPeraturan - already correctly shows only user's grade)",
+    "core.js (hasAccess function, role-based routing)"
+  ],
+  "directory_structure": "Single directory with index.html, core.js (auth/routing), modules.js (all module renderers), absensi-ijef.js (attendance), disc-test.html/js (personality test), recruitment.js"
+}

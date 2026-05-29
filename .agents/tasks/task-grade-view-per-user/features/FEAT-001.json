@@ -1,0 +1,29 @@
+{
+  "id": "FEAT-001",
+  "type": "fix",
+  "description": "Remove the 'Perbandingan Hak per Grade' comparison table from non-admin view in the Prosedur tab of Perjalanan Dinas. Each employee should only see their own grade's benefits and rules, not a side-by-side comparison of all tiers (BOD, HEAD, SENIOR, STAFF). The admin view (hasAccess(3)) should retain the full comparison table for configuration management purposes.",
+  "status": "completed",
+  "steps": [
+    "In modules.js, locate the loadSPPDProsedur function (around line 4465).",
+    "Find the section starting with comment '// Comparison table of all grades' (around line 4552) that builds the 'Perbandingan Hak per Grade' table using allGrades array.",
+    "Wrap the entire comparison table block (from 'const allGrades = ...' through the closing of the table div, ending around line 4566 with '</div></div>') inside an `if(hasAccess(3))` check, so only admin/manager/head/bod can see the comparison of all grade tiers.",
+    "For non-admin users (staff/leader), they already see their own grade info in the 'Ketentuan Berdasarkan Grade Anda' section above it - no additional content is needed.",
+    "The admin 'Konfigurasi Benefit per Grade' section (already wrapped in if(hasAccess(3))) remains unchanged.",
+    "Verify that renderPortalPeraturan() (line ~3475) already only shows the user's own grade - no changes needed there.",
+    "Run node --check modules.js to confirm no syntax errors."
+  ],
+  "acceptance_criteria": [
+    "loadSPPDProsedur no longer shows the 'Perbandingan Hak per Grade' comparison table to staff/leader users",
+    "Admin/manager users (hasAccess(3) returns true) still see the comparison table",
+    "The user's own grade info section ('Ketentuan Berdasarkan Grade Anda') remains visible to all users",
+    "The admin 'Konfigurasi Benefit per Grade' section remains unchanged (admin-only)",
+    "node --check modules.js passes without syntax errors"
+  ],
+  "verification": [
+    "Run: node --check /projects/sandbox/hr-legal-app/modules.js",
+    "Run: grep -n 'Perbandingan Hak per Grade' /projects/sandbox/hr-legal-app/modules.js to confirm it still exists but is inside an access check",
+    "Run: grep -B2 'Perbandingan Hak per Grade' /projects/sandbox/hr-legal-app/modules.js to confirm hasAccess(3) guard is present before the comparison table"
+  ],
+  "blocked_reason": null,
+  "findings": "The admin 'Konfigurasi Benefit per Grade' section originally referenced the outer allGrades const. Added its own const allGrades declaration inside its if(hasAccess(3)) block to maintain independence from the now-wrapped comparison table block. All syntax checks pass."
+}
