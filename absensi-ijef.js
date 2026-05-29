@@ -915,7 +915,7 @@ async function loadDinasTab(tab) {
 
 async function modalDinasLuar() {
   const grade = await getUserGrade();
-  const cfg = getGradeConfig(grade);
+  const cfg = await getGradeConfig(grade);
   openModal(`<div class="modal-title">📝 Ajukan Dinas Luar</div>
     <div style="background:#e8f5e9;padding:12px;border-radius:8px;margin-bottom:16px;border-left:4px solid var(--success)">
       <div class="fw-700 text-sm mb-4">🎯 Grade Anda: <span class="badge badge-info">${escHtml(grade || 'STAFF')}</span> (${escHtml(cfg.label)})</div>
@@ -937,7 +937,7 @@ function hitungEstimasiDinas(){
   const hari=Math.ceil((new Date(selesai)-new Date(mulai))/(1000*60*60*24)+1);
   if(hari<=0)return;
   const grade=currentUser.gradeJabatan||'STAFF';
-  const cfg=getGradeConfig(grade);
+  const cfg=getGradeConfigSync(grade);
   const malam=Math.max(hari-1,0);
   const estTransport=cfg.maxTransport;
   const estHotel=cfg.maxHotel*malam;
@@ -950,7 +950,7 @@ function hitungEstimasiDinas(){
 
 async function simpanDinasLuar() {
   const grade = await getUserGrade();
-  const cfg = getGradeConfig(grade);
+  const cfg = await getGradeConfig(grade);
   const tanggalSelesai = document.getElementById('dlTglSelesai')?.value || document.getElementById('dlTgl').value;
   const data = {nama:document.getElementById('dlNama').value,tanggal:document.getElementById('dlTgl').value,tanggalSelesai:tanggalSelesai,tujuan:document.getElementById('dlTujuan').value,keperluan:document.getElementById('dlKeperluan').value,jamBerangkat:document.getElementById('dlJamGo').value,jamKembali:document.getElementById('dlJamBack').value,status:'pending',userId:currentUser.id,createdAt:new Date().toISOString()};
   if(!data.tujuan)return toast('Tujuan wajib','warning');
@@ -1332,7 +1332,7 @@ function viewDinasLuar(id){
   db.collection('hrd_dinas_luar').doc(id).get().then(d=>{const p=d.data();
     let benefitHtml = '';
     if(p.gradeJabatan){
-      const cfg = getGradeConfig(p.gradeJabatan);
+      const cfg = getGradeConfigSync(p.gradeJabatan);
       benefitHtml = `<div style="background:#e8f5e9;padding:12px;border-radius:8px;margin-bottom:16px;border-left:4px solid var(--success)">
         <div class="fw-700 text-sm mb-4">🎯 Grade: <span class="badge badge-info">${escHtml(p.gradeJabatan)}</span> (${escHtml(cfg.label)})</div>
         <div class="text-sm" style="color:#555">Uang Harian: ${formatCurrency(p.uangHarian||cfg.uangHarian)} | Max Transport: ${formatCurrency(p.maxTransport||cfg.maxTransport)} | Max Hotel/mlm: ${formatCurrency(p.maxHotel||cfg.maxHotel)} | Max Makan/hr: ${formatCurrency(p.maxMakan||cfg.maxMakan)}</div>

@@ -546,4 +546,10 @@ function setupRealtimeSync() {
     }, () => {});
     unsubscribers.push(unsub);
   });
+
+  // Listen for benefit config changes (invalidate cache so portals auto-update)
+  const unsubBenefit = db.collection('hrd_config_benefit').doc('current').onSnapshot(() => {
+    if (typeof invalidateBenefitCache === 'function') invalidateBenefitCache();
+  }, () => {});
+  unsubscribers.push(unsubBenefit);
 }
