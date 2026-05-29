@@ -1,7 +1,14 @@
 {
   "task_id": "task-fix-dinas-portal",
   "task_description": "Fix 3 issues: (1) Dinas Luar form/view not showing benefit nominal (uang harian, transport, hotel, makan), (2) SPPD-DinasLuar bidirectional integration not working from dinas luar side, (3) Portal karyawan navigation not clickable due to sidebar collapse and redirect bugs",
-  "status": "in_progress",
+  "status": "completed",
   "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
-  "blocked_reason": null
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "All 3 JS files pass syntax validation. Integration checks confirm benefit display (getUserGrade, gradeJabatan, totalEstimasi), SPPD bidirectional link (hrd_perjalanan_dinas), approval propagation (dinasLuarId query), and SPPD collision fix (Math.random suffix) are all present. Review issues addressed."
+  }
 }
