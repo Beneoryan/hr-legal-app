@@ -4262,7 +4262,7 @@ function resolveGradeKey(grade) {
   if (g.includes('BOD') || g.includes('DIRECTOR')) return 'BOD';
   // Check HEAD/MANAGER before SENIOR to avoid "SENIOR MANAGER" matching SENIOR
   if (g.includes('HEAD') || g.includes('MANAGER')) return 'HEAD';
-  if (g.includes('SENIOR') || g.includes('SUPERVISOR')) return 'SENIOR';
+  if (g.includes('SENIOR') || g.includes('SUPERVISOR') || g.includes('LEADER')) return 'SENIOR';
   return 'STAFF';
 }
 
@@ -4604,8 +4604,8 @@ async function loadSPPDProsedur(el){
     </div>
   </div>`;
 
-  // Comparison table of all grades - only visible to admin/manager
-  if (hasAccess(3)) {
+  // Comparison table of all grades - only visible to admin
+  if (hasAccess(6)) {
     const allGrades = ['BOD', 'HEAD', 'SENIOR', 'STAFF'];
     const userGradeKey = resolveGradeKey(grade);
     const getCmpBen = (g, field) => {
@@ -4631,7 +4631,7 @@ async function loadSPPDProsedur(el){
   }
 
   // Admin section - Konfigurasi Benefit per Grade (EDITABLE)
-  if (hasAccess(3)) {
+  if (hasAccess(6)) {
     const allGrades2 = ['BOD', 'HEAD', 'SENIOR', 'STAFF'];
     const getBenVal = (grade, field) => {
       if (fsConfig && fsConfig.benefit && fsConfig.benefit[grade]) return fsConfig.benefit[grade][field];
