@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Make admin benefit config table editable, store config in Firestore, and auto-update employee portals. This transforms the read-only admin config table into an editable form with save functionality, stores the config in Firestore collection 'hrd_config_benefit', and modifies getGradeConfig() to read from Firestore (with fallback to hardcoded defaults).",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Step 1 - Add Firestore-backed config loader: In modules.js, add a new cached config loader function `loadBenefitConfig()` that fetches benefit config from Firestore collection 'hrd_config_benefit' (single document with id 'current'). The document stores both benefit values (uangHarian, maxTransport, maxHotel, kelasHotel, maxMakan, uangSaku, totalMaxPerDay, label per grade) and peraturan values (alurApproval, maxDurasiTanpaApprovalKhusus, persenUangMuka, batasWaktuLaporan, kelasHotelDiizinkan per grade). Use a module-level cache variable `_benefitConfigCache` with a 5-minute TTL so repeated calls don't hit Firestore every time. If Firestore fetch fails or document doesn't exist, fall back to the hardcoded BENEFIT_CONFIG_BY_GRADE and PERATURAN_DINAS_BY_GRADE constants.",
     "Step 2 - Modify getGradeConfig() and getGradePeraturan(): Change `getGradeConfig(grade)` from synchronous to async - it should call `loadBenefitConfig()` and return the benefit config for the resolved grade. Similarly make `getGradePeraturan(grade)` async. Keep the old synchronous versions available as `getGradeConfigSync(grade)` that reads from `_benefitConfigCache` or falls back to the hardcoded constant (for places that cannot easily be made async).",
@@ -28,5 +28,5 @@
     "Verify loadBenefitConfig() has proper fallback to hardcoded constants"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All three files (modules.js, core.js, absensi-ijef.js) pass node --check syntax validation. getGradeConfig and getGradePeraturan are now async with Firestore-first lookup. Sync versions (getGradeConfigSync, getGradePeraturanSync) provided for event handler contexts (hitungEstimasiBenefit, cekBatasGrade, hitungEstimasiDinas, viewDinasLuar detail block). The comparison table in loadSPPDProsedur also reads from Firestore via helper functions. No build step or test suite exists, so verification is limited to syntax checking."
 }
