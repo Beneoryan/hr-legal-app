@@ -1,0 +1,24 @@
+{
+  "project_type": "Single-page HR/Legal web app (vanilla JS + Firebase/Firestore)",
+  "language": "JavaScript (vanilla, no framework)",
+  "build_system": "None - static files deployed directly to Netlify",
+  "test_framework": "None - no test infrastructure exists",
+  "build_command": "N/A - static site, just validate JS syntax with node --check",
+  "test_command": "node --check modules.js && node --check core.js && node --check absensi-ijef.js",
+  "verification_instructions": "Run node --check on all JS files to verify no syntax errors. Visually inspect integration logic.",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "No setup needed - static files. node is available for syntax checking.",
+  "environment_constraints": "INTEGRATIONS_ONLY network - no npm install possible. All code must be vanilla JS with Firebase SDK loaded from CDN in index.html. No external dependencies can be added.",
+  "contribution_requirements": "Code follows existing patterns: single-file modules with functions for rendering, modal forms, and Firestore CRUD. HTML is generated as template strings inline. All UI in Indonesian language.",
+  "key_patterns": "1) Firestore collections prefixed with 'hrd_'. 2) currentUser object has: id, nama, role, departemen, posisi, nip, linkedKaryawan, profilePic. 3) Grade is stored as 'gradeJabatan' on hrd_karyawan docs (values like BOD/HEAD/SENIOR HEAD/STAFF). 4) SPPD integration already creates hrd_dinas_luar record on submit. 5) Portal views filter by currentUser.id or name. 6) renderPeraturanHTML() displays static company rules. 7) ROLES object: admin:6, bod:5, head:4, manager:3, leader:2, staff:1.",
+  "relevant_files": [
+    "modules.js (lines 4188-4735: Perjalanan Dinas module, SPPD form, uang muka, laporan, reimbursement)",
+    "modules.js (lines 3076-3080: PERATURAN_PERUSAHAAN constant and renderPeraturanHTML)",
+    "modules.js (lines 3475: renderPortalPeraturan function)",
+    "modules.js (lines 4209-4212: renderPortalPerjalananDinas)",
+    "modules.js (lines 145-170: simpanKaryawan with gradeJabatan field)",
+    "core.js (lines 140-222: navigation and routing)",
+    "absensi-ijef.js (lines 880-921: dinas luar pengajuan tab)"
+  ],
+  "directory_structure": "Flat structure: index.html, core.js (routing/auth), modules.js (all HR modules), absensi-ijef.js (attendance module), recruitment.js, disc-test.html/js, sw.js, manifest.json, netlify.toml"
+}

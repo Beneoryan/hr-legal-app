@@ -26,5 +26,5 @@
     "Run: node --check /projects/sandbox/hr-legal-app/absensi-ijef.js"
   ],
   "blocked_reason": null,
-  "findings": "All 5 steps implemented successfully. PERATURAN_DINAS_BY_GRADE constant added at line ~4296. loadSPPDProsedur is now async (showSPPDTab awaits it). renderPortalPeraturan is now async (router calls without await but works fine - same pattern as other async portal pages). Added getGradePeraturan() helper for grade matching. Dismissible banner uses inline onclick to hide via display:none. node --check passes on all JS files (requires NODE_OPTIONS=\"\" prefix)."
+  "findings": "All 5 steps implemented successfully. PERATURAN_DINAS_BY_GRADE constant added at line ~4296. loadSPPDProsedur is now async (showSPPDTab awaits it). renderPortalPeraturan is now async (router calls without await but works fine - same pattern as other async portal pages). Added getGradePeraturan() helper for grade matching. Dismissible banner uses inline onclick to hide via display:none. node --check passes on all JS files (requires NODE_OPTIONS=\"\" prefix). Review fixes applied: resolveGradeKey() extracted, grade match order fixed (HEAD/MANAGER before SENIOR), escHtml applied to transportasiDiizinkan, confirm() added for over-limit submissions, cross-reference update wrapped in try/catch."
 }
