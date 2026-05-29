@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "fix",
   "description": "Remove the 'Perbandingan Hak per Grade' comparison table from non-admin view in the Prosedur tab of Perjalanan Dinas. Each employee should only see their own grade's benefits and rules, not a side-by-side comparison of all tiers (BOD, HEAD, SENIOR, STAFF). The admin view (hasAccess(3)) should retain the full comparison table for configuration management purposes.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "In modules.js, locate the loadSPPDProsedur function (around line 4465).",
     "Find the section starting with comment '// Comparison table of all grades' (around line 4552) that builds the 'Perbandingan Hak per Grade' table using allGrades array.",
@@ -25,5 +25,5 @@
     "Run: grep -B2 'Perbandingan Hak per Grade' /projects/sandbox/hr-legal-app/modules.js to confirm hasAccess(3) guard is present before the comparison table"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "The admin 'Konfigurasi Benefit per Grade' section originally referenced the outer allGrades const. Added its own const allGrades declaration inside its if(hasAccess(3)) block to maintain independence from the now-wrapped comparison table block. All syntax checks pass."
 }
