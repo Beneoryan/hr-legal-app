@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "fix",
   "description": "Fix Portal Karyawan clickability issues - sidebar navigation collapse bug and portal-absensi redirect loop",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "1. In core.js, fix the navigateTo() function to re-expand the nav-group containing the active page after navigation. Currently, when a user clicks a nav-item in a different (collapsed) group, the group stays collapsed because only the .active class is toggled but nav-group-items display is not updated. After setting the active class, find the nav-item's parent .nav-group-items and ensure its display is 'block' and the arrow has class 'open'.",
     "2. In modules.js, fix renderPortalAbsensi() (line 3404-3407). Currently it does: window._portalAbsensiMode=true; navigateTo('absensi'); This causes currentPage to become 'absensi' which is NOT a portal-* page, so the sidebar nav-group 'Utama' loses its active state and collapses. Fix: instead of redirecting to 'absensi', render the absensi content directly within the portal context. Keep currentPage as 'portal-absensi' and call renderAbsensiIJEF() directly after setting _portalAbsensiMode=true.",
@@ -24,5 +24,5 @@
     "Run: node -e \"const fs=require('fs'); const code=fs.readFileSync('core.js','utf8'); if(!code.includes('nav-group-items') || !code.includes('navigateTo')) process.exit(0); console.log('nav-group handling present');\""
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All fixes applied and verified. Used NODE_OPTIONS='' for syntax checks. Three changes: (1) navigateTo() now auto-expands nav-group-items containing the active nav-item after navigation, (2) renderPortalAbsensi() calls renderAbsensiIJEF() directly instead of navigateTo('absensi') which would change currentPage and collapse the sidebar, (3) stat-cards and quick-action container got touch-action:manipulation and webkit-tap-highlight-color for better mobile responsiveness. closeSidebar() already works correctly - no change needed there."
 }
