@@ -1,0 +1,30 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Add grade-specific Peraturan & Prosedur for Perjalanan Dinas. Replace the static prosedur content in the 'Prosedur' tab with grade-tailored rules showing each employee their specific entitlements, approval flow requirements, and policies. Integrate this into both the admin Perjalanan Dinas view and each employee's portal.",
+  "status": "completed",
+  "steps": [
+    "Step 1: Create a PERATURAN_DINAS_BY_GRADE constant (in modules.js near the BENEFIT_CONFIG_BY_GRADE from FEAT-001) that defines per-grade rules including: (a) approval flow (e.g., STAFF needs Head + HRD approval, HEAD needs BOD approval), (b) max trip duration allowed without special approval, (c) allowed transport modes (e.g., STAFF gets bus/train, HEAD gets plane economy, BOD gets plane business), (d) allowed hotel classes, (e) advance payment percentage allowed, (f) reporting deadline, (g) any special privileges. Use Indonesian language for all labels.",
+    "Step 2: Modify the loadSPPDProsedur(el) function to: (a) Detect the current user's grade using getUserGrade(), (b) Display a personalized header showing 'Prosedur untuk Grade: [GRADE]', (c) Show the general procedure steps (keep existing numbered steps), (d) Add a new section below titled 'Ketentuan Berdasarkan Grade Anda' showing the grade-specific rules from PERATURAN_DINAS_BY_GRADE in a well-formatted card with icons, (e) Show a comparison table of all grades' entitlements so users understand the tier system (with their own grade highlighted).",
+    "Step 3: Add an admin-facing 'Konfigurasi Benefit Grade' section accessible from the prosedur tab when user hasAccess(3). This shows an editable table of all grade configs allowing admin to view (read-only display for now) the grade benefit matrix - all grades side by side in a comparison table.",
+    "Step 4: Update renderPortalPeraturan() to include a new section at the top or after the general company rules titled 'Ketentuan Perjalanan Dinas - Grade [USER_GRADE]' showing the personalized travel rules and benefit entitlements for the logged-in employee's grade. This section should clearly display: allowed transport, hotel class, daily allowance, meal budget, and the approval flow they must follow.",
+    "Step 5: In the portal Perjalanan Dinas page, add a dismissible info banner at the top (before the tabs) that summarizes key policies for the user's grade: 'Sebagai grade [X], Anda berhak atas: [uang harian], [kelas hotel], [transport]. Ajukan SPPD minimal 3 hari sebelum keberangkatan.'"
+  ],
+  "acceptance_criteria": [
+    "PERATURAN_DINAS_BY_GRADE constant exists with rules for at least 4 grade tiers",
+    "The Prosedur tab shows personalized rules based on the current user's grade",
+    "A comparison table of all grades' entitlements is shown with the user's grade highlighted",
+    "Admin users (hasAccess(3)) can see the full grade benefit matrix",
+    "The portal Peraturan page includes a Perjalanan Dinas section tailored to the user's grade",
+    "The portal Perjalanan Dinas page shows an info banner with the user's grade-specific entitlements",
+    "All text is in Indonesian language matching existing app conventions",
+    "All JS files pass syntax check (node --check)"
+  ],
+  "verification": [
+    "Run: node --check /projects/sandbox/hr-legal-app/modules.js",
+    "Run: node --check /projects/sandbox/hr-legal-app/core.js",
+    "Run: node --check /projects/sandbox/hr-legal-app/absensi-ijef.js"
+  ],
+  "blocked_reason": null,
+  "findings": "All 5 steps implemented successfully. PERATURAN_DINAS_BY_GRADE constant added at line ~4296. loadSPPDProsedur is now async (showSPPDTab awaits it). renderPortalPeraturan is now async (router calls without await but works fine - same pattern as other async portal pages). Added getGradePeraturan() helper for grade matching. Dismissible banner uses inline onclick to hide via display:none. node --check passes on all JS files (requires NODE_OPTIONS=\"\" prefix). Review fixes applied: resolveGradeKey() extracted, grade match order fixed (HEAD/MANAGER before SENIOR), escHtml applied to transportasiDiizinkan, confirm() added for over-limit submissions, cross-reference update wrapped in try/catch."
+}

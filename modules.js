@@ -3472,7 +3472,28 @@ async function loadJobdesk(){
   html+=renderDownloadAppSection();
   document.getElementById('jobdeskContent').innerHTML=html;
 }
-function renderPortalPeraturan(){document.getElementById('mainContent').innerHTML=`<div class="page-title"><span>📜 Peraturan Perusahaan</span></div><div class="card">${renderPeraturanHTML(true)}</div>`;}
+async function renderPortalPeraturan(){
+  const grade = await getUserGrade();
+  const cfg = getGradeConfig(grade);
+  const peraturan = getGradePeraturan(grade);
+  let gradeSection = `<div class="card mb-16" style="border-left:4px solid #ff9800">
+    <div class="card-header"><div class="card-title">✈️ Ketentuan Perjalanan Dinas - Grade ${escHtml(grade || 'STAFF')}</div></div>
+    <div style="padding:12px">
+      <div class="table-wrap"><table><thead><tr><th>Komponen</th><th>Ketentuan Anda</th></tr></thead><tbody>
+        <tr><td class="fw-700">Transportasi Diizinkan</td><td>${escHtml(peraturan.transportasiDiizinkan.join(', '))}</td></tr>
+        <tr><td class="fw-700">Kelas Hotel</td><td>${escHtml(peraturan.kelasHotelDiizinkan)}</td></tr>
+        <tr><td class="fw-700">Uang Harian</td><td>${formatCurrency(cfg.uangHarian)}</td></tr>
+        <tr><td class="fw-700">Max Makan/Hari</td><td>${formatCurrency(cfg.maxMakan)}</td></tr>
+        <tr><td class="fw-700">Uang Saku/Hari</td><td>${formatCurrency(cfg.uangSaku)}</td></tr>
+        <tr><td class="fw-700">Alur Approval</td><td>${escHtml(peraturan.alurApproval)}</td></tr>
+        <tr><td class="fw-700">Uang Muka</td><td>${peraturan.persenUangMuka}% dari estimasi</td></tr>
+        <tr><td class="fw-700">Batas Waktu Laporan</td><td>${peraturan.batasWaktuLaporan} hari setelah kembali</td></tr>
+      </tbody></table></div>
+      ${peraturan.ketentuanKhusus.length ? '<div class="mt-8"><div class="fw-700 text-sm mb-4">Ketentuan Khusus:</div><ul class="text-sm" style="padding-left:16px;line-height:1.6;color:#555;margin:0">'+peraturan.ketentuanKhusus.map(k=>'<li>'+escHtml(k)+'</li>').join('')+'</ul></div>' : ''}
+    </div>
+  </div>`;
+  document.getElementById('mainContent').innerHTML=`<div class="page-title"><span>📜 Peraturan Perusahaan</span></div>${gradeSection}<div class="card">${renderPeraturanHTML(true)}</div>`;
+}
 
 // ══════════════════════════════════════════════════════════════
 // ── KELOLA JOBDESK — Admin assign jobdesk ke karyawan ─────────
@@ -4189,6 +4210,157 @@ async function resetEntireSystem(){
 
 
 // ══════════════════════════════════════════════════════════════
+// ── BENEFIT CONFIG BY GRADE (Perjalanan Dinas) ────────────────
+// ══════════════════════════════════════════════════════════════
+
+const BENEFIT_CONFIG_BY_GRADE = {
+  BOD: {
+    label: 'BOD (Board of Directors)',
+    uangHarian: 500000,
+    maxTransport: 5000000,
+    maxHotel: 2000000,
+    kelasHotel: 'Bintang 4-5',
+    maxMakan: 300000,
+    uangSaku: 200000,
+    totalMaxPerDay: 3000000
+  },
+  HEAD: {
+    label: 'HEAD / MANAGER',
+    uangHarian: 350000,
+    maxTransport: 3000000,
+    maxHotel: 1200000,
+    kelasHotel: 'Bintang 3-4',
+    maxMakan: 200000,
+    uangSaku: 150000,
+    totalMaxPerDay: 1900000
+  },
+  SENIOR: {
+    label: 'SENIOR STAFF / SUPERVISOR',
+    uangHarian: 250000,
+    maxTransport: 2000000,
+    maxHotel: 800000,
+    kelasHotel: 'Bintang 2-3',
+    maxMakan: 150000,
+    uangSaku: 100000,
+    totalMaxPerDay: 1300000
+  },
+  STAFF: {
+    label: 'STAFF',
+    uangHarian: 150000,
+    maxTransport: 1500000,
+    maxHotel: 500000,
+    kelasHotel: 'Bintang 2 / Budget',
+    maxMakan: 100000,
+    uangSaku: 75000,
+    totalMaxPerDay: 825000
+  }
+};
+
+function resolveGradeKey(grade) {
+  if (!grade) return 'STAFF';
+  const g = grade.toUpperCase().trim();
+  if (g.includes('BOD') || g.includes('DIRECTOR')) return 'BOD';
+  // Check HEAD/MANAGER before SENIOR to avoid "SENIOR MANAGER" matching SENIOR
+  if (g.includes('HEAD') || g.includes('MANAGER')) return 'HEAD';
+  if (g.includes('SENIOR') || g.includes('SUPERVISOR')) return 'SENIOR';
+  return 'STAFF';
+}
+
+function getGradeConfig(grade) {
+  return BENEFIT_CONFIG_BY_GRADE[resolveGradeKey(grade)];
+}
+
+async function getUserGrade() {
+  if (currentUser.gradeJabatan) return currentUser.gradeJabatan;
+  try {
+    let snap;
+    if (currentUser.linkedKaryawan) {
+      const doc = await db.collection('hrd_karyawan').doc(currentUser.linkedKaryawan).get();
+      if (doc.exists && doc.data().gradeJabatan) {
+        currentUser.gradeJabatan = doc.data().gradeJabatan;
+        return currentUser.gradeJabatan;
+      }
+    }
+    snap = await db.collection('hrd_karyawan').where('nama', '==', currentUser.nama).get();
+    if (!snap.empty) {
+      const data = snap.docs[0].data();
+      currentUser.gradeJabatan = data.gradeJabatan || 'STAFF';
+      return currentUser.gradeJabatan;
+    }
+  } catch (e) {
+    console.warn('getUserGrade error:', e);
+  }
+  currentUser.gradeJabatan = 'STAFF';
+  return currentUser.gradeJabatan;
+}
+
+// ══════════════════════════════════════════════════════════════
+// ── PERATURAN DINAS PER GRADE ─────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+
+const PERATURAN_DINAS_BY_GRADE = {
+  BOD: {
+    alurApproval: 'Direktur Utama',
+    maxDurasiTanpaApprovalKhusus: 14,
+    transportasiDiizinkan: ['Pesawat (Business Class)', 'Kereta (Eksekutif)', 'Rental Mobil Pribadi'],
+    kelasHotelDiizinkan: 'Bintang 4-5 / Suite',
+    persenUangMuka: 100,
+    batasWaktuLaporan: 7,
+    ketentuanKhusus: [
+      'Dapat menggunakan lounge bandara',
+      'Tidak ada batasan nominal entertainment untuk relasi bisnis',
+      'Asuransi perjalanan premium otomatis',
+      'Boleh membawa pendamping untuk perjalanan > 5 hari',
+      'Fasilitas airport transfer (pick-up & drop-off)'
+    ]
+  },
+  HEAD: {
+    alurApproval: 'General Manager -> BOD',
+    maxDurasiTanpaApprovalKhusus: 7,
+    transportasiDiizinkan: ['Pesawat (Economy/Premium Economy)', 'Kereta (Bisnis/Eksekutif)', 'Rental Mobil'],
+    kelasHotelDiizinkan: 'Bintang 3-4',
+    persenUangMuka: 80,
+    batasWaktuLaporan: 5,
+    ketentuanKhusus: [
+      'Entertainment budget untuk meeting klien (dengan approval)',
+      'Upgrade kelas penerbangan untuk durasi > 4 jam',
+      'Asuransi perjalanan standar otomatis',
+      'Boleh extend 1 hari untuk perjalanan > 5 hari'
+    ]
+  },
+  SENIOR: {
+    alurApproval: 'Head Dept -> General Manager -> HRD',
+    maxDurasiTanpaApprovalKhusus: 5,
+    transportasiDiizinkan: ['Pesawat (Economy)', 'Kereta (Bisnis)', 'Bus (Eksekutif)', 'Rental Mobil (sharing)'],
+    kelasHotelDiizinkan: 'Bintang 2-3',
+    persenUangMuka: 75,
+    batasWaktuLaporan: 3,
+    ketentuanKhusus: [
+      'Asuransi perjalanan standar',
+      'Sharing kamar tidak diwajibkan',
+      'Dapat mengajukan upgrade transport dengan justifikasi'
+    ]
+  },
+  STAFF: {
+    alurApproval: 'Atasan Langsung -> Head Dept -> HRD',
+    maxDurasiTanpaApprovalKhusus: 3,
+    transportasiDiizinkan: ['Pesawat (Economy - rute tertentu)', 'Kereta (Ekonomi/Bisnis)', 'Bus (Eksekutif/Reguler)', 'Travel Pool'],
+    kelasHotelDiizinkan: 'Bintang 2 / Budget / Guest House',
+    persenUangMuka: 70,
+    batasWaktuLaporan: 3,
+    ketentuanKhusus: [
+      'Sharing kamar diutamakan untuk efisiensi',
+      'Transport darat diprioritaskan untuk jarak < 500km',
+      'Wajib melampirkan boarding pass/tiket untuk reimbursement'
+    ]
+  }
+};
+
+function getGradePeraturan(grade) {
+  return PERATURAN_DINAS_BY_GRADE[resolveGradeKey(grade)];
+}
+
+// ══════════════════════════════════════════════════════════════
 // ── PROSEDUR PERJALANAN DINAS — Terintegrasi ──────────────────
 // ══════════════════════════════════════════════════════════════
 
@@ -4208,7 +4380,43 @@ function renderPerjalananDinas(){
 
 function renderPortalPerjalananDinas(){
   window._portalDinasMode=true;
-  renderPerjalananDinas();
+  renderPerjalananDinasWithBenefit();
+}
+
+async function renderPerjalananDinasWithBenefit(){
+  const main=document.getElementById('mainContent');
+  const grade = await getUserGrade();
+  const cfg = getGradeConfig(grade);
+  const peraturan = getGradePeraturan(grade);
+  let infoBanner = `<div id="sppdGradeBanner" class="mb-16" style="position:relative;padding:14px 40px 14px 16px;background:linear-gradient(135deg,#e3f2fd,#f3e5f5);border-radius:10px;border:1px solid #bbdefb">
+    <button onclick="document.getElementById('sppdGradeBanner').style.display='none'" style="position:absolute;top:8px;right:12px;background:none;border:none;font-size:1.2rem;cursor:pointer;color:#666;line-height:1" title="Tutup">&times;</button>
+    <div class="text-sm" style="color:#333"><span class="fw-700">Sebagai grade ${escHtml(grade || 'STAFF')}</span>, Anda berhak atas: uang harian <b>${formatCurrency(cfg.uangHarian)}</b>, <b>${escHtml(peraturan.kelasHotelDiizinkan)}</b>, <b>${escHtml(peraturan.transportasiDiizinkan[0])}</b>. Ajukan SPPD minimal 3 hari sebelum keberangkatan.</div>
+  </div>`;
+  let benefitCard = `<div class="card mb-16" style="border-left:4px solid var(--accent)">
+    <div class="card-header"><div class="card-title">🎯 Benefit Perjalanan Dinas Saya</div></div>
+    <div style="padding:12px">
+      <div class="mb-8"><span class="fw-700">Grade:</span> <span class="badge badge-info">${escHtml(grade || 'STAFF')}</span> <span class="text-sm" style="color:#666">(${escHtml(cfg.label)})</span></div>
+      <div class="table-wrap"><table><thead><tr><th>Komponen</th><th>Hak / Malam</th></tr></thead><tbody>
+        <tr><td>Uang Harian</td><td>${formatCurrency(cfg.uangHarian)}</td></tr>
+        <tr><td>Max Transport</td><td>${formatCurrency(cfg.maxTransport)}</td></tr>
+        <tr><td>Max Hotel (per malam)</td><td>${formatCurrency(cfg.maxHotel)}</td></tr>
+        <tr><td>Kelas Hotel</td><td>${escHtml(cfg.kelasHotel)}</td></tr>
+        <tr><td>Max Makan (per hari)</td><td>${formatCurrency(cfg.maxMakan)}</td></tr>
+        <tr><td>Uang Saku (per hari)</td><td>${formatCurrency(cfg.uangSaku)}</td></tr>
+        <tr style="font-weight:700;background:#f0f4ff"><td>Total Max / Hari</td><td>${formatCurrency(cfg.totalMaxPerDay)}</td></tr>
+      </tbody></table></div>
+    </div>
+  </div>`;
+  main.innerHTML=infoBanner + benefitCard + `<div class="page-title"><span>✈️ Prosedur Perjalanan Dinas</span><button class="btn btn-primary btn-sm" onclick="modalAjukanSPPD()">+ Ajukan SPPD</button></div>
+    <div class="tabs" id="sppdTabs">
+      <div class="tab active" onclick="showSPPDTab('daftar')">📋 Daftar SPPD</div>
+      <div class="tab" onclick="showSPPDTab('prosedur')">📖 Prosedur</div>
+      <div class="tab" onclick="showSPPDTab('uang-muka')">💰 Uang Muka</div>
+      <div class="tab" onclick="showSPPDTab('laporan')">📝 Laporan Perjalanan</div>
+      <div class="tab" onclick="showSPPDTab('reimbursement')">🧾 Reimburse Dinas</div>
+    </div>
+    <div id="sppdContent"></div>`;
+  showSPPDTab('daftar');
 }
 
 
@@ -4223,7 +4431,7 @@ async function showSPPDTab(tab){
   });
   const el=document.getElementById('sppdContent');
   if(tab==='daftar') await loadSPPDDaftar(el);
-  else if(tab==='prosedur') loadSPPDProsedur(el);
+  else if(tab==='prosedur') await loadSPPDProsedur(el);
   else if(tab==='uang-muka') await loadSPPDUangMuka(el);
   else if(tab==='laporan') await loadSPPDLaporan(el);
   else if(tab==='reimbursement') await loadSPPDReimbursement(el);
@@ -4254,9 +4462,18 @@ async function loadSPPDDaftar(el){
 }
 
 
-function loadSPPDProsedur(el){
-  el.innerHTML=`<div class="card">
+async function loadSPPDProsedur(el){
+  const grade = await getUserGrade();
+  const cfg = getGradeConfig(grade);
+  const peraturan = getGradePeraturan(grade);
+  const gradeKey = grade ? grade.toUpperCase().trim() : 'STAFF';
+
+  let html = `<div class="card">
     <div class="card-title mb-16">📖 Prosedur Perjalanan Dinas</div>
+    <div style="background:#e3f2fd;padding:12px 16px;border-radius:8px;margin-bottom:16px;border-left:4px solid #1976d2">
+      <div class="fw-700" style="color:#1976d2">👤 Prosedur untuk Grade: <span class="badge badge-info">${escHtml(grade || 'STAFF')}</span></div>
+      <div class="text-sm" style="color:#555;margin-top:4px">Alur approval Anda: ${escHtml(peraturan.alurApproval)}</div>
+    </div>
     <div style="background:#f8f9ff;border-radius:12px;padding:20px;border-left:4px solid var(--accent)">
       <h3 style="margin-bottom:12px;color:var(--primary)">Alur Prosedur Perjalanan Dinas</h3>
       <div style="display:grid;gap:12px">
@@ -4295,15 +4512,95 @@ function loadSPPDProsedur(el){
         <li>Bukti pengeluaran (kwitansi/invoice) wajib dilampirkan untuk reimbursement</li>
         <li>Perjalanan dinas yang dibatalkan harus dikonfirmasi ke HRD</li>
       </ul>
+    </div>`;
+
+  // Grade-specific section
+  html += `<div class="mt-16" style="padding:16px;background:#fff3e0;border-radius:12px;border-left:4px solid #ff9800">
+    <div class="fw-700 mb-12" style="color:#e65100;font-size:1.05rem">📋 Ketentuan Berdasarkan Grade Anda (${escHtml(grade || 'STAFF')})</div>
+    <div style="display:grid;gap:10px">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px;background:#fff;border-radius:8px">
+        <span style="font-size:1.2rem">🔄</span>
+        <div><div class="fw-700 text-sm">Alur Approval</div><div class="text-sm" style="color:#555">${escHtml(peraturan.alurApproval)}</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:10px;background:#fff;border-radius:8px">
+        <span style="font-size:1.2rem">📅</span>
+        <div><div class="fw-700 text-sm">Max Durasi Tanpa Approval Khusus</div><div class="text-sm" style="color:#555">${peraturan.maxDurasiTanpaApprovalKhusus} hari</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:10px;background:#fff;border-radius:8px">
+        <span style="font-size:1.2rem">🚗</span>
+        <div><div class="fw-700 text-sm">Transportasi Diizinkan</div><div class="text-sm" style="color:#555">${escHtml(peraturan.transportasiDiizinkan.join(', '))}</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:10px;background:#fff;border-radius:8px">
+        <span style="font-size:1.2rem">🏨</span>
+        <div><div class="fw-700 text-sm">Kelas Hotel</div><div class="text-sm" style="color:#555">${escHtml(peraturan.kelasHotelDiizinkan)}</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:10px;background:#fff;border-radius:8px">
+        <span style="font-size:1.2rem">💰</span>
+        <div><div class="fw-700 text-sm">Uang Muka</div><div class="text-sm" style="color:#555">${peraturan.persenUangMuka}% dari estimasi biaya</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:10px;background:#fff;border-radius:8px">
+        <span style="font-size:1.2rem">⏰</span>
+        <div><div class="fw-700 text-sm">Batas Waktu Laporan</div><div class="text-sm" style="color:#555">${peraturan.batasWaktuLaporan} hari setelah kembali</div></div>
+      </div>
+      <div style="padding:10px;background:#fff;border-radius:8px">
+        <div class="fw-700 text-sm mb-4">⭐ Ketentuan Khusus:</div>
+        <ul class="text-sm" style="padding-left:16px;line-height:1.8;color:#555;margin:0">${peraturan.ketentuanKhusus.map(k=>'<li>'+escHtml(k)+'</li>').join('')}</ul>
+      </div>
     </div>
   </div>`;
+
+  // Comparison table of all grades
+  const allGrades = ['BOD', 'HEAD', 'SENIOR', 'STAFF'];
+  const userGradeKey = resolveGradeKey(grade);
+
+  html += `<div class="mt-16"><div class="fw-700 mb-12" style="font-size:1.05rem">📊 Perbandingan Hak per Grade</div>
+    <div class="table-wrap"><table><thead><tr><th>Komponen</th>${allGrades.map(g=>'<th style="'+(g===userGradeKey?'background:#e3f2fd;color:#1565c0;font-weight:700':'')+'">'+BENEFIT_CONFIG_BY_GRADE[g].label+'</th>').join('')}</tr></thead><tbody>
+      <tr><td class="fw-700">Uang Harian</td>${allGrades.map(g=>'<td style="'+(g===userGradeKey?'background:#e3f2fd':'')+'">'+formatCurrency(BENEFIT_CONFIG_BY_GRADE[g].uangHarian)+'</td>').join('')}</tr>
+      <tr><td class="fw-700">Max Hotel/Malam</td>${allGrades.map(g=>'<td style="'+(g===userGradeKey?'background:#e3f2fd':'')+'">'+formatCurrency(BENEFIT_CONFIG_BY_GRADE[g].maxHotel)+'</td>').join('')}</tr>
+      <tr><td class="fw-700">Kelas Hotel</td>${allGrades.map(g=>'<td style="'+(g===userGradeKey?'background:#e3f2fd':'')+'">'+escHtml(PERATURAN_DINAS_BY_GRADE[g].kelasHotelDiizinkan)+'</td>').join('')}</tr>
+      <tr><td class="fw-700">Transport</td>${allGrades.map(g=>'<td style="'+(g===userGradeKey?'background:#e3f2fd':'')+';font-size:.8rem">'+escHtml(PERATURAN_DINAS_BY_GRADE[g].transportasiDiizinkan.slice(0,2).join(', '))+'</td>').join('')}</tr>
+      <tr><td class="fw-700">Uang Muka</td>${allGrades.map(g=>'<td style="'+(g===userGradeKey?'background:#e3f2fd':'')+'">'+PERATURAN_DINAS_BY_GRADE[g].persenUangMuka+'%</td>').join('')}</tr>
+      <tr><td class="fw-700">Max Durasi (tanpa approval khusus)</td>${allGrades.map(g=>'<td style="'+(g===userGradeKey?'background:#e3f2fd':'')+'">'+PERATURAN_DINAS_BY_GRADE[g].maxDurasiTanpaApprovalKhusus+' hari</td>').join('')}</tr>
+      <tr><td class="fw-700">Batas Laporan</td>${allGrades.map(g=>'<td style="'+(g===userGradeKey?'background:#e3f2fd':'')+'">'+PERATURAN_DINAS_BY_GRADE[g].batasWaktuLaporan+' hari</td>').join('')}</tr>
+      <tr><td class="fw-700">Alur Approval</td>${allGrades.map(g=>'<td style="'+(g===userGradeKey?'background:#e3f2fd':'')+';font-size:.8rem">'+escHtml(PERATURAN_DINAS_BY_GRADE[g].alurApproval)+'</td>').join('')}</tr>
+    </tbody></table></div></div>`;
+
+  // Admin section - Konfigurasi Benefit per Grade
+  if (hasAccess(3)) {
+    html += `<div class="mt-16" style="padding:16px;background:#f3e5f5;border-radius:12px;border-left:4px solid #9c27b0">
+      <div class="fw-700 mb-12" style="color:#6a1b9a;font-size:1.05rem">⚙️ Konfigurasi Benefit per Grade (Admin)</div>
+      <div class="table-wrap"><table><thead><tr><th>Komponen</th>${allGrades.map(g=>'<th>'+BENEFIT_CONFIG_BY_GRADE[g].label+'</th>').join('')}</tr></thead><tbody>
+        <tr><td class="fw-700">Uang Harian</td>${allGrades.map(g=>'<td>'+formatCurrency(BENEFIT_CONFIG_BY_GRADE[g].uangHarian)+'</td>').join('')}</tr>
+        <tr><td class="fw-700">Max Transport</td>${allGrades.map(g=>'<td>'+formatCurrency(BENEFIT_CONFIG_BY_GRADE[g].maxTransport)+'</td>').join('')}</tr>
+        <tr><td class="fw-700">Max Hotel</td>${allGrades.map(g=>'<td>'+formatCurrency(BENEFIT_CONFIG_BY_GRADE[g].maxHotel)+'</td>').join('')}</tr>
+        <tr><td class="fw-700">Kelas Hotel</td>${allGrades.map(g=>'<td>'+escHtml(BENEFIT_CONFIG_BY_GRADE[g].kelasHotel)+'</td>').join('')}</tr>
+        <tr><td class="fw-700">Max Makan/Hari</td>${allGrades.map(g=>'<td>'+formatCurrency(BENEFIT_CONFIG_BY_GRADE[g].maxMakan)+'</td>').join('')}</tr>
+        <tr><td class="fw-700">Uang Saku/Hari</td>${allGrades.map(g=>'<td>'+formatCurrency(BENEFIT_CONFIG_BY_GRADE[g].uangSaku)+'</td>').join('')}</tr>
+        <tr style="font-weight:700;background:#f0f4ff"><td>Total Max/Hari</td>${allGrades.map(g=>'<td>'+formatCurrency(BENEFIT_CONFIG_BY_GRADE[g].totalMaxPerDay)+'</td>').join('')}</tr>
+        <tr><td class="fw-700">Uang Muka (%)</td>${allGrades.map(g=>'<td>'+PERATURAN_DINAS_BY_GRADE[g].persenUangMuka+'%</td>').join('')}</tr>
+        <tr><td class="fw-700">Max Durasi</td>${allGrades.map(g=>'<td>'+PERATURAN_DINAS_BY_GRADE[g].maxDurasiTanpaApprovalKhusus+' hari</td>').join('')}</tr>
+        <tr><td class="fw-700">Batas Laporan</td>${allGrades.map(g=>'<td>'+PERATURAN_DINAS_BY_GRADE[g].batasWaktuLaporan+' hari</td>').join('')}</tr>
+        <tr><td class="fw-700">Alur Approval</td>${allGrades.map(g=>'<td style="font-size:.8rem">'+escHtml(PERATURAN_DINAS_BY_GRADE[g].alurApproval)+'</td>').join('')}</tr>
+      </tbody></table></div>
+      <div class="text-sm mt-8" style="color:#666;font-style:italic">* Tabel ini bersifat read-only. Hubungi System Admin untuk perubahan konfigurasi.</div>
+    </div>`;
+  }
+
+  html += `</div>`;
+  el.innerHTML = html;
 }
 
 
-function modalAjukanSPPD(){
+async function modalAjukanSPPD(){
+  const grade = await getUserGrade();
+  const cfg = getGradeConfig(grade);
   const noSPPD='SPPD/'+new Date().getFullYear()+'/'+String(Date.now()).slice(-6);
   openModal(`<div class="modal-title">✈️ Ajukan Surat Perintah Perjalanan Dinas</div>
     <div style="background:#f0f4ff;padding:10px;border-radius:8px;margin-bottom:16px"><span class="fw-700">No. SPPD:</span> ${noSPPD}</div>
+    <div style="background:#e8f5e9;padding:12px;border-radius:8px;margin-bottom:16px;border-left:4px solid var(--success)">
+      <div class="fw-700 text-sm mb-4">🎯 Grade Anda: <span class="badge badge-info">${escHtml(grade || 'STAFF')}</span> (${escHtml(cfg.label)})</div>
+      <div class="text-sm" style="color:#555">Uang Harian: ${formatCurrency(cfg.uangHarian)} | Hotel: ${formatCurrency(cfg.maxHotel)}/mlm (${escHtml(cfg.kelasHotel)}) | Makan: ${formatCurrency(cfg.maxMakan)}/hr | Saku: ${formatCurrency(cfg.uangSaku)}/hr</div>
+    </div>
     <div class="grid-2">
       <div class="form-group"><label>Nama Karyawan</label><input class="form-control" id="sppdNama" value="${escHtml(currentUser.nama)}"></div>
       <div class="form-group"><label>Departemen</label><input class="form-control" id="sppdDept" value="${escHtml(currentUser.departemen||'')}"></div>
@@ -4311,27 +4608,72 @@ function modalAjukanSPPD(){
     <div class="form-group"><label>Tujuan / Kota Tujuan</label><input class="form-control" id="sppdTujuan" placeholder="Jakarta, Surabaya, dll"></div>
     <div class="form-group"><label>Nama Klien / Instansi</label><input class="form-control" id="sppdKlien" placeholder="Nama klien atau instansi yang dikunjungi"></div>
     <div class="grid-2">
-      <div class="form-group"><label>Tanggal Mulai</label><input class="form-control" type="date" id="sppdMulai"></div>
-      <div class="form-group"><label>Tanggal Selesai</label><input class="form-control" type="date" id="sppdSelesai"></div>
+      <div class="form-group"><label>Tanggal Mulai</label><input class="form-control" type="date" id="sppdMulai" onchange="hitungEstimasiBenefit()"></div>
+      <div class="form-group"><label>Tanggal Selesai</label><input class="form-control" type="date" id="sppdSelesai" onchange="hitungEstimasiBenefit()"></div>
     </div>
     <div class="form-group"><label>Keperluan / Tujuan Dinas</label><textarea class="form-control" id="sppdKeperluan" placeholder="Jelaskan tujuan dan keperluan perjalanan dinas"></textarea></div>
     <div class="grid-2">
       <div class="form-group"><label>Transportasi</label><select class="form-control" id="sppdTransport"><option value="Pesawat">Pesawat</option><option value="Kereta">Kereta</option><option value="Bus">Bus</option><option value="Mobil Dinas">Mobil Dinas</option><option value="Kendaraan Pribadi">Kendaraan Pribadi</option><option value="Lainnya">Lainnya</option></select></div>
       <div class="form-group"><label>Akomodasi</label><select class="form-control" id="sppdAkomodasi"><option value="Hotel">Hotel</option><option value="Guest House">Guest House</option><option value="Rumah Keluarga">Rumah Keluarga</option><option value="Tidak Perlu">Tidak Perlu</option><option value="Lainnya">Lainnya</option></select></div>
     </div>
+    <div id="sppdEstimasiInfo" class="mb-8"></div>
     <div class="fw-700 text-sm mb-8 mt-8 color-primary">💰 Estimasi Biaya</div>
     <div class="grid-2">
-      <div class="form-group"><label>Transport (Rp)</label><input class="form-control" type="number" id="sppdBiayaTransport" value="0"></div>
-      <div class="form-group"><label>Akomodasi (Rp)</label><input class="form-control" type="number" id="sppdBiayaAkomodasi" value="0"></div>
-      <div class="form-group"><label>Makan & Uang Saku (Rp)</label><input class="form-control" type="number" id="sppdBiayaMakan" value="0"></div>
+      <div class="form-group"><label>Transport (Rp)</label><input class="form-control" type="number" id="sppdBiayaTransport" value="0" onchange="cekBatasGrade()"></div>
+      <div class="form-group"><label>Akomodasi (Rp)</label><input class="form-control" type="number" id="sppdBiayaAkomodasi" value="0" onchange="cekBatasGrade()"></div>
+      <div class="form-group"><label>Makan & Uang Saku (Rp)</label><input class="form-control" type="number" id="sppdBiayaMakan" value="0" onchange="cekBatasGrade()"></div>
       <div class="form-group"><label>Lain-lain (Rp)</label><input class="form-control" type="number" id="sppdBiayaLain" value="0"></div>
     </div>
+    <div id="sppdWarningGrade" class="mb-8"></div>
     <div class="form-group"><label>Catatan Tambahan</label><textarea class="form-control" id="sppdCatatan" placeholder="Catatan khusus (opsional)"></textarea></div>
     <button class="btn btn-primary" style="width:100%;padding:12px" onclick="simpanSPPD('${noSPPD}')">📝 Ajukan SPPD</button>`,true);
 }
 
+function hitungEstimasiBenefit(){
+  const mulai=document.getElementById('sppdMulai')?.value;
+  const selesai=document.getElementById('sppdSelesai')?.value;
+  if(!mulai||!selesai)return;
+  const hari=Math.ceil((new Date(selesai)-new Date(mulai))/(1000*60*60*24)+1);
+  if(hari<=0)return;
+  const grade=currentUser.gradeJabatan||'STAFF';
+  const cfg=getGradeConfig(grade);
+  const malam=Math.max(hari-1,0);
+  const estTransport=cfg.maxTransport;
+  const estAkomodasi=cfg.maxHotel*malam;
+  const estMakan=(cfg.maxMakan+cfg.uangSaku)*hari;
+  document.getElementById('sppdBiayaTransport').value=estTransport;
+  document.getElementById('sppdBiayaAkomodasi').value=estAkomodasi;
+  document.getElementById('sppdBiayaMakan').value=estMakan;
+  const infoEl=document.getElementById('sppdEstimasiInfo');
+  if(infoEl)infoEl.innerHTML=`<div class="text-sm" style="background:#fff3cd;padding:8px;border-radius:6px;color:#856404">📊 Auto-kalkulasi: ${hari} hari, ${malam} malam | Estimasi grade ${escHtml(grade)}: Transport ${formatCurrency(estTransport)}, Hotel ${formatCurrency(estAkomodasi)}, Makan+Saku ${formatCurrency(estMakan)}</div>`;
+  cekBatasGrade();
+}
+
+function cekBatasGrade(){
+  const mulai=document.getElementById('sppdMulai')?.value;
+  const selesai=document.getElementById('sppdSelesai')?.value;
+  const warnEl=document.getElementById('sppdWarningGrade');
+  if(!warnEl||!mulai||!selesai)return;
+  const hari=Math.ceil((new Date(selesai)-new Date(mulai))/(1000*60*60*24)+1);
+  if(hari<=0){warnEl.innerHTML='';return;}
+  const grade=currentUser.gradeJabatan||'STAFF';
+  const cfg=getGradeConfig(grade);
+  const malam=Math.max(hari-1,0);
+  const warnings=[];
+  const transport=parseInt(document.getElementById('sppdBiayaTransport').value)||0;
+  const akomodasi=parseInt(document.getElementById('sppdBiayaAkomodasi').value)||0;
+  const makan=parseInt(document.getElementById('sppdBiayaMakan').value)||0;
+  if(transport>cfg.maxTransport)warnings.push('Transport melebihi batas grade (max '+formatCurrency(cfg.maxTransport)+')');
+  if(malam>0&&akomodasi>cfg.maxHotel*malam)warnings.push('Akomodasi melebihi batas grade (max '+formatCurrency(cfg.maxHotel*malam)+' untuk '+malam+' malam)');
+  if(makan>(cfg.maxMakan+cfg.uangSaku)*hari)warnings.push('Makan & Saku melebihi batas grade (max '+formatCurrency((cfg.maxMakan+cfg.uangSaku)*hari)+' untuk '+hari+' hari)');
+  if(warnings.length)warnEl.innerHTML='<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:8px;color:#856404" class="text-sm">⚠️ '+warnings.join('<br>⚠️ ')+'</div>';
+  else warnEl.innerHTML='';
+}
+
 
 async function simpanSPPD(noSPPD){
+  const grade=currentUser.gradeJabatan||'STAFF';
+  const gradeConfig=getGradeConfig(grade);
   const data={
     noSPPD,
     nama:document.getElementById('sppdNama').value,
@@ -4348,6 +4690,8 @@ async function simpanSPPD(noSPPD){
     biayaMakan:parseInt(document.getElementById('sppdBiayaMakan').value)||0,
     biayaLain:parseInt(document.getElementById('sppdBiayaLain').value)||0,
     catatan:document.getElementById('sppdCatatan').value,
+    gradeJabatan:grade,
+    gradeConfigUsed:gradeConfig.label,
     status:'pending',
     userId:currentUser.id,
     createdAt:new Date().toISOString()
@@ -4356,14 +4700,34 @@ async function simpanSPPD(noSPPD){
   if(!data.tujuan)return toast('Tujuan wajib diisi','warning');
   if(!data.tanggalMulai||!data.tanggalSelesai)return toast('Tanggal mulai dan selesai wajib','warning');
   if(!data.keperluan)return toast('Keperluan wajib diisi','warning');
-  await db.collection('hrd_perjalanan_dinas').add(data);
+  // Check if any amount exceeds grade limits
+  const _hari=Math.ceil((new Date(data.tanggalSelesai)-new Date(data.tanggalMulai))/(1000*60*60*24)+1);
+  const _malam=Math.max(_hari-1,0);
+  if(_hari>0){
+    let _exceeded=false;
+    if(data.biayaTransport>gradeConfig.maxTransport)_exceeded=true;
+    if(_malam>0&&data.biayaAkomodasi>gradeConfig.maxHotel*_malam)_exceeded=true;
+    if(data.biayaMakan>(gradeConfig.maxMakan+gradeConfig.uangSaku)*_hari)_exceeded=true;
+    if(_exceeded&&!confirm('Estimasi melebihi batas grade Anda, tetap ajukan?'))return;
+  }
+  const sppdRef=await db.collection('hrd_perjalanan_dinas').add(data);
   // Juga tambahkan ke hrd_dinas_luar agar terintegrasi dengan modul absensi
-  await db.collection('hrd_dinas_luar').add({
-    nama:data.nama,tanggal:data.tanggalMulai,tujuan:data.tujuan,
-    keperluan:data.keperluan,jamBerangkat:'',jamKembali:'',
+  const dinasLuarRef=await db.collection('hrd_dinas_luar').add({
+    nama:data.nama,tanggal:data.tanggalMulai,tanggalSelesai:data.tanggalSelesai,
+    tujuan:data.tujuan,keperluan:data.keperluan,
+    transportasi:data.transportasi,akomodasi:data.akomodasi,
+    gradeJabatan:grade,totalEstimasi:data.totalEstimasi,
+    jamBerangkat:'',jamKembali:'',
     status:'pending',userId:currentUser.id,noSPPD,
+    sppdId:sppdRef.id,
     createdAt:new Date().toISOString()
   });
+  // Update SPPD with linked dinas luar ID
+  try {
+    await db.collection('hrd_perjalanan_dinas').doc(sppdRef.id).update({dinasLuarId:dinasLuarRef.id});
+  } catch(e) {
+    console.warn('Failed to update SPPD with dinasLuarId, cross-reference may be incomplete:', e);
+  }
   await sendNotification('admin','SPPD Baru',`${data.nama} mengajukan perjalanan dinas ke ${data.tujuan}`);
   closeModalDirect();
   toast('✅ SPPD berhasil diajukan!','success');
@@ -4402,7 +4766,28 @@ async function viewSPPD(id){
   const doc=await db.collection('hrd_perjalanan_dinas').doc(id).get();
   const p=doc.data();
   const durasi=p.tanggalMulai&&p.tanggalSelesai?Math.ceil((new Date(p.tanggalSelesai)-new Date(p.tanggalMulai))/(1000*60*60*24)+1)+' hari':'-';
+  const durasiFull=p.tanggalMulai&&p.tanggalSelesai?Math.ceil((new Date(p.tanggalSelesai)-new Date(p.tanggalMulai))/(1000*60*60*24)+1):0;
   const badge=p.status==='approved'?'badge-success':p.status==='rejected'?'badge-danger':p.status==='selesai'?'badge-info':'badge-warning';
+  const sppdGrade=p.gradeJabatan||'STAFF';
+  const cfg=getGradeConfig(sppdGrade);
+  const malam=Math.max(durasiFull-1,0);
+  let gradeBenefitHtml='';
+  if(durasiFull>0){
+    const maxTransport=cfg.maxTransport;
+    const maxAkomodasi=cfg.maxHotel*malam;
+    const maxMakan=(cfg.maxMakan+cfg.uangSaku)*durasiFull;
+    const transportStatus=p.biayaTransport<=maxTransport?'color:var(--success)':'color:var(--danger)';
+    const akomodasiStatus=malam>0&&p.biayaAkomodasi<=maxAkomodasi?'color:var(--success)':malam===0?'color:var(--success)':'color:var(--danger)';
+    const makanStatus=p.biayaMakan<=maxMakan?'color:var(--success)':'color:var(--danger)';
+    gradeBenefitHtml=`<div class="mb-16" style="background:#f0f4ff;padding:12px;border-radius:8px;border-left:4px solid var(--accent)">
+      <div class="fw-700 text-sm mb-8">🎯 Benefit Grade: <span class="badge badge-info">${escHtml(sppdGrade)}</span> (${escHtml(cfg.label)})</div>
+      <div class="text-sm" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px">
+        <div>Transport</div><div>Diajukan: ${formatCurrency(p.biayaTransport)}</div><div style="${transportStatus}">Max: ${formatCurrency(maxTransport)}</div>
+        <div>Akomodasi</div><div>Diajukan: ${formatCurrency(p.biayaAkomodasi)}</div><div style="${akomodasiStatus}">Max: ${formatCurrency(maxAkomodasi)} (${malam} mlm)</div>
+        <div>Makan+Saku</div><div>Diajukan: ${formatCurrency(p.biayaMakan)}</div><div style="${makanStatus}">Max: ${formatCurrency(maxMakan)} (${durasiFull} hr)</div>
+      </div>
+    </div>`;
+  }
   openModal(`<div class="modal-title">📋 Detail SPPD — ${escHtml(p.noSPPD)}</div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><span class="badge ${badge}" style="font-size:.85rem;padding:6px 14px">${p.status?.toUpperCase()}</span><span class="text-sm" style="color:#999">${formatDate(p.createdAt)}</span></div>
     <div class="grid-2 mb-16">
@@ -4416,6 +4801,7 @@ async function viewSPPD(id){
       <div><b>Akomodasi:</b> ${escHtml(p.akomodasi||'-')}</div>
     </div>
     <div class="mb-16"><b>Keperluan:</b><div class="text-sm mt-4" style="background:#f8f9ff;padding:10px;border-radius:6px">${escHtml(p.keperluan||'-')}</div></div>
+    ${gradeBenefitHtml}
     <div class="fw-700 mb-8">💰 Estimasi Biaya:</div>
     <div class="grid-2 mb-16" style="background:#f8f9ff;padding:12px;border-radius:8px">
       <div>Transport: ${formatCurrency(p.biayaTransport)}</div>
