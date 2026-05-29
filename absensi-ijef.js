@@ -881,13 +881,24 @@ async function loadDinasTab(tab) {
   if (tab === 'pengajuan') {
     const isPortal=!hasAccess(3);
     const snap = await db.collection('hrd_dinas_luar').get();
-    let h = '<div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Tanggal</th><th>Tujuan</th><th>Grade</th><th>Estimasi</th><th>Status</th><th>Aksi</th></tr></thead><tbody>';
+    let h = '<div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Tanggal</th><th>Tujuan</th><th>Grade</th><th>Rincian Biaya</th><th>Status</th><th>Aksi</th></tr></thead><tbody>';
     let hasData=false;
     snap.forEach(d=>{const p=d.data();
       // Portal staff: only show own data
       if(isPortal&&p.userId!==currentUser.id&&p.nama?.toLowerCase()!==currentUser.nama?.toLowerCase())return;
       hasData=true;
-      const badge=p.status==='approved'?'badge-success':p.status==='rejected'?'badge-danger':'badge-warning';h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggal)}</td><td>${escHtml(p.tujuan)}</td><td>${p.gradeJabatan?`<span class="badge badge-info">${escHtml(p.gradeJabatan)}</span>`:'-'}</td><td>${p.totalEstimasi?formatCurrency(p.totalEstimasi):'-'}</td><td><span class="badge ${badge}">${p.status}</span></td><td><button class="btn btn-xs btn-info" onclick="viewDinasLuar('${d.id}')">👁️</button>${(!isPortal||p.userId===currentUser.id)?` <button class="btn btn-xs btn-primary" onclick="editDinasLuar('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_dinas_luar','${d.id}','dinas')">🗑️</button>`:''} ${p.status==='pending'&&hasAccess(3)?`<button class="btn btn-xs btn-success" onclick="approveDinas('${d.id}','approved')">✅</button>`:''}</td></tr>`;});
+      // Build detailed benefit breakdown for Rincian Biaya column
+      let rincian='-';
+      if(p.totalEstimasi||p.uangHarian||p.maxTransport||p.maxHotel||p.maxMakan){
+        rincian=`<div style="font-size:11px;line-height:1.6;white-space:nowrap">`;
+        if(p.uangHarian)rincian+=`<div>Uang Harian: <b>${formatCurrency(p.uangHarian)}</b></div>`;
+        if(p.maxTransport)rincian+=`<div>Transport: <b>${formatCurrency(p.maxTransport)}</b></div>`;
+        if(p.maxHotel)rincian+=`<div>Hotel: <b>${formatCurrency(p.maxHotel)}</b></div>`;
+        if(p.maxMakan)rincian+=`<div>Makan: <b>${formatCurrency(p.maxMakan)}</b></div>`;
+        if(p.totalEstimasi)rincian+=`<div style="border-top:1px solid #ccc;margin-top:2px;padding-top:2px;font-weight:700;color:var(--primary)">Total: ${formatCurrency(p.totalEstimasi)}</div>`;
+        rincian+=`</div>`;
+      }
+      const badge=p.status==='approved'?'badge-success':p.status==='rejected'?'badge-danger':'badge-warning';h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggal)}</td><td>${escHtml(p.tujuan)}</td><td>${p.gradeJabatan?`<span class="badge badge-info">${escHtml(p.gradeJabatan)}</span>`:'-'}</td><td>${rincian}</td><td><span class="badge ${badge}">${p.status}</span></td><td><button class="btn btn-xs btn-info" onclick="viewDinasLuar('${d.id}')">👁️</button>${(!isPortal||p.userId===currentUser.id)?` <button class="btn btn-xs btn-primary" onclick="editDinasLuar('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_dinas_luar','${d.id}','dinas')">🗑️</button>`:''} ${p.status==='pending'&&hasAccess(3)?`<button class="btn btn-xs btn-success" onclick="approveDinas('${d.id}','approved')">✅</button>`:''}</td></tr>`;});
     if(!hasData) h += '<tr><td colspan="7" class="text-center">Belum ada pengajuan</td></tr>';
     h += '</tbody></table></div>';
     el.innerHTML = h;
