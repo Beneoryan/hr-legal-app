@@ -960,7 +960,7 @@ async function simpanDinasLuar() {
   const dinasLuarRef = await db.collection('hrd_dinas_luar').add(data);
 
   // Create linked SPPD record in hrd_perjalanan_dinas
-  const noSPPD = 'SPPD/' + new Date().getFullYear() + '/' + String(Date.now()).slice(-6);
+  const noSPPD = 'SPPD/' + new Date().getFullYear() + '/' + String(Date.now()).slice(-6) + Math.random().toString(36).substr(2,3).toUpperCase();
   const sppdData = {
     noSPPD,
     nama: data.nama,
@@ -990,7 +990,13 @@ async function simpanDinasLuar() {
   closeModalDirect();toast('Pengajuan dinas luar terkirim & SPPD dibuat','success');loadDinasTab('pengajuan');
 }
 
-async function approveDinas(id,status){await db.collection('hrd_dinas_luar').doc(id).update({status,approvedBy:currentUser.nama,approvedAt:new Date().toISOString()});toast('Updated','success');loadDinasTab('pengajuan');}
+async function approveDinas(id,status){
+  await db.collection('hrd_dinas_luar').doc(id).update({status,approvedBy:currentUser.nama,approvedAt:new Date().toISOString()});
+  // Propagate status to linked SPPD record
+  const linkSnap=await db.collection('hrd_perjalanan_dinas').where('dinasLuarId','==',id).get();
+  linkSnap.forEach(d=>d.ref.update({status,approvedBy:currentUser.nama,approvedAt:new Date().toISOString()}));
+  toast('Updated','success');loadDinasTab('pengajuan');
+}
 
 // ── ABSEN DINAS LUAR — Selfie + GPS (tanpa batasan radius) ────
 function modalAbsenDinasLuar() {
