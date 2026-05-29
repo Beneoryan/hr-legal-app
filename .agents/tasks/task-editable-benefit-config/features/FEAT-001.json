@@ -1,0 +1,32 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Make admin benefit config table editable, store config in Firestore, and auto-update employee portals. This transforms the read-only admin config table into an editable form with save functionality, stores the config in Firestore collection 'hrd_config_benefit', and modifies getGradeConfig() to read from Firestore (with fallback to hardcoded defaults).",
+  "status": "completed",
+  "steps": [
+    "Step 1 - Add Firestore-backed config loader: In modules.js, add a new cached config loader function `loadBenefitConfig()` that fetches benefit config from Firestore collection 'hrd_config_benefit' (single document with id 'current'). The document stores both benefit values (uangHarian, maxTransport, maxHotel, kelasHotel, maxMakan, uangSaku, totalMaxPerDay, label per grade) and peraturan values (alurApproval, maxDurasiTanpaApprovalKhusus, persenUangMuka, batasWaktuLaporan, kelasHotelDiizinkan per grade). Use a module-level cache variable `_benefitConfigCache` with a 5-minute TTL so repeated calls don't hit Firestore every time. If Firestore fetch fails or document doesn't exist, fall back to the hardcoded BENEFIT_CONFIG_BY_GRADE and PERATURAN_DINAS_BY_GRADE constants.",
+    "Step 2 - Modify getGradeConfig() and getGradePeraturan(): Change `getGradeConfig(grade)` from synchronous to async - it should call `loadBenefitConfig()` and return the benefit config for the resolved grade. Similarly make `getGradePeraturan(grade)` async. Keep the old synchronous versions available as `getGradeConfigSync(grade)` that reads from `_benefitConfigCache` or falls back to the hardcoded constant (for places that cannot easily be made async).",
+    "Step 3 - Update all callers of getGradeConfig/getGradePeraturan to await: In modules.js, update renderPortalPeraturan(), renderPerjalananDinasWithBenefit(), loadSPPDProsedur(), modalAjukanSPPD() to await the now-async getGradeConfig() and getGradePeraturan(). In absensi-ijef.js, update modalDinasLuar() and simpanDinasLuar() similarly. The hitungEstimasiBenefit() and cekBatasGrade() functions use synchronous access - update them to use getGradeConfigSync() which reads from cache.",
+    "Step 4 - Replace the read-only admin config table with an editable version: In the loadSPPDProsedur() function (around line 4570 in modules.js), replace the static table that shows 'Tabel ini bersifat read-only' with an editable form. The form should show all 4 grades (BOD, HEAD, SENIOR, STAFF) as columns, with rows for: Uang Harian, Max Transport, Max Hotel, Kelas Hotel, Max Makan/Hari, Uang Saku/Hari, Total Max/Hari (auto-calculated from uangHarian+maxMakan+uangSaku), Uang Muka (%), Max Durasi (hari), Batas Laporan (hari), Alur Approval. Each cell should be an input field (type=number for monetary values, type=text for kelas hotel and alur approval). Include a 'Simpan Konfigurasi' button that calls saveBenefitConfig(). Load initial values from Firestore (or hardcoded defaults if no Firestore data exists yet).",
+    "Step 5 - Implement saveBenefitConfig(): This function reads all input values from the editable form, validates them (all monetary values must be >= 0), and writes to Firestore document db.collection('hrd_config_benefit').doc('current').set({...}). The document structure: { benefit: { BOD: {...}, HEAD: {...}, SENIOR: {...}, STAFF: {...} }, peraturan: { BOD: {...}, HEAD: {...}, SENIOR: {...}, STAFF: {...} }, updatedAt: new Date().toISOString(), updatedBy: currentUser.nama }. On success, show toast('Konfigurasi benefit berhasil disimpan!', 'success'), invalidate the cache (_benefitConfigCache = null), and re-render the section.",
+    "Step 6 - Add real-time listener for config changes: In the setupRealtimeSync() function in core.js, add a Firestore onSnapshot listener on db.collection('hrd_config_benefit').doc('current') that invalidates the _benefitConfigCache whenever the document changes. This ensures that when admin saves new config, any employee who has the app open will get fresh values on their next navigation (since getGradeConfig will re-fetch from Firestore when cache is invalidated)."
+  ],
+  "acceptance_criteria": [
+    "Admin (hasAccess(3)) sees editable input fields in the benefit config table instead of static read-only text",
+    "Admin can change values and click 'Simpan Konfigurasi' to save to Firestore collection 'hrd_config_benefit' document 'current'",
+    "Success toast appears after saving",
+    "getGradeConfig() reads from Firestore with fallback to hardcoded constant",
+    "Employee portal (renderPortalPeraturan, renderPerjalananDinasWithBenefit) displays values from Firestore after admin saves",
+    "Cache invalidation via onSnapshot ensures next page load gets fresh values without full page refresh",
+    "All existing callers of getGradeConfig and getGradePeraturan continue to work correctly"
+  ],
+  "verification": [
+    "Verify no JavaScript syntax errors by searching for unmatched braces/brackets in modified code",
+    "Verify getGradeConfig is now async and all its callers use await",
+    "Verify saveBenefitConfig() writes to Firestore with correct structure",
+    "Verify the admin table renders input fields for all benefit/peraturan fields",
+    "Verify loadBenefitConfig() has proper fallback to hardcoded constants"
+  ],
+  "blocked_reason": null,
+  "findings": "All three files (modules.js, core.js, absensi-ijef.js) pass node --check syntax validation. getGradeConfig and getGradePeraturan are now async with Firestore-first lookup. Sync versions (getGradeConfigSync, getGradePeraturanSync) provided for event handler contexts (hitungEstimasiBenefit, cekBatasGrade, hitungEstimasiDinas, viewDinasLuar detail block). The comparison table in loadSPPDProsedur also reads from Firestore via helper functions. No build step or test suite exists, so verification is limited to syntax checking."
+}
