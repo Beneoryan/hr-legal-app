@@ -4521,6 +4521,7 @@ async function loadSPPDProsedur(el){
   const cfg = await getGradeConfig(grade);
   const peraturan = await getGradePeraturan(grade);
   const gradeKey = grade ? grade.toUpperCase().trim() : 'STAFF';
+  const fsConfig = await loadBenefitConfig();
 
   let html = `<div class="card">
     <div class="card-title mb-16">📖 Prosedur Perjalanan Dinas</div>
@@ -4607,13 +4608,12 @@ async function loadSPPDProsedur(el){
   if (hasAccess(3)) {
     const allGrades = ['BOD', 'HEAD', 'SENIOR', 'STAFF'];
     const userGradeKey = resolveGradeKey(grade);
-    const fsConfigCmp = await loadBenefitConfig();
     const getCmpBen = (g, field) => {
-      if (fsConfigCmp && fsConfigCmp.benefit && fsConfigCmp.benefit[g]) return fsConfigCmp.benefit[g][field];
+      if (fsConfig && fsConfig.benefit && fsConfig.benefit[g]) return fsConfig.benefit[g][field];
       return BENEFIT_CONFIG_BY_GRADE[g][field];
     };
     const getCmpPer = (g, field) => {
-      if (fsConfigCmp && fsConfigCmp.peraturan && fsConfigCmp.peraturan[g]) return fsConfigCmp.peraturan[g][field];
+      if (fsConfig && fsConfig.peraturan && fsConfig.peraturan[g]) return fsConfig.peraturan[g][field];
       return PERATURAN_DINAS_BY_GRADE[g][field];
     };
 
@@ -4633,7 +4633,6 @@ async function loadSPPDProsedur(el){
   // Admin section - Konfigurasi Benefit per Grade (EDITABLE)
   if (hasAccess(3)) {
     const allGrades2 = ['BOD', 'HEAD', 'SENIOR', 'STAFF'];
-    const fsConfig = await loadBenefitConfig();
     const getBenVal = (grade, field) => {
       if (fsConfig && fsConfig.benefit && fsConfig.benefit[grade]) return fsConfig.benefit[grade][field];
       return BENEFIT_CONFIG_BY_GRADE[grade][field];
@@ -4667,6 +4666,7 @@ async function loadSPPDProsedur(el){
 }
 
 async function saveBenefitConfig() {
+  if (!confirm('Apakah Anda yakin ingin menyimpan konfigurasi benefit? Perubahan akan langsung berlaku untuk semua karyawan.')) return;
   const allGrades = ['BOD', 'HEAD', 'SENIOR', 'STAFF'];
   const benefit = {};
   const peraturan = {};
