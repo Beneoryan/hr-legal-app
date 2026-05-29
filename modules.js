@@ -4549,24 +4549,27 @@ async function loadSPPDProsedur(el){
     </div>
   </div>`;
 
-  // Comparison table of all grades
-  const allGrades = ['BOD', 'HEAD', 'SENIOR', 'STAFF'];
-  const userGradeKey = resolveGradeKey(grade);
+  // Comparison table of all grades - only visible to admin/manager
+  if (hasAccess(3)) {
+    const allGrades = ['BOD', 'HEAD', 'SENIOR', 'STAFF'];
+    const userGradeKey = resolveGradeKey(grade);
 
-  html += `<div class="mt-16"><div class="fw-700 mb-12" style="font-size:1.05rem">📊 Perbandingan Hak per Grade</div>
-    <div class="table-wrap"><table><thead><tr><th>Komponen</th>${allGrades.map(g=>'<th style="'+(g===userGradeKey?'background:#e3f2fd;color:#1565c0;font-weight:700':'')+'">'+BENEFIT_CONFIG_BY_GRADE[g].label+'</th>').join('')}</tr></thead><tbody>
-      <tr><td class="fw-700">Uang Harian</td>${allGrades.map(g=>'<td style="'+(g===userGradeKey?'background:#e3f2fd':'')+'">'+formatCurrency(BENEFIT_CONFIG_BY_GRADE[g].uangHarian)+'</td>').join('')}</tr>
-      <tr><td class="fw-700">Max Hotel/Malam</td>${allGrades.map(g=>'<td style="'+(g===userGradeKey?'background:#e3f2fd':'')+'">'+formatCurrency(BENEFIT_CONFIG_BY_GRADE[g].maxHotel)+'</td>').join('')}</tr>
-      <tr><td class="fw-700">Kelas Hotel</td>${allGrades.map(g=>'<td style="'+(g===userGradeKey?'background:#e3f2fd':'')+'">'+escHtml(PERATURAN_DINAS_BY_GRADE[g].kelasHotelDiizinkan)+'</td>').join('')}</tr>
-      <tr><td class="fw-700">Transport</td>${allGrades.map(g=>'<td style="'+(g===userGradeKey?'background:#e3f2fd':'')+';font-size:.8rem">'+escHtml(PERATURAN_DINAS_BY_GRADE[g].transportasiDiizinkan.slice(0,2).join(', '))+'</td>').join('')}</tr>
-      <tr><td class="fw-700">Uang Muka</td>${allGrades.map(g=>'<td style="'+(g===userGradeKey?'background:#e3f2fd':'')+'">'+PERATURAN_DINAS_BY_GRADE[g].persenUangMuka+'%</td>').join('')}</tr>
-      <tr><td class="fw-700">Max Durasi (tanpa approval khusus)</td>${allGrades.map(g=>'<td style="'+(g===userGradeKey?'background:#e3f2fd':'')+'">'+PERATURAN_DINAS_BY_GRADE[g].maxDurasiTanpaApprovalKhusus+' hari</td>').join('')}</tr>
-      <tr><td class="fw-700">Batas Laporan</td>${allGrades.map(g=>'<td style="'+(g===userGradeKey?'background:#e3f2fd':'')+'">'+PERATURAN_DINAS_BY_GRADE[g].batasWaktuLaporan+' hari</td>').join('')}</tr>
-      <tr><td class="fw-700">Alur Approval</td>${allGrades.map(g=>'<td style="'+(g===userGradeKey?'background:#e3f2fd':'')+';font-size:.8rem">'+escHtml(PERATURAN_DINAS_BY_GRADE[g].alurApproval)+'</td>').join('')}</tr>
-    </tbody></table></div></div>`;
+    html += `<div class="mt-16"><div class="fw-700 mb-12" style="font-size:1.05rem">📊 Perbandingan Hak per Grade</div>
+      <div class="table-wrap"><table><thead><tr><th>Komponen</th>${allGrades.map(g=>'<th style="'+(g===userGradeKey?'background:#e3f2fd;color:#1565c0;font-weight:700':'')+'">'+BENEFIT_CONFIG_BY_GRADE[g].label+'</th>').join('')}</tr></thead><tbody>
+        <tr><td class="fw-700">Uang Harian</td>${allGrades.map(g=>'<td style="'+(g===userGradeKey?'background:#e3f2fd':'')+'">'+formatCurrency(BENEFIT_CONFIG_BY_GRADE[g].uangHarian)+'</td>').join('')}</tr>
+        <tr><td class="fw-700">Max Hotel/Malam</td>${allGrades.map(g=>'<td style="'+(g===userGradeKey?'background:#e3f2fd':'')+'">'+formatCurrency(BENEFIT_CONFIG_BY_GRADE[g].maxHotel)+'</td>').join('')}</tr>
+        <tr><td class="fw-700">Kelas Hotel</td>${allGrades.map(g=>'<td style="'+(g===userGradeKey?'background:#e3f2fd':'')+'">'+escHtml(PERATURAN_DINAS_BY_GRADE[g].kelasHotelDiizinkan)+'</td>').join('')}</tr>
+        <tr><td class="fw-700">Transport</td>${allGrades.map(g=>'<td style="'+(g===userGradeKey?'background:#e3f2fd':'')+';font-size:.8rem">'+escHtml(PERATURAN_DINAS_BY_GRADE[g].transportasiDiizinkan.slice(0,2).join(', '))+'</td>').join('')}</tr>
+        <tr><td class="fw-700">Uang Muka</td>${allGrades.map(g=>'<td style="'+(g===userGradeKey?'background:#e3f2fd':'')+'">'+PERATURAN_DINAS_BY_GRADE[g].persenUangMuka+'%</td>').join('')}</tr>
+        <tr><td class="fw-700">Max Durasi (tanpa approval khusus)</td>${allGrades.map(g=>'<td style="'+(g===userGradeKey?'background:#e3f2fd':'')+'">'+PERATURAN_DINAS_BY_GRADE[g].maxDurasiTanpaApprovalKhusus+' hari</td>').join('')}</tr>
+        <tr><td class="fw-700">Batas Laporan</td>${allGrades.map(g=>'<td style="'+(g===userGradeKey?'background:#e3f2fd':'')+'">'+PERATURAN_DINAS_BY_GRADE[g].batasWaktuLaporan+' hari</td>').join('')}</tr>
+        <tr><td class="fw-700">Alur Approval</td>${allGrades.map(g=>'<td style="'+(g===userGradeKey?'background:#e3f2fd':'')+';font-size:.8rem">'+escHtml(PERATURAN_DINAS_BY_GRADE[g].alurApproval)+'</td>').join('')}</tr>
+      </tbody></table></div></div>`;
+  }
 
   // Admin section - Konfigurasi Benefit per Grade
   if (hasAccess(3)) {
+    const allGrades = ['BOD', 'HEAD', 'SENIOR', 'STAFF'];
     html += `<div class="mt-16" style="padding:16px;background:#f3e5f5;border-radius:12px;border-left:4px solid #9c27b0">
       <div class="fw-700 mb-12" style="color:#6a1b9a;font-size:1.05rem">⚙️ Konfigurasi Benefit per Grade (Admin)</div>
       <div class="table-wrap"><table><thead><tr><th>Komponen</th>${allGrades.map(g=>'<th>'+BENEFIT_CONFIG_BY_GRADE[g].label+'</th>').join('')}</tr></thead><tbody>
