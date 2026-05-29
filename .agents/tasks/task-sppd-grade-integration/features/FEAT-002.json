@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "feat",
   "description": "Add grade-specific Peraturan & Prosedur for Perjalanan Dinas. Replace the static prosedur content in the 'Prosedur' tab with grade-tailored rules showing each employee their specific entitlements, approval flow requirements, and policies. Integrate this into both the admin Perjalanan Dinas view and each employee's portal.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Step 1: Create a PERATURAN_DINAS_BY_GRADE constant (in modules.js near the BENEFIT_CONFIG_BY_GRADE from FEAT-001) that defines per-grade rules including: (a) approval flow (e.g., STAFF needs Head + HRD approval, HEAD needs BOD approval), (b) max trip duration allowed without special approval, (c) allowed transport modes (e.g., STAFF gets bus/train, HEAD gets plane economy, BOD gets plane business), (d) allowed hotel classes, (e) advance payment percentage allowed, (f) reporting deadline, (g) any special privileges. Use Indonesian language for all labels.",
     "Step 2: Modify the loadSPPDProsedur(el) function to: (a) Detect the current user's grade using getUserGrade(), (b) Display a personalized header showing 'Prosedur untuk Grade: [GRADE]', (c) Show the general procedure steps (keep existing numbered steps), (d) Add a new section below titled 'Ketentuan Berdasarkan Grade Anda' showing the grade-specific rules from PERATURAN_DINAS_BY_GRADE in a well-formatted card with icons, (e) Show a comparison table of all grades' entitlements so users understand the tier system (with their own grade highlighted).",
@@ -26,5 +26,5 @@
     "Run: node --check /projects/sandbox/hr-legal-app/absensi-ijef.js"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 5 steps implemented successfully. PERATURAN_DINAS_BY_GRADE constant added at line ~4296. loadSPPDProsedur is now async (showSPPDTab awaits it). renderPortalPeraturan is now async (router calls without await but works fine - same pattern as other async portal pages). Added getGradePeraturan() helper for grade matching. Dismissible banner uses inline onclick to hide via display:none. node --check passes on all JS files (requires NODE_OPTIONS=\"\" prefix)."
 }
