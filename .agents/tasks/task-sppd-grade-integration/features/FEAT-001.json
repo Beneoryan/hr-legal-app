@@ -1,0 +1,30 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Add grade-based benefit configuration system and integrate SPPD with Izin Dinas Luar. Create a BENEFIT_CONFIG_BY_GRADE constant mapping grade levels (BOD, HEAD, SENIOR HEAD, STAFF) to their benefit entitlements (uang harian, max transport, max hotel, hotel class, etc.). Modify the SPPD submission form to auto-calculate benefit amounts based on the employee's grade. Enhance the SPPD-to-dinas-luar integration to be bidirectional and more robust. Display personalized benefit entitlements in each employee's portal view.",
+  "status": "completed",
+  "steps": [
+    "Step 1: Add a BENEFIT_CONFIG_BY_GRADE constant near the top of modules.js (around line 4190, before the Perjalanan Dinas section). This should define per-grade tiers with these properties: uangHarian (daily allowance), maxTransport, maxHotel (per night), kelasHotel (hotel class string), maxMakan (meal allowance per day), uangSaku, totalMaxPerDay. Define 4 grades: BOD (highest), HEAD/MANAGER, SENIOR STAFF/SUPERVISOR, STAFF (lowest). Include a helper function getGradeConfig(grade) that returns the matching config by doing case-insensitive partial matching.",
+    "Step 2: Add a helper function getUserGrade() that fetches the current user's gradeJabatan from hrd_karyawan collection (queried by currentUser.nama or currentUser.linkedKaryawan). Cache it on the currentUser object. If no grade found, default to 'STAFF'.",
+    "Step 3: Modify the modalAjukanSPPD() function to: (a) Call getUserGrade() first, (b) Display the user's grade and their benefit entitlements at the top of the form, (c) Auto-fill the estimasi biaya fields based on grade config multiplied by trip duration (tanggal selesai - tanggal mulai), (d) Add onchange handlers to the date fields to recalculate estimates when dates change, (e) Show a warning if manually entered amounts exceed grade limits.",
+    "Step 4: Modify the simpanSPPD() function to: (a) Save the user's gradeJabatan and benefit config used into the SPPD document, (b) Enhance the hrd_dinas_luar record with more fields from SPPD (tanggalSelesai, transportasi, akomodasi, gradeJabatan, totalEstimasi, noSPPD), (c) Add a link ID reference between the two documents for easier cross-referencing.",
+    "Step 5: Add a 'Benefit Saya' info card in the renderPortalPerjalananDinas() function that shows the current user's grade-based entitlements in a clear table format (uang harian, kelas hotel, max transport, dll). This is visible at the top of the portal Perjalanan Dinas page before the SPPD tabs.",
+    "Step 6: Update the viewSPPD() detail modal to show the grade-based benefit breakdown alongside the manual estimates, showing which amounts are within or exceed the grade policy."
+  ],
+  "acceptance_criteria": [
+    "A BENEFIT_CONFIG_BY_GRADE constant exists with at least 4 grade tiers and realistic Rupiah amounts",
+    "The SPPD form shows the user's grade and auto-calculates benefit amounts based on trip duration",
+    "Submitted SPPD documents include gradeJabatan and grade config reference",
+    "The hrd_dinas_luar record created from SPPD includes additional cross-reference fields",
+    "Portal Perjalanan Dinas page displays a personalized benefit entitlement card based on user grade",
+    "The SPPD detail view shows grade-based benefit info",
+    "All JS files pass syntax check (node --check)"
+  ],
+  "verification": [
+    "Run: node --check /projects/sandbox/hr-legal-app/modules.js",
+    "Run: node --check /projects/sandbox/hr-legal-app/core.js",
+    "Run: node --check /projects/sandbox/hr-legal-app/absensi-ijef.js"
+  ],
+  "blocked_reason": null,
+  "findings": "All 6 steps implemented successfully. node --check passes on all JS files (requires NODE_OPTIONS=\"\" prefix due to sandbox preload module issue). The BENEFIT_CONFIG_BY_GRADE constant starts at line 4195. getUserGrade() caches on currentUser.gradeJabatan. renderPortalPerjalananDinas now uses an async helper renderPerjalananDinasWithBenefit() to show the benefit card before the tabs."
+}
