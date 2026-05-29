@@ -2,7 +2,7 @@
   "id": "FEAT-003",
   "type": "fix",
   "description": "Address review findings: fix approval asymmetry and SPPD number collision risk",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "1. In absensi-ijef.js, update approveDinas() to also propagate status to the linked SPPD record in hrd_perjalanan_dinas (query where dinasLuarId == id, update status)",
     "2. In absensi-ijef.js, update simpanDinasLuar() to add 3 random uppercase characters to noSPPD generation to reduce collision risk"
@@ -18,5 +18,5 @@
     "Run: NODE_OPTIONS='' node -e \"const fs=require('fs'); const code=fs.readFileSync('absensi-ijef.js','utf8'); if(!code.includes('Math.random')) throw new Error('Missing random suffix in noSPPD generation');\""
   ],
   "blocked_reason": null,
-  "findings": null
+  "findings": "Both fixes applied and verified. Issue #1: approveDinas now queries hrd_perjalanan_dinas by dinasLuarId and propagates status, matching the approveSPPD reverse pattern. Issue #3: noSPPD now includes Math.random().toString(36).substr(2,3).toUpperCase() suffix. Issues #2 (non-atomic writes), #4 (grade stale), and #5 (currentPage mismatch) confirmed as non-issues requiring no changes."
 }
