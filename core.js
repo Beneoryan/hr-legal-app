@@ -197,6 +197,8 @@ function navigateTo(page) {
   unsubscribers.forEach(fn=>fn()); unsubscribers=[];
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(el=>{if(el.getAttribute('onclick')?.includes(`'${page}'`))el.classList.add('active');});
+  // Auto-expand nav-group containing active page
+  document.querySelectorAll('.nav-item.active').forEach(el=>{const groupItems=el.closest('.nav-group-items');if(groupItems){groupItems.style.display='block';const arrow=groupItems.previousElementSibling?.querySelector('.nav-arrow');if(arrow)arrow.classList.add('open');}});
   const main=document.getElementById('mainContent'); if(!main)return;
   closeSidebar();
   const routes={

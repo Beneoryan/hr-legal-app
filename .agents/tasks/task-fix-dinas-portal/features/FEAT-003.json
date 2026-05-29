@@ -1,0 +1,22 @@
+{
+  "id": "FEAT-003",
+  "type": "fix",
+  "description": "Address review findings: fix approval asymmetry and SPPD number collision risk",
+  "status": "completed",
+  "steps": [
+    "1. In absensi-ijef.js, update approveDinas() to also propagate status to the linked SPPD record in hrd_perjalanan_dinas (query where dinasLuarId == id, update status)",
+    "2. In absensi-ijef.js, update simpanDinasLuar() to add 3 random uppercase characters to noSPPD generation to reduce collision risk"
+  ],
+  "acceptance_criteria": [
+    "approveDinas() queries hrd_perjalanan_dinas where dinasLuarId matches and updates status on the linked SPPD",
+    "noSPPD generation includes random suffix to prevent collisions",
+    "No JavaScript syntax errors in modified files"
+  ],
+  "verification": [
+    "Run: NODE_OPTIONS='' node -c absensi-ijef.js (syntax check passes)",
+    "Run: NODE_OPTIONS='' node -e \"const fs=require('fs'); const code=fs.readFileSync('absensi-ijef.js','utf8'); if(!code.includes('hrd_perjalanan_dinas') || !code.includes('dinasLuarId')) throw new Error('Missing SPPD status propagation in approveDinas')\"",
+    "Run: NODE_OPTIONS='' node -e \"const fs=require('fs'); const code=fs.readFileSync('absensi-ijef.js','utf8'); if(!code.includes('Math.random')) throw new Error('Missing random suffix in noSPPD generation');\""
+  ],
+  "blocked_reason": null,
+  "findings": "Both fixes applied and verified. Issue #1: approveDinas now queries hrd_perjalanan_dinas by dinasLuarId and propagates status, matching the approveSPPD reverse pattern. Issue #3: noSPPD now includes Math.random().toString(36).substr(2,3).toUpperCase() suffix. Issues #2 (non-atomic writes), #4 (grade stale), and #5 (currentPage mismatch) confirmed as non-issues requiring no changes."
+}

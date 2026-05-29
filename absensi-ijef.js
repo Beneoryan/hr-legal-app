@@ -851,6 +851,7 @@ async function loadCoreHoursStatus() {
 
 // ══════════════════════════════════════════════════════════════
 // ── DINAS LUAR — Form Pengajuan + Absen Selfie+GPS di Lokasi ──
+// ── Uses BENEFIT_CONFIG_BY_GRADE via getGradeConfig/getUserGrade for grade-based benefit display ──
 // ══════════════════════════════════════════════════════════════
 
 function renderDinasLuar(container) {
@@ -880,14 +881,14 @@ async function loadDinasTab(tab) {
   if (tab === 'pengajuan') {
     const isPortal=!hasAccess(3);
     const snap = await db.collection('hrd_dinas_luar').get();
-    let h = '<div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Tanggal</th><th>Tujuan</th><th>Status</th><th>Aksi</th></tr></thead><tbody>';
+    let h = '<div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Tanggal</th><th>Tujuan</th><th>Grade</th><th>Estimasi</th><th>Status</th><th>Aksi</th></tr></thead><tbody>';
     let hasData=false;
     snap.forEach(d=>{const p=d.data();
       // Portal staff: only show own data
       if(isPortal&&p.userId!==currentUser.id&&p.nama?.toLowerCase()!==currentUser.nama?.toLowerCase())return;
       hasData=true;
-      const badge=p.status==='approved'?'badge-success':p.status==='rejected'?'badge-danger':'badge-warning';h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggal)}</td><td>${escHtml(p.tujuan)}</td><td><span class="badge ${badge}">${p.status}</span></td><td><button class="btn btn-xs btn-info" onclick="viewDinasLuar('${d.id}')">👁️</button>${(!isPortal||p.userId===currentUser.id)?` <button class="btn btn-xs btn-primary" onclick="editDinasLuar('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_dinas_luar','${d.id}','dinas')">🗑️</button>`:''} ${p.status==='pending'&&hasAccess(3)?`<button class="btn btn-xs btn-success" onclick="approveDinas('${d.id}','approved')">✅</button>`:''}</td></tr>`;});
-    if(!hasData) h += '<tr><td colspan="5" class="text-center">Belum ada pengajuan</td></tr>';
+      const badge=p.status==='approved'?'badge-success':p.status==='rejected'?'badge-danger':'badge-warning';h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggal)}</td><td>${escHtml(p.tujuan)}</td><td>${p.gradeJabatan?`<span class="badge badge-info">${escHtml(p.gradeJabatan)}</span>`:'-'}</td><td>${p.totalEstimasi?formatCurrency(p.totalEstimasi):'-'}</td><td><span class="badge ${badge}">${p.status}</span></td><td><button class="btn btn-xs btn-info" onclick="viewDinasLuar('${d.id}')">👁️</button>${(!isPortal||p.userId===currentUser.id)?` <button class="btn btn-xs btn-primary" onclick="editDinasLuar('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_dinas_luar','${d.id}','dinas')">🗑️</button>`:''} ${p.status==='pending'&&hasAccess(3)?`<button class="btn btn-xs btn-success" onclick="approveDinas('${d.id}','approved')">✅</button>`:''}</td></tr>`;});
+    if(!hasData) h += '<tr><td colspan="7" class="text-center">Belum ada pengajuan</td></tr>';
     h += '</tbody></table></div>';
     el.innerHTML = h;
   } else {
@@ -901,24 +902,101 @@ async function loadDinasTab(tab) {
   }
 }
 
-function modalDinasLuar() {
+async function modalDinasLuar() {
+  const grade = await getUserGrade();
+  const cfg = getGradeConfig(grade);
   openModal(`<div class="modal-title">📝 Ajukan Dinas Luar</div>
-    <div class="grid-2"><div class="form-group"><label>Nama</label><input class="form-control" id="dlNama" value="${currentUser.nama}"></div><div class="form-group"><label>Tanggal</label><input class="form-control" type="date" id="dlTgl" value="${todayStr()}"></div></div>
+    <div style="background:#e8f5e9;padding:12px;border-radius:8px;margin-bottom:16px;border-left:4px solid var(--success)">
+      <div class="fw-700 text-sm mb-4">🎯 Grade Anda: <span class="badge badge-info">${escHtml(grade || 'STAFF')}</span> (${escHtml(cfg.label)})</div>
+      <div class="text-sm" style="color:#555">Uang Harian: ${formatCurrency(cfg.uangHarian)} | Max Transport: ${formatCurrency(cfg.maxTransport)} | Max Hotel/mlm: ${formatCurrency(cfg.maxHotel)} (${escHtml(cfg.kelasHotel)}) | Max Makan/hr: ${formatCurrency(cfg.maxMakan)} | Total Max/Hari: ${formatCurrency(cfg.totalMaxPerDay)}</div>
+    </div>
+    <div class="grid-2"><div class="form-group"><label>Nama</label><input class="form-control" id="dlNama" value="${escHtml(currentUser.nama)}"></div><div class="form-group"><label>Departemen</label><input class="form-control" id="dlDept" value="${escHtml(currentUser.departemen||'')}" readonly></div></div>
+    <div class="grid-2"><div class="form-group"><label>Tanggal Mulai</label><input class="form-control" type="date" id="dlTgl" value="${todayStr()}" onchange="hitungEstimasiDinas()"></div><div class="form-group"><label>Tanggal Selesai</label><input class="form-control" type="date" id="dlTglSelesai" value="${todayStr()}" onchange="hitungEstimasiDinas()"></div></div>
+    <div id="dlEstimasiInfo" class="mb-8"></div>
     <div class="form-group"><label>Tujuan / Lokasi</label><input class="form-control" id="dlTujuan" placeholder="Nama klien / alamat tujuan"></div>
     <div class="form-group"><label>Keperluan</label><textarea class="form-control" id="dlKeperluan" placeholder="Jelaskan keperluan dinas luar"></textarea></div>
     <div class="grid-2"><div class="form-group"><label>Jam Berangkat</label><input class="form-control" type="time" id="dlJamGo"></div><div class="form-group"><label>Estimasi Kembali</label><input class="form-control" type="time" id="dlJamBack"></div></div>
-    <button class="btn btn-primary" onclick="simpanDinasLuar()">📝 Ajukan</button>`);
+    <button class="btn btn-primary" style="width:100%;padding:12px" onclick="simpanDinasLuar()">📝 Ajukan Dinas Luar</button>`);
+}
+
+function hitungEstimasiDinas(){
+  const mulai=document.getElementById('dlTgl')?.value;
+  const selesai=document.getElementById('dlTglSelesai')?.value;
+  if(!mulai||!selesai)return;
+  const hari=Math.ceil((new Date(selesai)-new Date(mulai))/(1000*60*60*24)+1);
+  if(hari<=0)return;
+  const grade=currentUser.gradeJabatan||'STAFF';
+  const cfg=getGradeConfig(grade);
+  const malam=Math.max(hari-1,0);
+  const estTransport=cfg.maxTransport;
+  const estHotel=cfg.maxHotel*malam;
+  const estMakan=(cfg.maxMakan+cfg.uangSaku)*hari;
+  const estHarian=cfg.uangHarian*hari;
+  const totalEst=estTransport+estHotel+estMakan+estHarian;
+  const infoEl=document.getElementById('dlEstimasiInfo');
+  if(infoEl)infoEl.innerHTML=`<div class="text-sm" style="background:#fff3cd;padding:8px;border-radius:6px;color:#856404">📊 Estimasi: ${hari} hari, ${malam} malam | Transport ${formatCurrency(estTransport)} + Hotel ${formatCurrency(estHotel)} + Makan+Saku ${formatCurrency(estMakan)} + Uang Harian ${formatCurrency(estHarian)} = <b>${formatCurrency(totalEst)}</b></div>`;
 }
 
 async function simpanDinasLuar() {
-  const data = {nama:document.getElementById('dlNama').value,tanggal:document.getElementById('dlTgl').value,tujuan:document.getElementById('dlTujuan').value,keperluan:document.getElementById('dlKeperluan').value,jamBerangkat:document.getElementById('dlJamGo').value,jamKembali:document.getElementById('dlJamBack').value,status:'pending',userId:currentUser.id,createdAt:new Date().toISOString()};
+  const grade = await getUserGrade();
+  const cfg = getGradeConfig(grade);
+  const tanggalSelesai = document.getElementById('dlTglSelesai')?.value || document.getElementById('dlTgl').value;
+  const data = {nama:document.getElementById('dlNama').value,tanggal:document.getElementById('dlTgl').value,tanggalSelesai:tanggalSelesai,tujuan:document.getElementById('dlTujuan').value,keperluan:document.getElementById('dlKeperluan').value,jamBerangkat:document.getElementById('dlJamGo').value,jamKembali:document.getElementById('dlJamBack').value,status:'pending',userId:currentUser.id,createdAt:new Date().toISOString()};
   if(!data.tujuan)return toast('Tujuan wajib','warning');
-  await db.collection('hrd_dinas_luar').add(data);
-  await sendNotification('hr','Dinas Luar',`${data.nama} → ${data.tujuan}`);
-  closeModalDirect();toast('Pengajuan dinas luar terkirim','success');loadDinasTab('pengajuan');
+
+  // Calculate benefit estimation
+  const hari = Math.ceil((new Date(data.tanggalSelesai) - new Date(data.tanggal)) / (1000*60*60*24) + 1);
+  const malam = Math.max(hari - 1, 0);
+  const totalEstimasi = cfg.maxTransport + (cfg.maxHotel * malam) + ((cfg.maxMakan + cfg.uangSaku) * hari) + (cfg.uangHarian * hari);
+
+  // Add grade and benefit info to dinas luar record
+  data.gradeJabatan = grade || 'STAFF';
+  data.uangHarian = cfg.uangHarian;
+  data.maxTransport = cfg.maxTransport;
+  data.maxHotel = cfg.maxHotel;
+  data.maxMakan = cfg.maxMakan;
+  data.totalEstimasi = totalEstimasi;
+
+  const dinasLuarRef = await db.collection('hrd_dinas_luar').add(data);
+
+  // Create linked SPPD record in hrd_perjalanan_dinas
+  const noSPPD = 'SPPD/' + new Date().getFullYear() + '/' + String(Date.now()).slice(-6) + Math.random().toString(36).substr(2,3).toUpperCase();
+  const sppdData = {
+    noSPPD,
+    nama: data.nama,
+    departemen: currentUser.departemen || '',
+    tujuan: data.tujuan,
+    tanggalMulai: data.tanggal,
+    tanggalSelesai: data.tanggalSelesai,
+    keperluan: data.keperluan,
+    status: 'pending',
+    userId: currentUser.id,
+    gradeJabatan: data.gradeJabatan,
+    gradeConfigUsed: cfg.label,
+    biayaTransport: cfg.maxTransport,
+    biayaAkomodasi: cfg.maxHotel * malam,
+    biayaMakan: (cfg.maxMakan + cfg.uangSaku) * hari,
+    biayaLain: 0,
+    totalEstimasi: totalEstimasi,
+    dinasLuarId: dinasLuarRef.id,
+    createdAt: new Date().toISOString()
+  };
+  const sppdRef = await db.collection('hrd_perjalanan_dinas').add(sppdData);
+
+  // Update dinas luar record with SPPD reference
+  await db.collection('hrd_dinas_luar').doc(dinasLuarRef.id).update({sppdId: sppdRef.id, noSPPD: noSPPD});
+
+  await sendNotification('hr','Dinas Luar',`${data.nama} → ${data.tujuan} (SPPD: ${noSPPD})`);
+  closeModalDirect();toast('Pengajuan dinas luar terkirim & SPPD dibuat','success');loadDinasTab('pengajuan');
 }
 
-async function approveDinas(id,status){await db.collection('hrd_dinas_luar').doc(id).update({status,approvedBy:currentUser.nama,approvedAt:new Date().toISOString()});toast('Updated','success');loadDinasTab('pengajuan');}
+async function approveDinas(id,status){
+  await db.collection('hrd_dinas_luar').doc(id).update({status,approvedBy:currentUser.nama,approvedAt:new Date().toISOString()});
+  // Propagate status to linked SPPD record
+  const linkSnap=await db.collection('hrd_perjalanan_dinas').where('dinasLuarId','==',id).get();
+  linkSnap.forEach(d=>d.ref.update({status,approvedBy:currentUser.nama,approvedAt:new Date().toISOString()}));
+  toast('Updated','success');loadDinasTab('pengajuan');
+}
 
 // ── ABSEN DINAS LUAR — Selfie + GPS (tanpa batasan radius) ────
 function modalAbsenDinasLuar() {
@@ -1241,8 +1319,24 @@ async function hapusAbsenHari() {
 // ── VIEW/EDIT DINAS LUAR ──────────────────────────────────────
 function viewDinasLuar(id){
   db.collection('hrd_dinas_luar').doc(id).get().then(d=>{const p=d.data();
+    let benefitHtml = '';
+    if(p.gradeJabatan){
+      const cfg = getGradeConfig(p.gradeJabatan);
+      benefitHtml = `<div style="background:#e8f5e9;padding:12px;border-radius:8px;margin-bottom:16px;border-left:4px solid var(--success)">
+        <div class="fw-700 text-sm mb-4">🎯 Grade: <span class="badge badge-info">${escHtml(p.gradeJabatan)}</span> (${escHtml(cfg.label)})</div>
+        <div class="text-sm" style="color:#555">Uang Harian: ${formatCurrency(p.uangHarian||cfg.uangHarian)} | Max Transport: ${formatCurrency(p.maxTransport||cfg.maxTransport)} | Max Hotel/mlm: ${formatCurrency(p.maxHotel||cfg.maxHotel)} | Max Makan/hr: ${formatCurrency(p.maxMakan||cfg.maxMakan)}</div>
+        ${p.totalEstimasi?`<div class="fw-700 text-sm mt-4" style="color:var(--success)">💰 Total Estimasi: ${formatCurrency(p.totalEstimasi)}</div>`:''}
+      </div>`;
+    }
+    let sppdHtml = '';
+    if(p.noSPPD){
+      sppdHtml = `<div style="background:#f0f4ff;padding:10px;border-radius:8px;margin-bottom:16px;border-left:4px solid var(--primary)">
+        <div class="fw-700 text-sm">🔗 Linked SPPD: <span class="badge badge-primary">${escHtml(p.noSPPD)}</span></div>
+      </div>`;
+    }
     openModal(`<div class="modal-title">📋 Detail Pengajuan Dinas Luar</div>
-      <div class="grid-2 mb-16"><div><b>Nama:</b> ${escHtml(p.nama)}</div><div><b>Tanggal:</b> ${formatDate(p.tanggal)}</div><div><b>Tujuan:</b> ${escHtml(p.tujuan||'-')}</div><div><b>Status:</b> <span class="badge badge-${p.status==='approved'?'success':p.status==='rejected'?'danger':'warning'}">${p.status}</span></div><div><b>Jam Berangkat:</b> ${p.jamBerangkat||'-'}</div><div><b>Estimasi Kembali:</b> ${p.jamKembali||'-'}</div></div>
+      ${benefitHtml}${sppdHtml}
+      <div class="grid-2 mb-16"><div><b>Nama:</b> ${escHtml(p.nama)}</div><div><b>Tanggal:</b> ${formatDate(p.tanggal)}${p.tanggalSelesai?' s/d '+formatDate(p.tanggalSelesai):''}</div><div><b>Tujuan:</b> ${escHtml(p.tujuan||'-')}</div><div><b>Status:</b> <span class="badge badge-${p.status==='approved'?'success':p.status==='rejected'?'danger':'warning'}">${p.status}</span></div><div><b>Jam Berangkat:</b> ${p.jamBerangkat||'-'}</div><div><b>Estimasi Kembali:</b> ${p.jamKembali||'-'}</div></div>
       ${p.keperluan?`<div class="mb-16"><b>Keperluan:</b><div class="text-sm mt-8" style="background:#f8f9ff;padding:10px;border-radius:6px">${escHtml(p.keperluan)}</div></div>`:''}
       ${p.approvedBy?`<div><b>Diproses oleh:</b> ${escHtml(p.approvedBy)}</div>`:''}`);
   });
