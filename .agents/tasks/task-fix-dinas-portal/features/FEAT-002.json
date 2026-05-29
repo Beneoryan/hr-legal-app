@@ -1,0 +1,28 @@
+{
+  "id": "FEAT-002",
+  "type": "fix",
+  "description": "Fix Portal Karyawan clickability issues - sidebar navigation collapse bug and portal-absensi redirect loop",
+  "status": "pending",
+  "steps": [
+    "1. In core.js, fix the navigateTo() function to re-expand the nav-group containing the active page after navigation. Currently, when a user clicks a nav-item in a different (collapsed) group, the group stays collapsed because only the .active class is toggled but nav-group-items display is not updated. After setting the active class, find the nav-item's parent .nav-group-items and ensure its display is 'block' and the arrow has class 'open'.",
+    "2. In modules.js, fix renderPortalAbsensi() (line 3404-3407). Currently it does: window._portalAbsensiMode=true; navigateTo('absensi'); This causes currentPage to become 'absensi' which is NOT a portal-* page, so the sidebar nav-group 'Utama' loses its active state and collapses. Fix: instead of redirecting to 'absensi', render the absensi content directly within the portal context. Keep currentPage as 'portal-absensi' and call renderAbsensiIJEF() directly after setting _portalAbsensiMode=true.",
+    "3. In core.js, in the renderApp() function, ensure that on mobile the overlay-sidebar element (#overlaySidebar) is always initially hidden (remove any .active class) when the app first renders. Also verify that the closeSidebar() call in navigateTo() correctly removes the .active class from the overlay.",
+    "4. In the renderPortal() function in modules.js, ensure stat-card onclick handlers and quick-action buttons have proper touch handling. Add -webkit-tap-highlight-color and touch-action:manipulation to stat-card elements inline to prevent mobile tap delays that make buttons feel unclickable.",
+    "5. In core.js buildNavItems for portal users, ensure the nav-group containing the active portal page has hasActive=true so it starts expanded. Currently if currentPage is 'portal' the first group is active, but if user is on 'portal-perjalanan-dinas' the hasActive check in the first group only matches 'portal', not 'portal-perjalanan-dinas' because that item is in the first group. Verify all portal-* pages are in the correct nav-groups."
+  ],
+  "acceptance_criteria": [
+    "When navigating to a page in a collapsed nav-group, that group auto-expands to show the active item",
+    "renderPortalAbsensi() renders absensi content without changing currentPage away from 'portal-absensi', keeping sidebar state correct",
+    "Portal stat-cards and quick-action buttons respond to clicks/taps immediately on mobile",
+    "Sidebar overlay does not remain active after navigation, preventing click blocking",
+    "No JavaScript syntax errors in modified files"
+  ],
+  "verification": [
+    "Run: node -c core.js (syntax check passes)",
+    "Run: node -c modules.js (syntax check passes)",
+    "Run: node -e \"const fs=require('fs'); const code=fs.readFileSync('modules.js','utf8'); if(code.includes(\\\"navigateTo('absensi')\\\") && code.includes('renderPortalAbsensi')) { const match=code.match(/function renderPortalAbsensi[^}]+}/); if(match && match[0].includes(\\\"navigateTo('absensi')\\\")) throw new Error('renderPortalAbsensi still redirects to absensi'); }\"",
+    "Run: node -e \"const fs=require('fs'); const code=fs.readFileSync('core.js','utf8'); if(!code.includes('nav-group-items') || !code.includes('navigateTo')) process.exit(0); console.log('nav-group handling present');\""
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

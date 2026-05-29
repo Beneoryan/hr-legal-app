@@ -1,0 +1,26 @@
+{
+  "project_type": "Vanilla JS single-page application with Firebase/Firestore backend",
+  "language": "JavaScript (ES6+)",
+  "build_system": "None (static files, deployed via Netlify)",
+  "test_framework": "None (no automated tests)",
+  "build_command": "N/A - static files, no build step",
+  "test_command": "N/A - no test infrastructure",
+  "verification_instructions": "Open index.html in browser, test portal and dinas luar features manually. For automated validation: use Node.js to parse JS files for syntax errors.",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "No setup needed - static HTML/JS/CSS files served directly",
+  "environment_constraints": "INTEGRATIONS_ONLY network - no external package installs. Validation limited to AST/syntax checks with Node.js.",
+  "contribution_requirements": "No formal contributing guide. Code follows vanilla JS patterns with Firestore integration.",
+  "key_patterns": "Global functions called via onclick handlers in HTML templates. Firestore collections prefixed with hrd_. Grade system uses BENEFIT_CONFIG_BY_GRADE and resolveGradeKey(). Portal pages prefixed with renderPortal*. Navigation uses navigateTo(page) with routes map in core.js. Modals via openModal(html). Toast notifications via toast(msg,type).",
+  "relevant_files": [
+    "absensi-ijef.js (lines 854-920: renderDinasLuar, loadDinasTab, modalDinasLuar, simpanDinasLuar, viewDinasLuar)",
+    "modules.js (lines 4216-4270: BENEFIT_CONFIG_BY_GRADE, resolveGradeKey, getGradeConfig, getUserGrade)",
+    "modules.js (lines 4381-4383: renderPortalPerjalananDinas)",
+    "modules.js (lines 4594-4700: modalAjukanSPPD, simpanSPPD with hrd_dinas_luar integration)",
+    "modules.js (lines 3088-3130: renderPortal - portal homepage with stat-cards and quick-action buttons)",
+    "modules.js (lines 3404-3407: renderPortalAbsensi - redirects to navigateTo('absensi'))",
+    "core.js (lines 100-223: renderApp, buildNavItems, navGroup, navigateTo with routes map)",
+    "core.js (lines 179-183: navGroup - nav-group-items with display:none for collapsed groups)",
+    "index.html (full file: CSS styles, DOM structure)"
+  ],
+  "directory_structure": "Single directory app: index.html (entry + CSS), core.js (routing/auth/helpers), modules.js (all HR modules), absensi-ijef.js (attendance/dinas luar), disc-test.html/js (separate DISC page), sw.js (service worker), manifest.json (PWA)"
+}
