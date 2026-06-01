@@ -388,26 +388,7 @@ async function loadJobdesk(){
   document.getElementById('jobdeskContent').innerHTML=html;
 }
 async function renderPortalPeraturan(){
-  const grade = await getUserGrade();
-  const cfg = await getGradeConfig(grade);
-  const peraturan = await getGradePeraturan(grade);
-  let gradeSection = `<div class="card mb-16" style="border-left:4px solid #ff9800">
-    <div class="card-header"><div class="card-title">✈️ Ketentuan Perjalanan Dinas - Grade ${escHtml(grade || 'STAFF')}</div></div>
-    <div style="padding:12px">
-      <div class="table-wrap"><table><thead><tr><th>Komponen</th><th>Ketentuan Anda</th></tr></thead><tbody>
-        <tr><td class="fw-700">Transportasi Diizinkan</td><td>${escHtml(peraturan.transportasiDiizinkan.join(', '))}</td></tr>
-        <tr><td class="fw-700">Kelas Hotel</td><td>${escHtml(peraturan.kelasHotelDiizinkan)}</td></tr>
-        <tr><td class="fw-700">Uang Harian</td><td>${formatCurrency(cfg.uangHarian)}</td></tr>
-        <tr><td class="fw-700">Max Makan/Hari</td><td>${formatCurrency(cfg.maxMakan)}</td></tr>
-        <tr><td class="fw-700">Uang Saku/Hari</td><td>${formatCurrency(cfg.uangSaku)}</td></tr>
-        <tr><td class="fw-700">Alur Approval</td><td>${escHtml(peraturan.alurApproval)}</td></tr>
-        <tr><td class="fw-700">Uang Muka</td><td>${peraturan.persenUangMuka}% dari estimasi</td></tr>
-        <tr><td class="fw-700">Batas Waktu Laporan</td><td>${peraturan.batasWaktuLaporan} hari setelah kembali</td></tr>
-      </tbody></table></div>
-      ${peraturan.ketentuanKhusus.length ? '<div class="mt-8"><div class="fw-700 text-sm mb-4">Ketentuan Khusus:</div><ul class="text-sm" style="padding-left:16px;line-height:1.6;color:#555;margin:0">'+peraturan.ketentuanKhusus.map(k=>'<li>'+escHtml(k)+'</li>').join('')+'</ul></div>' : ''}
-    </div>
-  </div>`;
-  document.getElementById('mainContent').innerHTML=`<div class="page-title"><span>📜 Peraturan Perusahaan</span></div>${gradeSection}<div class="card">${renderPeraturanHTML(true)}</div>`;
+  document.getElementById('mainContent').innerHTML=`<div class="page-title"><span>📜 Peraturan Perusahaan</span></div><div class="card">${renderPeraturanHTML(true)}</div>`;
 }
 
 // ── PORTAL SHARE — Admin share link/QR ke karyawan ────────────
