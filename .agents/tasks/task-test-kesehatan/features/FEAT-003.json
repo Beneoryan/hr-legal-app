@@ -2,7 +2,7 @@
   "id": "FEAT-003",
   "type": "fix",
   "description": "Address code review issues: fix portal name-collision exposing health records, eliminate full-collection download, and handle orphaned records when name typed manually.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "In loadPortalTestKesehatan(), replace full-collection get() with two targeted Firestore queries: (1) where('userId','==',u.id) for records linked by userId, (2) a query for records where userId is empty/absent but name matches.",
     "In the matching logic, use userId as PRIMARY match. Only fall back to name matching if the userId field is empty/absent on the record.",
@@ -21,5 +21,5 @@
     "Run node --check modules-test-kesehatan.js"
   ],
   "blocked_reason": null,
-  "findings": null
+  "findings": "All three review issues addressed. Syntax validated with node --check (NODE_OPTIONS='' required due to sandbox proxy). File size remains 32KB, well under 100KB limit. modules-peraturan.js change from commit 608990d is from a prior intentional fix task - left alone."
 }
