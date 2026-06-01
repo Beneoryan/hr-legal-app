@@ -207,8 +207,14 @@ async function modalFormTestKesehatan(id) {
   const html = `
     <div class="modal-title">📋 Form Test Kesehatan - ${escHtml(data.nama || '')}</div>
     <div style="max-height:70vh;overflow-y:auto;padding-right:8px">
+    <div style="background:#e8f5e9;border-radius:8px;padding:12px;margin-bottom:14px;border-left:4px solid #4caf50">
+      <p style="margin:0;font-size:.82rem;color:#2e7d32;line-height:1.6">
+        <strong>Petunjuk Pengisian:</strong> Isi Bagian A-F sesuai kondisi Anda. Bagian D (Lab) boleh dikosongkan jika belum ada hasil. Bagian G hanya diisi oleh dokter pemeriksa.
+      </p>
+    </div>
 
     <h4 style="margin:16px 0 8px;color:var(--primary)">A. Data Umum</h4>
+    <p style="margin:0 0 10px;font-size:.8rem;color:#666;font-style:italic">Isi data diri dasar. Tinggi badan dalam satuan cm, berat badan dalam kg. BMI akan terhitung otomatis.</p>
     <div class="grid-2">
       <div class="form-group"><label>Nama</label><input class="form-control" id="tkfNama" value="${escHtml(du.nama || data.nama || '')}"></div>
       <div class="form-group"><label>Usia</label><input type="number" class="form-control" id="tkfUsia" value="${du.usia || ''}"></div>
@@ -234,6 +240,7 @@ async function modalFormTestKesehatan(id) {
     </div>
 
     <h4 style="margin:16px 0 8px;color:var(--primary)">B. Riwayat Kesehatan</h4>
+    <p style="margin:0 0 10px;font-size:.8rem;color:#666;font-style:italic">Centang penyakit yang pernah atau sedang diderita. Isi riwayat operasi, obat rutin, dan rawat inap jika ada.</p>
     <div class="form-group"><label>Riwayat Penyakit Keluarga/Pribadi</label><div style="margin:8px 0">${diseaseChecks}</div></div>
     <div class="grid-2">
       <div class="form-group"><label>Riwayat Operasi</label><input class="form-control" id="tkfOperasi" value="${escHtml(rk.operasi || '')}"></div>
@@ -242,6 +249,7 @@ async function modalFormTestKesehatan(id) {
     </div>
 
     <h4 style="margin:16px 0 8px;color:var(--primary)">C. Pemeriksaan Fisik</h4>
+    <p style="margin:0 0 10px;font-size:.8rem;color:#666;font-style:italic">Tekanan darah: systole/diastole dalam mmHg (normal: 120/80). Nadi normal: 60-100 bpm. Suhu normal: 36-37.5&deg;C. Penglihatan format "6/6" atau "20/20".</p>
     <div class="grid-2">
       <div class="form-group"><label>Tekanan Darah Systole</label><input type="number" class="form-control" id="tkfSystole" value="${pf.systole || ''}"></div>
       <div class="form-group"><label>Tekanan Darah Diastole</label><input type="number" class="form-control" id="tkfDiastole" value="${pf.diastole || ''}"></div>
@@ -254,6 +262,7 @@ async function modalFormTestKesehatan(id) {
     </div>
 
     <h4 style="margin:16px 0 8px;color:var(--primary)">D. Pemeriksaan Lab (Opsional)</h4>
+    <p style="margin:0 0 10px;font-size:.8rem;color:#666;font-style:italic">Bagian ini opsional. Isi jika sudah ada hasil laboratorium. Kosongkan jika belum dilakukan pemeriksaan lab.</p>
     <div class="grid-2">
       <div class="form-group"><label>Hemoglobin</label><input class="form-control" id="tkfHb" value="${escHtml(pl.hemoglobin || '')}"></div>
       <div class="form-group"><label>Gula Darah</label><input class="form-control" id="tkfGula" value="${escHtml(pl.gulaDarah || '')}"></div>
@@ -262,6 +271,7 @@ async function modalFormTestKesehatan(id) {
     </div>
 
     <h4 style="margin:16px 0 8px;color:var(--primary)">E. Kondisi Mental</h4>
+    <p style="margin:0 0 10px;font-size:.8rem;color:#666;font-style:italic">Jawab sesuai kondisi yang Anda rasakan saat ini. Tidak ada jawaban benar atau salah.</p>
     <div class="grid-2">
       <div class="form-group"><label>Gangguan Mental</label>
         <select class="form-control" id="tkfMental">
@@ -289,6 +299,7 @@ async function modalFormTestKesehatan(id) {
     </div>
 
     <h4 style="margin:16px 0 8px;color:var(--primary)">F. Kebiasaan</h4>
+    <p style="margin:0 0 10px;font-size:.8rem;color:#666;font-style:italic">Jawab dengan jujur agar rekomendasi kesehatan yang diberikan sesuai dengan kondisi Anda.</p>
     <div class="grid-2">
       <div class="form-group"><label>Merokok</label>
         <select class="form-control" id="tkfMerokok">
@@ -316,6 +327,7 @@ async function modalFormTestKesehatan(id) {
     </div>
 
     <h4 style="margin:16px 0 8px;color:var(--primary)">G. Kesimpulan (Diisi Pemeriksa)</h4>
+    <div style="margin:0 0 10px;padding:8px 12px;background:#fff3cd;border-radius:6px;border-left:3px solid #ffc107;font-size:.8rem;color:#856404">⚠️ Bagian ini <strong>HANYA diisi oleh dokter/pemeriksa</strong>, bukan oleh peserta test. Jangan mengisi bagian ini sendiri.</div>
     <div class="grid-2">
       <div class="form-group"><label>Status Kesehatan</label>
         <select class="form-control" id="tkfStatus">
@@ -548,7 +560,14 @@ async function renderPortalTestKesehatan() {
   <div class="page-title"><span>🏥 Test Kesehatan Saya</span></div>
   <div class="card">
     <div style="background:#e3f2fd;border-radius:8px;padding:14px;margin-bottom:16px;border-left:4px solid var(--info)">
-      <p class="text-sm" style="line-height:1.6">Halaman ini menampilkan jadwal test kesehatan dan riwayat pemeriksaan Anda. Jika ada test yang dijadwalkan, Anda dapat mengisi form pemeriksaan.</p>
+      <p class="fw-700" style="margin-bottom:8px;font-size:.95rem">📖 Tata Cara Pengisian Test Kesehatan</p>
+      <ol class="text-sm" style="line-height:1.8;margin:0;padding-left:18px">
+        <li><strong>Test dijadwalkan oleh HRD/Admin</strong> - Anda akan melihat jadwal test di tabel bawah.</li>
+        <li><strong>Klik tombol "Isi Form"</strong> pada test yang berstatus Pending untuk membuka form pemeriksaan.</li>
+        <li><strong>Isi Bagian A-F sesuai petunjuk</strong> yang tertera di setiap bagian form. Pastikan data yang diisi akurat.</li>
+        <li><strong>Bagian G (Kesimpulan) HANYA diisi oleh dokter/pemeriksa</strong>, bukan peserta test.</li>
+        <li><strong>Klik Simpan</strong> setelah selesai mengisi. HRD akan menerima notifikasi.</li>
+      </ol>
     </div>
   </div>
   <div class="card">
