@@ -2,7 +2,7 @@
   "id": "FEAT-004",
   "type": "fix",
   "description": "Fix portal test kesehatan not showing scheduled records due to userId mismatch between hrd_karyawan and hrd_users collections. Also add Test Kesehatan button to Aksi Cepat section in modules-portal.js.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "In loadPortalTestKesehatan(), add a third query that fetches all hrd_test_kesehatan records for tipe 'existing' and filters client-side by matching nama (case-insensitive). This catches records where userId was set from hrd_karyawan doc ID which does not match hrd_users doc ID.",
     "In simpanJadwalTestKesehatan(), for tipe 'existing', also look up the hrd_users doc by name and store both karyawanId and userId fields so future portal queries work correctly.",
@@ -21,5 +21,5 @@
     "Grep modules-portal.js for portal-test-kesehatan button"
   ],
   "blocked_reason": null,
-  "findings": null
+  "findings": "Root cause was userId mismatch: admin saves hrd_karyawan doc ID as userId but portal queries using hrd_users doc ID. Fixed by leveraging currentUser.linkedKaryawan field which stores the karyawan doc ID on the user account. Added 4-tier query strategy: (1) by hrd_users ID, (2) by linkedKaryawan ID, (3) empty userId with name match, (4) tipe=existing with name match as last resort. Also added Test Kesehatan button to Aksi Cepat in portal."
 }
