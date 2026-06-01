@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "feat",
   "description": "Integrate the health test module into the app: update index.html with script tag, update core.js with navigation items and routes for both admin and portal views.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "In /projects/sandbox/hr-legal-app/index.html, add a script tag for modules-test-kesehatan.js after the last module script (absensi-ijef.js): <script src=\"modules-test-kesehatan.js?v=6.0\" charset=\"utf-8\"></script>",
     "In /projects/sandbox/hr-legal-app/core.js, add admin nav item in the 'Karyawan' nav group. Add ['test-kesehatan','🏥','Test Kesehatan'] to the items array in the line: nav+=navGroup('👥 Karyawan',[...])",
@@ -24,5 +24,5 @@
     "Grep core.js for 'Test Kesehatan' nav item in buildNavItems"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 4 integration points added successfully. Node --check passes on core.js. npm run validate not run due to INTEGRATIONS_ONLY network (no npm install available)."
 }
