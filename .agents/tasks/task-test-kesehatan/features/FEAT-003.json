@@ -1,0 +1,25 @@
+{
+  "id": "FEAT-003",
+  "type": "fix",
+  "description": "Address code review issues: fix portal name-collision exposing health records, eliminate full-collection download, and handle orphaned records when name typed manually.",
+  "status": "in_progress",
+  "steps": [
+    "In loadPortalTestKesehatan(), replace full-collection get() with two targeted Firestore queries: (1) where('userId','==',u.id) for records linked by userId, (2) a query for records where userId is empty/absent but name matches.",
+    "In the matching logic, use userId as PRIMARY match. Only fall back to name matching if the userId field is empty/absent on the record.",
+    "In simpanJadwalTestKesehatan(), when personId is empty (manual name entry), look up the person by name from the relevant collection (hrd_kandidat or hrd_karyawan) to populate userId/kandidatId. If lookup fails, leave as-is but still set the field."
+  ],
+  "acceptance_criteria": [
+    "loadPortalTestKesehatan uses targeted where queries instead of full-collection get",
+    "Portal matching uses userId as primary key, name only as fallback for legacy records",
+    "simpanJadwalTestKesehatan attempts to resolve userId when personId is empty",
+    "File passes Node --check syntax validation"
+  ],
+  "verification": [
+    "Grep for .where('userId' in loadPortalTestKesehatan",
+    "Verify no full-collection .get() in loadPortalTestKesehatan",
+    "Grep simpanJadwalTestKesehatan for userId lookup logic",
+    "Run node --check modules-test-kesehatan.js"
+  ],
+  "blocked_reason": null,
+  "findings": null
+}

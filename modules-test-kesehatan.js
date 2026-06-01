@@ -139,12 +139,24 @@ async function modalJadwalTestKesehatan(tipe) {
 }
 
 async function simpanJadwalTestKesehatan(tipe) {
-  const personId = document.getElementById('tkPerson').value;
+  let personId = document.getElementById('tkPerson').value;
   const nama = document.getElementById('tkNama').value;
   const tanggal = document.getElementById('tkTanggal').value;
   const catatan = document.getElementById('tkCatatan').value;
   if (!nama) return toast('Nama wajib diisi', 'warning');
   if (!tanggal) return toast('Tanggal wajib diisi', 'warning');
+
+  // If no person selected from dropdown, try to look up by name
+  if (!personId && nama) {
+    const col = tipe === 'calon' ? 'hrd_kandidat' : 'hrd_karyawan';
+    const lookupSnap = await db.collection(col).get();
+    lookupSnap.forEach(d => {
+      const rec = d.data();
+      if (!personId && (rec.nama || '').toLowerCase().trim() === nama.toLowerCase().trim()) {
+        personId = d.id;
+      }
+    });
+  }
 
   const data = {
     id: generateId(),
@@ -162,8 +174,8 @@ async function simpanJadwalTestKesehatan(tipe) {
     status: 'pending',
     createdAt: new Date().toISOString(),
   };
-  if (tipe === 'calon') data.kandidatId = personId;
-  else data.userId = personId;
+  if (tipe === 'calon') data.kandidatId = personId || '';
+  else data.userId = personId || '';
 
   await db.collection('hrd_test_kesehatan').add(data);
   closeModalDirect();
@@ -554,13 +566,26 @@ async function renderPortalTestKesehatan() {
 
 async function loadPortalTestKesehatan() {
   const u = currentUser;
-  const snap = await db.collection('hrd_test_kesehatan').get();
   const myTests = [];
-  snap.forEach(d => {
+  const seen = {};
+
+  // Primary query: records linked by userId (most reliable)
+  const snapById = await db.collection('hrd_test_kesehatan').where('userId', '==', u.id).get();
+  snapById.forEach(d => {
+    seen[d.id] = true;
+    myTests.push({id: d.id, ...d.data()});
+  });
+
+  // Fallback: legacy/candidate records where userId is empty but name matches
+  const snapByName = await db.collection('hrd_test_kesehatan').where('userId', '==', '').get();
+  snapByName.forEach(d => {
+    if (seen[d.id]) return;
     const r = d.data();
     const matchNama = (r.nama || '').toLowerCase().trim() === (u.nama || '').toLowerCase().trim();
-    const matchId = r.userId === u.id;
-    if (matchNama || matchId) myTests.push({id: d.id, ...r});
+    if (matchNama) {
+      seen[d.id] = true;
+      myTests.push({id: d.id, ...r});
+    }
   });
 
   const pending = myTests.filter(t => t.status === 'pending');
