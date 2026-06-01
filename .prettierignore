@@ -1,0 +1,14 @@
+node_modules
+dist
+build
+*.min.js
+*.min.css
+.git
+.github
+.vscode
+package-lock.json
+yarn.lock
+.DS_Store
+.env
+.env.local
+coverage
