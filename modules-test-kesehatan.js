@@ -209,7 +209,7 @@ async function modalFormTestKesehatan(id) {
     <div style="max-height:70vh;overflow-y:auto;padding-right:8px">
     <div style="background:#e8f5e9;border-radius:8px;padding:12px;margin-bottom:14px;border-left:4px solid #4caf50">
       <p style="margin:0;font-size:.82rem;color:#2e7d32;line-height:1.6">
-        <strong>Petunjuk Pengisian:</strong> Isi Bagian A-F sesuai kondisi Anda. Bagian D (Lab) boleh dikosongkan jika belum ada hasil. Bagian G hanya diisi oleh dokter pemeriksa.
+        <strong>Petunjuk Pengisian:</strong> Isi Bagian A-F sesuai kondisi Anda. Bagian D (Lab) boleh dikosongkan jika belum ada hasil. Bagian G (Kesimpulan) dihitung otomatis dari data yang diisi.
       </p>
     </div>
 
@@ -326,18 +326,19 @@ async function modalFormTestKesehatan(id) {
       <div class="form-group"><label>Olahraga (kali/minggu)</label><input type="number" class="form-control" id="tkfOlahragaJumlah" value="${kb.olahragaPerMinggu || ''}"></div>
     </div>
 
-    <h4 style="margin:16px 0 8px;color:var(--primary)">G. Kesimpulan (Diisi Pemeriksa)</h4>
-    <div style="margin:0 0 10px;padding:8px 12px;background:#fff3cd;border-radius:6px;border-left:3px solid #ffc107;font-size:.8rem;color:#856404">⚠️ Bagian ini <strong>HANYA diisi oleh dokter/pemeriksa</strong>, bukan oleh peserta test. Jangan mengisi bagian ini sendiri.</div>
+    <h4 style="margin:16px 0 8px;color:var(--primary)">G. Kesimpulan</h4>
+    <div style="margin:0 0 10px;padding:8px 12px;background:#e8f5e9;border-radius:6px;border-left:3px solid #4caf50;font-size:.8rem;color:#2e7d32">
+      ℹ️ Status kesehatan ditentukan <strong>otomatis</strong> berdasarkan data pemeriksaan yang diisi pada Bagian A-F. Catatan Dokter dan Rekomendasi dapat diisi secara opsional oleh pemeriksa.
+    </div>
     <div class="grid-2">
-      <div class="form-group"><label>Status Kesehatan</label>
-        <select class="form-control" id="tkfStatus">
-          <option value="">-- Pilih --</option>
-          <option value="sehat" ${ks.status === 'sehat' ? 'selected' : ''}>Sehat</option>
-          <option value="tidak_sehat" ${ks.status === 'tidak_sehat' ? 'selected' : ''}>Tidak Sehat</option>
-          <option value="perlu_pemeriksaan" ${ks.status === 'perlu_pemeriksaan' ? 'selected' : ''}>Perlu Pemeriksaan Lanjut</option>
-        </select>
+      <div class="form-group"><label>Status Kesehatan (Otomatis)</label>
+        <div id="tkfStatusPreview" style="padding:8px 12px;background:#f5f5f5;border-radius:6px;min-height:36px;display:flex;align-items:center">
+          ${ks.status ? getStatusBadgeKesehatan(ks.status) : '<span style="color:#999;font-size:.85rem">Isi data pemeriksaan fisik (Bagian C) terlebih dahulu</span>'}
+        </div>
       </div>
-      <div class="form-group"><label>Diperiksa Oleh</label><input class="form-control" id="tkfPemeriksa" value="${escHtml(ks.pemeriksaOleh || '')}"></div>
+      <div class="form-group"><label>Diperiksa Oleh</label>
+        <input class="form-control" id="tkfPemeriksa" value="${escHtml(ks.pemeriksaOleh || (typeof currentUser !== 'undefined' ? currentUser.nama || '' : ''))}" readonly style="background:#f5f5f5">
+      </div>
     </div>
     <div class="form-group"><label>Catatan Dokter</label><textarea class="form-control" id="tkfCatatanDokter" rows="2">${escHtml(ks.catatan || '')}</textarea></div>
     <div class="form-group"><label>Rekomendasi</label><textarea class="form-control" id="tkfRekomendasi" rows="2">${escHtml(ks.rekomendasi || '')}</textarea></div>
@@ -346,7 +347,21 @@ async function modalFormTestKesehatan(id) {
     <div style="margin-top:16px"><button class="btn btn-primary" onclick="simpanTestKesehatan('${id || ''}')">💾 Simpan</button></div>
   `;
   openModal(html);
-  setTimeout(() => hitungBMI(), 100);
+  setTimeout(() => {
+    hitungBMI();
+    updateStatusPreview();
+    // Add live status preview listeners
+    const statusFields = ['tkfSystole', 'tkfDiastole', 'tkfNadi', 'tkfSuhu', 'tkfGula', 'tkfKolesterol', 'tkfRokokJumlah'];
+    statusFields.forEach(fId => {
+      const el = document.getElementById(fId);
+      if (el) el.addEventListener('input', updateStatusPreview);
+    });
+    const statusSelects = ['tkfMental', 'tkfStres', 'tkfTidur', 'tkfMerokok'];
+    statusSelects.forEach(fId => {
+      const el = document.getElementById(fId);
+      if (el) el.addEventListener('change', updateStatusPreview);
+    });
+  }, 100);
 }
 
 // ── BMI CALCULATION ───────────────────────────────────────────
@@ -359,6 +374,62 @@ function hitungBMI() {
     bmiEl.value = bmi.toFixed(1);
   } else {
     bmiEl.value = '';
+  }
+  updateStatusPreview();
+}
+
+// ── AUTO-CALCULATE HEALTH STATUS ──────────────────────────────
+function hitungStatusKesehatan() {
+  const systole = parseFloat(document.getElementById('tkfSystole').value) || 0;
+  const diastole = parseFloat(document.getElementById('tkfDiastole').value) || 0;
+  const nadi = parseFloat(document.getElementById('tkfNadi').value) || 0;
+  const suhu = parseFloat(document.getElementById('tkfSuhu').value) || 0;
+  const bmi = parseFloat(document.getElementById('tkfBMI').value) || 0;
+  const gulaDarah = parseFloat(document.getElementById('tkfGula').value) || 0;
+  const kolesterol = parseFloat(document.getElementById('tkfKolesterol').value) || 0;
+  const gangguanMental = document.getElementById('tkfMental').value;
+  const stres = document.getElementById('tkfStres').value;
+  const kualitasTidur = document.getElementById('tkfTidur').value;
+  const merokok = document.getElementById('tkfMerokok').value;
+  const rokokPerHari = parseFloat(document.getElementById('tkfRokokJumlah').value) || 0;
+
+  // Check if basic fields are filled
+  const basicFilled = systole > 0 && diastole > 0 && nadi > 0 && suhu > 0;
+  if (!basicFilled) return '';
+
+  // Conditions for "tidak_sehat"
+  if (systole > 140 || systole < 90) return 'tidak_sehat';
+  if (diastole > 90 || diastole < 60) return 'tidak_sehat';
+  if (nadi > 100 || nadi < 60) return 'tidak_sehat';
+  if (suhu > 37.5 || suhu < 35.5) return 'tidak_sehat';
+  if (bmi > 30 || (bmi > 0 && bmi < 16)) return 'tidak_sehat';
+  if (gulaDarah > 200) return 'tidak_sehat';
+  if (gangguanMental === 'ya') return 'tidak_sehat';
+  if (stres === 'tinggi') return 'tidak_sehat';
+
+  // Conditions for "perlu_pemeriksaan"
+  if (systole >= 130 && systole <= 140) return 'perlu_pemeriksaan';
+  if (diastole >= 80 && diastole <= 90) return 'perlu_pemeriksaan';
+  if (nadi === 100) return 'perlu_pemeriksaan';
+  if (suhu >= 37.1 && suhu <= 37.5) return 'perlu_pemeriksaan';
+  if (bmi >= 25 && bmi <= 30) return 'perlu_pemeriksaan';
+  if (bmi >= 16 && bmi < 18.5) return 'perlu_pemeriksaan';
+  if (gulaDarah >= 140 && gulaDarah <= 200) return 'perlu_pemeriksaan';
+  if (kolesterol > 240) return 'perlu_pemeriksaan';
+  if (kualitasTidur === 'buruk') return 'perlu_pemeriksaan';
+  if (merokok === 'ya' && rokokPerHari > 10) return 'perlu_pemeriksaan';
+
+  return 'sehat';
+}
+
+function updateStatusPreview() {
+  const el = document.getElementById('tkfStatusPreview');
+  if (!el) return;
+  const status = hitungStatusKesehatan();
+  if (status) {
+    el.innerHTML = getStatusBadgeKesehatan(status);
+  } else {
+    el.innerHTML = '<span style="color:#999;font-size:.85rem">Isi data pemeriksaan fisik (Bagian C) terlebih dahulu</span>';
   }
 }
 
@@ -411,10 +482,10 @@ async function simpanTestKesehatan(id) {
     olahragaPerMinggu: document.getElementById('tkfOlahragaJumlah').value,
   };
   const kesimpulan = {
-    status: document.getElementById('tkfStatus').value,
+    status: hitungStatusKesehatan(),
     catatan: document.getElementById('tkfCatatanDokter').value,
     rekomendasi: document.getElementById('tkfRekomendasi').value,
-    pemeriksaOleh: document.getElementById('tkfPemeriksa').value,
+    pemeriksaOleh: typeof currentUser !== 'undefined' ? currentUser.nama || '' : '',
   };
 
   const updateData = {
@@ -565,7 +636,7 @@ async function renderPortalTestKesehatan() {
         <li><strong>Test dijadwalkan oleh HRD/Admin</strong> - Anda akan melihat jadwal test di tabel bawah.</li>
         <li><strong>Klik tombol "Isi Form"</strong> pada test yang berstatus Pending untuk membuka form pemeriksaan.</li>
         <li><strong>Isi Bagian A-F sesuai petunjuk</strong> yang tertera di setiap bagian form. Pastikan data yang diisi akurat.</li>
-        <li><strong>Bagian G (Kesimpulan) HANYA diisi oleh dokter/pemeriksa</strong>, bukan peserta test.</li>
+        <li><strong>Bagian G (Kesimpulan) dihitung otomatis</strong> berdasarkan data pemeriksaan Bagian A-F. Pemeriksa dapat menambahkan catatan/rekomendasi.</li>
         <li><strong>Klik Simpan</strong> setelah selesai mengisi. HRD akan menerima notifikasi.</li>
       </ol>
     </div>
