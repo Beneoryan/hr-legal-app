@@ -1,0 +1,32 @@
+{
+  "id": "FEAT-006",
+  "type": "feat",
+  "description": "Make Section G (Kesimpulan) fully automatic - auto-generate Catatan Dokter and Rekomendasi based on examination data, replace manual textareas with read-only displays, update live as form is filled.",
+  "status": "in_progress",
+  "steps": [
+    "Add generateCatatanOtomatis() function that produces a summary of abnormal findings",
+    "Add generateRekomendasiOtomatis() function that generates recommendations based on findings",
+    "Replace Section G textareas with read-only styled displays",
+    "Update Section G header to indicate fully automatic generation",
+    "Remove manual Diperiksa Oleh field or make it auto-only",
+    "Update updateStatusPreview() to also update catatan and rekomendasi displays",
+    "Update simpanTestKesehatan() to use auto-generated values",
+    "Add event listeners on ALL relevant form fields (sections A-F) for real-time updates"
+  ],
+  "acceptance_criteria": [
+    "Catatan Dokter is auto-generated based on examination data with abnormal findings listed",
+    "Rekomendasi is auto-generated with specific advice per condition",
+    "Section G fields are read-only displays, not editable textareas",
+    "All relevant form fields in sections A-F trigger live updates to Section G",
+    "simpanTestKesehatan uses auto-generated values",
+    "Edge cases handled: no data, partial data",
+    "File passes node --check syntax validation"
+  ],
+  "verification": [
+    "Run node --check modules-test-kesehatan.js",
+    "Grep for generateCatatanOtomatis function",
+    "Grep for generateRekomendasiOtomatis function"
+  ],
+  "blocked_reason": null,
+  "findings": null
+}

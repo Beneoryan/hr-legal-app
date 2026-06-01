@@ -327,21 +327,20 @@ async function modalFormTestKesehatan(id) {
     </div>
 
     <h4 style="margin:16px 0 8px;color:var(--primary)">G. Kesimpulan</h4>
-    <div style="margin:0 0 10px;padding:8px 12px;background:#e8f5e9;border-radius:6px;border-left:3px solid #4caf50;font-size:.8rem;color:#2e7d32">
-      ℹ️ Status kesehatan ditentukan <strong>otomatis</strong> berdasarkan data pemeriksaan yang diisi pada Bagian A-F. Catatan Dokter dan Rekomendasi dapat diisi secara opsional oleh pemeriksa.
+    <div style="margin:0 0 10px;padding:10px 12px;background:#fff3e0;border-radius:6px;border-left:3px solid #ff9800;font-size:.8rem;color:#e65100">
+      ⚙️ Bagian ini dihasilkan <strong>otomatis</strong> berdasarkan data pemeriksaan Anda di Bagian A-F. Tidak perlu diisi manual. Hasil akan diperbarui secara langsung saat data diisi.
     </div>
-    <div class="grid-2">
-      <div class="form-group"><label>Status Kesehatan (Otomatis)</label>
-        <div id="tkfStatusPreview" style="padding:8px 12px;background:#f5f5f5;border-radius:6px;min-height:36px;display:flex;align-items:center">
-          ${ks.status ? getStatusBadgeKesehatan(ks.status) : '<span style="color:#999;font-size:.85rem">Isi data pemeriksaan fisik (Bagian C) terlebih dahulu</span>'}
-        </div>
-      </div>
-      <div class="form-group"><label>Diperiksa Oleh</label>
-        <input class="form-control" id="tkfPemeriksa" value="${escHtml(ks.pemeriksaOleh || (typeof currentUser !== 'undefined' ? currentUser.nama || '' : ''))}" readonly style="background:#f5f5f5">
+    <div class="form-group"><label>Status Kesehatan (Otomatis)</label>
+      <div id="tkfStatusPreview" style="padding:8px 12px;background:#f5f5f5;border-radius:6px;min-height:36px;display:flex;align-items:center">
+        ${ks.status ? getStatusBadgeKesehatan(ks.status) : '<span style="color:#999;font-size:.85rem">Isi data pemeriksaan fisik (Bagian C) terlebih dahulu</span>'}
       </div>
     </div>
-    <div class="form-group"><label>Catatan Dokter</label><textarea class="form-control" id="tkfCatatanDokter" rows="2">${escHtml(ks.catatan || '')}</textarea></div>
-    <div class="form-group"><label>Rekomendasi</label><textarea class="form-control" id="tkfRekomendasi" rows="2">${escHtml(ks.rekomendasi || '')}</textarea></div>
+    <div class="form-group"><label>Catatan Medis (Otomatis)</label>
+      <div id="tkfCatatanPreview" style="padding:10px 12px;background:#f5f5f5;border-radius:6px;min-height:44px;font-size:.85rem;color:#333;line-height:1.6;white-space:pre-wrap">${escHtml(ks.catatan || 'Belum ada data untuk dianalisis.')}</div>
+    </div>
+    <div class="form-group"><label>Rekomendasi (Otomatis)</label>
+      <div id="tkfRekomendasiPreview" style="padding:10px 12px;background:#f5f5f5;border-radius:6px;min-height:44px;font-size:.85rem;color:#333;line-height:1.6;white-space:pre-wrap">${escHtml(ks.rekomendasi || 'Belum ada data untuk dianalisis.')}</div>
+    </div>
 
     </div>
     <div style="margin-top:16px"><button class="btn btn-primary" onclick="simpanTestKesehatan('${id || ''}')">💾 Simpan</button></div>
@@ -350,16 +349,27 @@ async function modalFormTestKesehatan(id) {
   setTimeout(() => {
     hitungBMI();
     updateStatusPreview();
-    // Add live status preview listeners
-    const statusFields = ['tkfSystole', 'tkfDiastole', 'tkfNadi', 'tkfSuhu', 'tkfGula', 'tkfKolesterol', 'tkfRokokJumlah'];
-    statusFields.forEach(fId => {
+    // Add live update listeners on ALL relevant fields (sections A-F)
+    const inputFields = [
+      'tkfTinggi', 'tkfBerat', 'tkfSystole', 'tkfDiastole',
+      'tkfNadi', 'tkfSuhu', 'tkfGula', 'tkfKolesterol',
+      'tkfRokokJumlah', 'tkfOlahragaJumlah', 'tkfHb'
+    ];
+    inputFields.forEach(fId => {
       const el = document.getElementById(fId);
       if (el) el.addEventListener('input', updateStatusPreview);
     });
-    const statusSelects = ['tkfMental', 'tkfStres', 'tkfTidur', 'tkfMerokok'];
-    statusSelects.forEach(fId => {
+    const selectFields = [
+      'tkfMental', 'tkfStres', 'tkfTidur',
+      'tkfMerokok', 'tkfAlkohol', 'tkfOlahraga', 'tkfGender', 'tkfGolDarah'
+    ];
+    selectFields.forEach(fId => {
       const el = document.getElementById(fId);
       if (el) el.addEventListener('change', updateStatusPreview);
+    });
+    // Disease checkboxes
+    document.querySelectorAll('.tkDisease').forEach(cb => {
+      cb.addEventListener('change', updateStatusPreview);
     });
   }, 100);
 }
@@ -376,6 +386,179 @@ function hitungBMI() {
     bmiEl.value = '';
   }
   updateStatusPreview();
+}
+
+// ── AUTO-GENERATE CATATAN (DOCTOR'S NOTES) ────────────────────
+function generateCatatanOtomatis() {
+  const systole = parseFloat(document.getElementById('tkfSystole').value) || 0;
+  const diastole = parseFloat(document.getElementById('tkfDiastole').value) || 0;
+  const nadi = parseFloat(document.getElementById('tkfNadi').value) || 0;
+  const suhu = parseFloat(document.getElementById('tkfSuhu').value) || 0;
+  const bmi = parseFloat(document.getElementById('tkfBMI').value) || 0;
+  const gulaDarah = parseFloat(document.getElementById('tkfGula').value) || 0;
+  const kolesterol = parseFloat(document.getElementById('tkfKolesterol').value) || 0;
+  const gangguanMental = document.getElementById('tkfMental').value;
+  const stres = document.getElementById('tkfStres').value;
+  const kualitasTidur = document.getElementById('tkfTidur').value;
+  const merokok = document.getElementById('tkfMerokok').value;
+  const rokokPerHari = parseFloat(document.getElementById('tkfRokokJumlah').value) || 0;
+  const hb = document.getElementById('tkfHb').value;
+
+  // Check if any data is filled
+  const hasAnyData = systole > 0 || diastole > 0 || nadi > 0 || suhu > 0 || bmi > 0;
+  if (!hasAnyData) return 'Belum ada data untuk dianalisis.';
+
+  const temuan = [];
+
+  // Blood pressure
+  if (systole > 140) temuan.push('Tekanan darah tinggi/hipertensi (systole: ' + systole + ' mmHg)');
+  else if (systole >= 130 && systole <= 140) temuan.push('Tekanan darah pra-hipertensi (systole: ' + systole + ' mmHg)');
+  else if (systole > 0 && systole < 90) temuan.push('Tekanan darah rendah/hipotensi (systole: ' + systole + ' mmHg)');
+
+  if (diastole > 90) temuan.push('Diastole tinggi (' + diastole + ' mmHg)');
+  else if (diastole >= 80 && diastole <= 90) temuan.push('Diastole pra-hipertensi (' + diastole + ' mmHg)');
+  else if (diastole > 0 && diastole < 60) temuan.push('Diastole rendah (' + diastole + ' mmHg)');
+
+  // Heart rate
+  if (nadi > 100) temuan.push('Nadi tinggi/takikardia (' + nadi + ' bpm)');
+  else if (nadi > 0 && nadi < 60) temuan.push('Nadi rendah/bradikardia (' + nadi + ' bpm)');
+
+  // Temperature
+  if (suhu > 37.5) temuan.push('Suhu tubuh tinggi/demam (' + suhu + ' C)');
+  else if (suhu > 0 && suhu < 35.5) temuan.push('Suhu tubuh rendah/hipotermia (' + suhu + ' C)');
+
+  // BMI
+  if (bmi > 30) temuan.push('BMI obesitas (' + bmi.toFixed(1) + ')');
+  else if (bmi >= 25 && bmi <= 30) temuan.push('BMI kelebihan berat badan (' + bmi.toFixed(1) + ')');
+  else if (bmi > 0 && bmi < 16) temuan.push('BMI sangat kurus (' + bmi.toFixed(1) + ')');
+  else if (bmi >= 16 && bmi < 18.5) temuan.push('BMI kurus/underweight (' + bmi.toFixed(1) + ')');
+
+  // Blood sugar
+  if (gulaDarah > 200) temuan.push('Gula darah sangat tinggi (' + gulaDarah + ' mg/dL)');
+  else if (gulaDarah >= 140 && gulaDarah <= 200) temuan.push('Gula darah tinggi/pra-diabetes (' + gulaDarah + ' mg/dL)');
+
+  // Cholesterol
+  if (kolesterol > 240) temuan.push('Kolesterol tinggi (' + kolesterol + ' mg/dL)');
+
+  // Hemoglobin
+  if (hb) {
+    const hbVal = parseFloat(hb) || 0;
+    if (hbVal > 0 && hbVal < 12) temuan.push('Hemoglobin rendah/anemia (' + hbVal + ' g/dL)');
+  }
+
+  // Mental health
+  if (gangguanMental === 'ya') temuan.push('Memiliki riwayat gangguan mental');
+  if (stres === 'tinggi') temuan.push('Tingkat stres tinggi');
+  else if (stres === 'sedang') temuan.push('Tingkat stres sedang');
+  if (kualitasTidur === 'buruk') temuan.push('Kualitas tidur buruk');
+
+  // Habits
+  if (merokok === 'ya' && rokokPerHari > 10) temuan.push('Perokok berat (' + rokokPerHari + ' batang/hari)');
+  else if (merokok === 'ya') temuan.push('Perokok aktif (' + rokokPerHari + ' batang/hari)');
+
+  // Disease history
+  const penyakitChecked = [];
+  document.querySelectorAll('.tkDisease:checked').forEach(function(c) { penyakitChecked.push(c.value); });
+  if (penyakitChecked.length > 0) temuan.push('Riwayat penyakit: ' + penyakitChecked.join(', '));
+
+  if (temuan.length === 0) {
+    return 'Semua hasil pemeriksaan dalam batas normal.';
+  }
+
+  return 'Temuan: ' + temuan.join('; ') + '.';
+}
+
+// ── AUTO-GENERATE REKOMENDASI ─────────────────────────────────
+function generateRekomendasiOtomatis() {
+  const systole = parseFloat(document.getElementById('tkfSystole').value) || 0;
+  const diastole = parseFloat(document.getElementById('tkfDiastole').value) || 0;
+  const bmi = parseFloat(document.getElementById('tkfBMI').value) || 0;
+  const gulaDarah = parseFloat(document.getElementById('tkfGula').value) || 0;
+  const kolesterol = parseFloat(document.getElementById('tkfKolesterol').value) || 0;
+  const gangguanMental = document.getElementById('tkfMental').value;
+  const stres = document.getElementById('tkfStres').value;
+  const kualitasTidur = document.getElementById('tkfTidur').value;
+  const merokok = document.getElementById('tkfMerokok').value;
+  const rokokPerHari = parseFloat(document.getElementById('tkfRokokJumlah').value) || 0;
+  const nadi = parseFloat(document.getElementById('tkfNadi').value) || 0;
+  const suhu = parseFloat(document.getElementById('tkfSuhu').value) || 0;
+  const hb = document.getElementById('tkfHb').value;
+
+  // Check if any data is filled
+  const hasAnyData = systole > 0 || diastole > 0 || nadi > 0 || suhu > 0 || bmi > 0;
+  if (!hasAnyData) return 'Belum ada data untuk dianalisis.';
+
+  const rekomendasi = [];
+
+  // Blood pressure recommendations
+  if (systole > 140 || diastole > 90) {
+    rekomendasi.push('Konsultasi ke dokter spesialis jantung. Kurangi konsumsi garam dan makanan berlemak.');
+  } else if ((systole >= 130 && systole <= 140) || (diastole >= 80 && diastole <= 90)) {
+    rekomendasi.push('Monitor tekanan darah secara rutin. Kurangi konsumsi garam.');
+  }
+
+  // BMI recommendations
+  if (bmi > 30) {
+    rekomendasi.push('Program diet dan olahraga teratur disarankan. Konsultasi ahli gizi.');
+  } else if (bmi >= 25 && bmi <= 30) {
+    rekomendasi.push('Jaga pola makan sehat dan tingkatkan aktivitas fisik.');
+  } else if (bmi > 0 && bmi < 18.5) {
+    rekomendasi.push('Tingkatkan asupan nutrisi dan kalori. Konsultasi ahli gizi jika perlu.');
+  }
+
+  // Blood sugar recommendations
+  if (gulaDarah > 200) {
+    rekomendasi.push('Pemeriksaan HbA1c dan konsultasi ke dokter spesialis penyakit dalam segera.');
+  } else if (gulaDarah >= 140 && gulaDarah <= 200) {
+    rekomendasi.push('Pemeriksaan gula darah ulang dan kontrol pola makan. Kurangi gula dan karbohidrat.');
+  }
+
+  // Cholesterol recommendations
+  if (kolesterol > 240) {
+    rekomendasi.push('Diet rendah lemak dan pemeriksaan profil lipid lanjutan. Konsultasi dokter.');
+  }
+
+  // Hemoglobin
+  if (hb) {
+    const hbVal = parseFloat(hb) || 0;
+    if (hbVal > 0 && hbVal < 12) {
+      rekomendasi.push('Tingkatkan asupan zat besi (daging merah, sayuran hijau). Pemeriksaan lanjutan untuk anemia.');
+    }
+  }
+
+  // Heart rate
+  if (nadi > 100) {
+    rekomendasi.push('Evaluasi penyebab nadi tinggi. Hindari kafein berlebihan.');
+  }
+
+  // Temperature
+  if (suhu > 37.5) {
+    rekomendasi.push('Istirahat cukup dan minum banyak air. Periksakan jika demam berlanjut.');
+  }
+
+  // Smoking recommendations
+  if (merokok === 'ya' && rokokPerHari > 10) {
+    rekomendasi.push('Sangat disarankan untuk berhenti merokok. Konsultasi program berhenti merokok.');
+  } else if (merokok === 'ya') {
+    rekomendasi.push('Disarankan untuk mengurangi dan berhenti merokok.');
+  }
+
+  // Mental health recommendations
+  if (gangguanMental === 'ya') {
+    rekomendasi.push('Konsultasi psikolog/psikiater disarankan untuk evaluasi lanjutan.');
+  }
+  if (stres === 'tinggi') {
+    rekomendasi.push('Manajemen stres: olahraga teratur, meditasi, dan istirahat cukup.');
+  }
+  if (kualitasTidur === 'buruk') {
+    rekomendasi.push('Evaluasi pola tidur. Hindari gadget sebelum tidur, atur jadwal tidur teratur.');
+  }
+
+  if (rekomendasi.length === 0) {
+    return 'Pertahankan pola hidup sehat. Kontrol ulang berkala sesuai jadwal.';
+  }
+
+  return rekomendasi.join(' ');
 }
 
 // ── AUTO-CALCULATE HEALTH STATUS ──────────────────────────────
@@ -431,6 +614,16 @@ function updateStatusPreview() {
   } else {
     el.innerHTML = '<span style="color:#999;font-size:.85rem">Isi data pemeriksaan fisik (Bagian C) terlebih dahulu</span>';
   }
+  // Update auto-generated catatan
+  const catatanEl = document.getElementById('tkfCatatanPreview');
+  if (catatanEl) {
+    catatanEl.textContent = generateCatatanOtomatis();
+  }
+  // Update auto-generated rekomendasi
+  const rekomendasiEl = document.getElementById('tkfRekomendasiPreview');
+  if (rekomendasiEl) {
+    rekomendasiEl.textContent = generateRekomendasiOtomatis();
+  }
 }
 
 // ── SIMPAN TEST KESEHATAN ─────────────────────────────────────
@@ -483,8 +676,8 @@ async function simpanTestKesehatan(id) {
   };
   const kesimpulan = {
     status: hitungStatusKesehatan(),
-    catatan: document.getElementById('tkfCatatanDokter').value,
-    rekomendasi: document.getElementById('tkfRekomendasi').value,
+    catatan: generateCatatanOtomatis(),
+    rekomendasi: generateRekomendasiOtomatis(),
     pemeriksaOleh: typeof currentUser !== 'undefined' ? currentUser.nama || '' : '',
   };
 
@@ -636,7 +829,7 @@ async function renderPortalTestKesehatan() {
         <li><strong>Test dijadwalkan oleh HRD/Admin</strong> - Anda akan melihat jadwal test di tabel bawah.</li>
         <li><strong>Klik tombol "Isi Form"</strong> pada test yang berstatus Pending untuk membuka form pemeriksaan.</li>
         <li><strong>Isi Bagian A-F sesuai petunjuk</strong> yang tertera di setiap bagian form. Pastikan data yang diisi akurat.</li>
-        <li><strong>Bagian G (Kesimpulan) dihitung otomatis</strong> berdasarkan data pemeriksaan Bagian A-F. Pemeriksa dapat menambahkan catatan/rekomendasi.</li>
+        <li><strong>Bagian G (Kesimpulan) dihasilkan otomatis sepenuhnya</strong> - status, catatan, dan rekomendasi dihitung dari data Bagian A-F.</li>
         <li><strong>Klik Simpan</strong> setelah selesai mengisi. HRD akan menerima notifikasi.</li>
       </ol>
     </div>
