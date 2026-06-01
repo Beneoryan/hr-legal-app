@@ -2,7 +2,7 @@
   "id": "FEAT-005",
   "type": "feat",
   "description": "Add filling instructions/guidelines (tata cara pengisian) to the health test form portal page and modal form so users don't make mistakes when filling out the form.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "In renderPortalTestKesehatan(), enhance the existing info box to include step-by-step filling guide explaining the process (test dijadwalkan HRD, isi form sesuai petunjuk, bagian Kesimpulan diisi dokter pemeriksa).",
     "In modalFormTestKesehatan(), add inline helper text under each section header with guidance: Section A (height in cm, weight in kg, BMI auto-calculates), Section B (centang penyakit yang pernah/sedang diderita), Section C (tekanan darah format, nadi normal 60-100bpm, suhu 36-37.5C, penglihatan format 6/6 atau 20/20), Section D (opsional, isi jika sudah ada hasil lab), Section E (jawab sesuai kondisi saat ini), Section F (jawab jujur untuk rekomendasi yang tepat), Section G (HANYA diisi dokter/pemeriksa)."
@@ -21,5 +21,5 @@
     "Grep for helper text markers in each section"
   ],
   "blocked_reason": null,
-  "findings": null
+  "findings": "Added filling instructions to both portal page and form modal. Portal page has a numbered step-by-step guide (5 steps). Form modal has a top banner plus 7 inline helper texts (one per section A-G). Section G uses a yellow warning box to strongly indicate it is doctor-only. File size grew from ~32KB to ~35KB, still well under 100KB. node --check passes cleanly."
 }
