@@ -913,6 +913,14 @@ async function submitTestKesehatan(docId) {
     rekomendasi: generateRekomendasiOtomatis(),
   };
 
+  if (!kesimpulan.status) {
+    toast(
+      "Harap isi Bagian C (Pemeriksaan Fisik) terlebih dahulu sebelum mengirim.",
+      "warning",
+    );
+    return;
+  }
+
   var updateData = {
     dataUmum: dataUmum,
     riwayatKesehatan: riwayatKesehatan,
@@ -922,11 +930,8 @@ async function submitTestKesehatan(docId) {
     kebiasaan: kebiasaan,
     kesimpulan: kesimpulan,
     updatedAt: new Date().toISOString(),
+    status: "selesai",
   };
-
-  if (kesimpulan.status) {
-    updateData.status = "selesai";
-  }
 
   try {
     await db.collection("hrd_test_kesehatan").doc(docId).update(updateData);

@@ -103,7 +103,7 @@ async function showTestKesehatanTab(tab) {
         <td>
           <button class="btn btn-xs btn-info" onclick="detailTestKesehatan('${p.id}')">&#x1F441;&#xFE0F;</button>
           <button class="btn btn-xs btn-primary" onclick="modalFormTestKesehatan('${p.id}')">&#x1F4DD;</button>
-          ${p.tipe === "calon" && p.status !== "selesai" ? `<button class="btn btn-xs btn-success" onclick="navigator.clipboard.writeText(window.location.origin+'/test-kesehatan?id=${p.id}').then(function(){toast('Link disalin ke clipboard','success')})">&#x1F4CB; Copy Link</button>` : ""}
+          ${p.tipe === "calon" && p.status !== "selesai" ? `<button class="btn btn-xs btn-success" onclick="(function(){var url=window.location.origin+'/test-kesehatan?id=${p.id}';if(navigator.clipboard){navigator.clipboard.writeText(url).then(function(){toast('Link disalin ke clipboard','success')}).catch(function(){prompt('Salin link berikut:',url)})}else{prompt('Salin link berikut:',url)}})()">&#x1F4CB; Copy Link</button>` : ""}
           <button class="btn btn-xs btn-danger" onclick="hapusTestKesehatan('${p.id}')">&#x1F5D1;&#xFE0F;</button>
         </td>
       </tr>`;
@@ -211,7 +211,7 @@ async function simpanJadwalTestKesehatan(tipe) {
       <p style="font-size:.85rem;margin-bottom:12px">Bagikan link berikut kepada calon karyawan untuk mengisi form test kesehatan:</p>
       <div style="display:flex;gap:8px;align-items:center">
         <input class="form-control" id="tkShareLink" value="${shareUrl}" readonly style="font-size:.82rem">
-        <button class="btn btn-primary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('tkShareLink').value).then(function(){toast('Link berhasil disalin','success')})">&#x1F4CB; Copy</button>
+        <button class="btn btn-primary btn-sm" onclick="(function(){var url=document.getElementById('tkShareLink').value;if(navigator.clipboard){navigator.clipboard.writeText(url).then(function(){toast('Link berhasil disalin','success')}).catch(function(){prompt('Salin link berikut:',url)})}else{prompt('Salin link berikut:',url)}})()">&#x1F4CB; Copy</button>
       </div>
     `);
   }
