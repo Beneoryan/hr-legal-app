@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"
+    />
+    <title>Test Kesehatan - IJEF Corp</title>
+    <meta name="theme-color" content="#1a237e" />
+    <link rel="manifest" href="manifest.json" />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      :root {
+        --primary: #1a237e;
+        --primary-light: #283593;
+        --primary-dark: #0d1642;
+        --accent: #ff6f00;
+        --success: #2e7d32;
+        --danger: #c62828;
+        --warning: #f57f17;
+        --info: #0277bd;
+        --bg: #f0f2f5;
+        --card: #fff;
+        --text: #212121;
+        --text-light: #666;
+        --border: #e0e0e0;
+        --radius: 10px;
+      }
+      body {
+        font-family: "Segoe UI", system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        font-size: 14px;
+        min-height: 100vh;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      class="header-bar"
+      style="
+        background: var(--primary);
+        color: #fff;
+        padding: 14px 20px;
+        text-align: center;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      "
+    >
+      <h1 style="font-size: 1.1rem; font-weight: 700">🏥 Test Kesehatan</h1>
+      <div style="font-size: 0.78rem; opacity: 0.8; margin-top: 2px">
+        IJEF Corp — Human Resource Department
+      </div>
+    </div>
+    <div
+      class="toast-container"
+      id="toastContainer"
+      style="
+        position: fixed;
+        top: 70px;
+        right: 20px;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      "
+    ></div>
+    <div id="app" style="max-width: 900px; margin: 0 auto; padding: 20px"></div>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="test-kesehatan-public.js?v=1.0"></script>
+  </body>
+</html>
