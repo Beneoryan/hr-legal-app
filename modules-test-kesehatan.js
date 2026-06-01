@@ -568,21 +568,45 @@ async function loadPortalTestKesehatan() {
   const u = currentUser;
   const myTests = [];
   const seen = {};
+  const uNama = (u.nama || '').toLowerCase().trim();
 
-  // Primary query: records linked by userId (most reliable)
+  // Query 1: records linked by userId matching current user's hrd_users doc ID
   const snapById = await db.collection('hrd_test_kesehatan').where('userId', '==', u.id).get();
   snapById.forEach(d => {
     seen[d.id] = true;
     myTests.push({id: d.id, ...d.data()});
   });
 
-  // Fallback: legacy/candidate records where userId is empty but name matches
-  const snapByName = await db.collection('hrd_test_kesehatan').where('userId', '==', '').get();
-  snapByName.forEach(d => {
+  // Query 2: records where userId matches the linked karyawan ID.
+  // Admin schedules set userId from hrd_karyawan dropdown, which is stored as
+  // currentUser.linkedKaryawan on the user account.
+  if (u.linkedKaryawan) {
+    const snapByKary = await db.collection('hrd_test_kesehatan').where('userId', '==', u.linkedKaryawan).get();
+    snapByKary.forEach(d => {
+      if (seen[d.id]) return;
+      seen[d.id] = true;
+      myTests.push({id: d.id, ...d.data()});
+    });
+  }
+
+  // Query 3: records where userId is empty but name matches (legacy/manual records)
+  const snapEmpty = await db.collection('hrd_test_kesehatan').where('userId', '==', '').get();
+  snapEmpty.forEach(d => {
     if (seen[d.id]) return;
     const r = d.data();
-    const matchNama = (r.nama || '').toLowerCase().trim() === (u.nama || '').toLowerCase().trim();
-    if (matchNama) {
+    if ((r.nama || '').toLowerCase().trim() === uNama) {
+      seen[d.id] = true;
+      myTests.push({id: d.id, ...r});
+    }
+  });
+
+  // Query 4: records for tipe 'existing' matched by name as a last resort.
+  // Catches edge cases where neither userId matches (e.g. linkedKaryawan not set).
+  const snapExisting = await db.collection('hrd_test_kesehatan').where('tipe', '==', 'existing').get();
+  snapExisting.forEach(d => {
+    if (seen[d.id]) return;
+    const r = d.data();
+    if ((r.nama || '').toLowerCase().trim() === uNama) {
       seen[d.id] = true;
       myTests.push({id: d.id, ...r});
     }
