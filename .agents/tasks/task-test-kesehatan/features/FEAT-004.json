@@ -1,0 +1,25 @@
+{
+  "id": "FEAT-004",
+  "type": "fix",
+  "description": "Fix portal test kesehatan not showing scheduled records due to userId mismatch between hrd_karyawan and hrd_users collections. Also add Test Kesehatan button to Aksi Cepat section in modules-portal.js.",
+  "status": "in_progress",
+  "steps": [
+    "In loadPortalTestKesehatan(), add a third query that fetches all hrd_test_kesehatan records for tipe 'existing' and filters client-side by matching nama (case-insensitive). This catches records where userId was set from hrd_karyawan doc ID which does not match hrd_users doc ID.",
+    "In simpanJadwalTestKesehatan(), for tipe 'existing', also look up the hrd_users doc by name and store both karyawanId and userId fields so future portal queries work correctly.",
+    "In modules-portal.js renderPortal(), add a Test Kesehatan button in the Aksi Cepat section to improve discoverability."
+  ],
+  "acceptance_criteria": [
+    "loadPortalTestKesehatan finds records even when userId is a karyawan doc ID (not matching hrd_users ID)",
+    "Staff portal shows test schedules that were created by admin selecting from karyawan dropdown",
+    "Aksi Cepat section has a Test Kesehatan button navigating to portal-test-kesehatan",
+    "File passes node --check syntax validation"
+  ],
+  "verification": [
+    "Run node --check modules-test-kesehatan.js",
+    "Run node --check modules-portal.js",
+    "Grep loadPortalTestKesehatan for the name-based fallback query that handles non-empty userId",
+    "Grep modules-portal.js for portal-test-kesehatan button"
+  ],
+  "blocked_reason": null,
+  "findings": null
+}

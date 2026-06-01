@@ -27,6 +27,7 @@ async function renderPortal(){const main=document.getElementById('mainContent');
       <button class="btn btn-sm" style="background:#00796b;color:#fff" onclick="navigateTo('portal-kpi')">📈 KPI</button>
       <button class="btn btn-sm" style="background:#e65100;color:#fff" onclick="navigateTo('portal-jobdesk')">📋 Jobdesk</button>
       <button class="btn btn-sm" style="background:#4e342e;color:#fff" onclick="navigateTo('portal-disc')">🧠 DISC Test</button>
+      <button class="btn btn-sm" style="background:#1b5e20;color:#fff" onclick="navigateTo('portal-test-kesehatan')">🏥 Test Kesehatan</button>
       <button class="btn btn-sm" style="background:#37474f;color:#fff" onclick="navigateTo('portal-setting')">⚙️ Setting</button>
     </div>
     <div class="card-title mb-12 mt-16">📋 Informasi & Komunikasi</div>
