@@ -1,0 +1,37 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Create the modules-test-kesehatan.js file with the full Health Test module: admin views (tabs: Calon Karyawan, Karyawan Existing, Riwayat Test), test form, portal view, Firestore CRUD, and status indicators.",
+  "status": "completed",
+  "steps": [
+    "Create /projects/sandbox/hr-legal-app/modules-test-kesehatan.js with 'use strict' header",
+    "Implement renderTestKesehatan() - admin page with tabs: 'Calon Karyawan' | 'Karyawan Existing' | 'Riwayat Test'. Each tab shows a table with status indicators (emoji badges). Include search/filter. Add button '+ Jadwalkan Test' to assign/request test.",
+    "Implement showTestKesehatanTab(tab) to switch between 'calon', 'existing', 'riwayat' tabs. 'calon' tab loads from hrd_test_kesehatan where tipe=='calon'. 'existing' tab loads where tipe=='existing'. 'riwayat' shows all completed tests.",
+    "Implement modalJadwalTestKesehatan(tipe) - form to schedule a test. For 'calon': dropdown of candidates from hrd_kandidat. For 'existing': dropdown of employees from hrd_karyawan (aktif). Fields: nama, tanggal, catatan. Creates a new doc in hrd_test_kesehatan with status 'pending'.",
+    "Implement modalFormTestKesehatan(id) - large modal form with all sections: (a) Data Umum (nama, usia, jenis kelamin, tinggi, berat, BMI auto-calc, golongan darah), (b) Riwayat Kesehatan (checkboxes for diseases, riwayat operasi, obat, rawat inap), (c) Pemeriksaan Fisik (tekanan darah systole/diastole, nadi, suhu, penglihatan kiri/kanan, pendengaran, gigi), (d) Pemeriksaan Lab optional (hemoglobin, gula darah, kolesterol, urine), (e) Kondisi Mental (gangguan mental ya/tidak, stres rendah/sedang/tinggi, kualitas tidur), (f) Kebiasaan (merokok ya/tidak + batang/hari, alkohol ya/tidak, olahraga ya/tidak + kali/minggu), (g) Kesimpulan (status: Sehat/Tidak Sehat/Perlu Pemeriksaan Lanjut, catatan dokter, rekomendasi, pemeriksa).",
+    "Implement simpanTestKesehatan(id) - saves form data to hrd_test_kesehatan. Updates status to 'selesai' if kesimpulan is filled. Sends notification to admin when employee submits. Uses BMI auto-calculation: weight/(height/100)^2.",
+    "Implement detailTestKesehatan(id) - read-only detail view modal showing all sections with formatted data and status badge.",
+    "Implement renderPortalTestKesehatan() - employee portal view. Shows: (1) upcoming scheduled tests, (2) history table of past results with status badges, (3) button to fill form if test is scheduled (status=='pending'). Pattern follows renderPortalDisc() in modules-portal.js.",
+    "Implement hapusTestKesehatan(id) - delete with confirmation. Admin only.",
+    "Add status indicator helpers: getStatusBadgeKesehatan(status) returns badge HTML with emoji (green circle Sehat, red circle Tidak Sehat, yellow circle Perlu Pemeriksaan Lanjut, hourglass Pending)."
+  ],
+  "acceptance_criteria": [
+    "modules-test-kesehatan.js exists and is under 100KB",
+    "All functions are global (no export/import)",
+    "renderTestKesehatan() renders admin page with 3 tabs and data tables",
+    "modalFormTestKesehatan() renders complete health form with all 7 sections",
+    "BMI auto-calculates from tinggi and berat inputs",
+    "renderPortalTestKesehatan() renders employee portal view with history and scheduled tests",
+    "Firestore collection used is 'hrd_test_kesehatan'",
+    "Status badges show correct emoji indicators",
+    "Notifications sent to admin when test submitted",
+    "UI text is all in Indonesian"
+  ],
+  "verification": [
+    "Run 'wc -c modules-test-kesehatan.js' to confirm file is under 100KB (102400 bytes)",
+    "Run 'npx eslint modules-test-kesehatan.js --no-eslintrc --env browser,es2021 --parser-options=ecmaVersion:latest --rule \"{semi: [error, always], quotes: [error, single, {avoidEscape: true}]}\"' to check basic syntax",
+    "Grep for renderTestKesehatan, renderPortalTestKesehatan, modalFormTestKesehatan functions exist"
+  ],
+  "blocked_reason": null,
+  "findings": "ESLint v8 not installable (INTEGRATIONS_ONLY network). Validated via Node.js --check (syntax) and ESLint v10 Linter API (semi, quotes rules). File is 31KB, well under 100KB limit. Prettier format:check not enforced since existing project files also fail it."
+}

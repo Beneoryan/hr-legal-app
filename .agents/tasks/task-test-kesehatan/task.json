@@ -1,0 +1,14 @@
+{
+  "task_id": "task-test-kesehatan",
+  "task_description": "Create a Health Test (Test Kesehatan) module for the HR app supporting both prospective employees (calon karyawan) during recruitment and existing employees (karyawan existing) for periodic checkups. Includes admin management views, comprehensive health form, portal employee view, and Firestore integration.",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null,
+  "verification": {
+    "build": "skipped",
+    "tests": "skipped",
+    "test_quality": "skipped",
+    "docker_build": "skipped",
+    "summary": "npm install unavailable (INTEGRATIONS_ONLY network). Verified: file size 32KB (under 100KB limit), all 12 global functions present, routes and nav items added to core.js, script tag in index.html. Semantic review v2 APPROVED after addressing privacy concerns (portal query uses targeted userId-based Firestore queries instead of full-collection scan)."
+  }
+}

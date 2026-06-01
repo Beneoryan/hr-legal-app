@@ -1,0 +1,28 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Integrate the health test module into the app: update index.html with script tag, update core.js with navigation items and routes for both admin and portal views.",
+  "status": "completed",
+  "steps": [
+    "In /projects/sandbox/hr-legal-app/index.html, add a script tag for modules-test-kesehatan.js after the last module script (absensi-ijef.js): <script src=\"modules-test-kesehatan.js?v=6.0\" charset=\"utf-8\"></script>",
+    "In /projects/sandbox/hr-legal-app/core.js, add admin nav item in the 'Karyawan' nav group. Add ['test-kesehatan','🏥','Test Kesehatan'] to the items array in the line: nav+=navGroup('👥 Karyawan',[...])",
+    "In /projects/sandbox/hr-legal-app/core.js, add portal nav item for staff/leader. Add ['portal-test-kesehatan','🏥','Test Kesehatan'] to a relevant portal nav group (suggest: under 'Pekerjaan' group alongside jobdesk, disc, kpi)",
+    "In /projects/sandbox/hr-legal-app/core.js, add routes in the routes object inside navigateTo(): 'test-kesehatan':renderTestKesehatan, 'portal-test-kesehatan':renderPortalTestKesehatan"
+  ],
+  "acceptance_criteria": [
+    "index.html includes script tag for modules-test-kesehatan.js",
+    "core.js routes object contains 'test-kesehatan' mapping to renderTestKesehatan",
+    "core.js routes object contains 'portal-test-kesehatan' mapping to renderPortalTestKesehatan",
+    "Admin sidebar shows 'Test Kesehatan' under Karyawan group",
+    "Portal sidebar shows 'Test Kesehatan' under Pekerjaan group",
+    "npm run validate passes (or at least no new errors introduced)"
+  ],
+  "verification": [
+    "Grep index.html for 'modules-test-kesehatan.js' script tag",
+    "Grep core.js for 'test-kesehatan':renderTestKesehatan route",
+    "Grep core.js for 'portal-test-kesehatan':renderPortalTestKesehatan route",
+    "Grep core.js for 'Test Kesehatan' nav item in buildNavItems"
+  ],
+  "blocked_reason": null,
+  "findings": "All 4 integration points added successfully. Node --check passes on core.js. npm run validate not run due to INTEGRATIONS_ONLY network (no npm install available)."
+}

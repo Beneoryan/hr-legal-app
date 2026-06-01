@@ -145,7 +145,7 @@ function buildNavItems(isPortalUser) {
     let nav='';
     nav+=navGroup('🏠 Utama',[['portal','🏠','Beranda'],['portal-absensi','📍','Absensi'],['portal-cuti','🏖️','Cuti & Izin'],['portal-overtime','⏰','Overtime'],['portal-perjalanan-dinas','✈️','Perjalanan Dinas']]);
     nav+=navGroup('💰 Keuangan',[['portal-gaji','💰','Slip Gaji'],['portal-reimburse','🧾','Reimburse'],['portal-kasbon','💳','Kasbon & Loan']]);
-    nav+=navGroup('💼 Pekerjaan',[['portal-jobdesk','📋','Jobdesk'],['portal-disc','🧠','DISC Test'],['portal-kpi','📈','KPI Saya']]);
+    nav+=navGroup('💼 Pekerjaan',[['portal-jobdesk','📋','Jobdesk'],['portal-disc','🧠','DISC Test'],['portal-kpi','📈','KPI Saya'],['portal-test-kesehatan','🏥','Test Kesehatan']]);
     nav+=navGroup('🏢 Organisasi',[['portal-struktur','🌳','Struktur Org'],['portal-libur','📅','Hari Libur'],['portal-peraturan','📜','Peraturan']]);
     nav+=navGroup('💬 Komunikasi',[['portal-pengumuman','📢','Pengumuman'],['portal-broadcast','📡','Broadcast'],['portal-meeting','📅','Meeting'],['portal-invite','✉️','Undangan'],['inbox','📥','Inbox'],['chat','💬','Obrolan']]);
     // Leader gets approval access
@@ -157,7 +157,7 @@ function buildNavItems(isPortalUser) {
   let nav='';
   nav+=navGroup('🏠 Utama',[['dashboard','🏠','Beranda'],['approval-center','✅','Approval Center'],['notifikasi','🔔','Notifikasi'],['pengumuman','📢','Pengumuman']]);
   nav+=navGroup('🏢 Perusahaan',[['departemen','🏢','Departemen'],['posisi','💼','Posisi'],['cabang','🏛️','Cabang']]);
-  nav+=navGroup('👥 Karyawan',[['karyawan','👥','Data Karyawan'],['struktur-org','🌳','Struktur Org'],['jobdesk-mgmt','📋','Kelola Jobdesk'],['onboarding','🚀','Onboarding'],['offboarding','📦','Offboarding']]);
+  nav+=navGroup('👥 Karyawan',[['karyawan','👥','Data Karyawan'],['struktur-org','🌳','Struktur Org'],['jobdesk-mgmt','📋','Kelola Jobdesk'],['onboarding','🚀','Onboarding'],['offboarding','📦','Offboarding'],['test-kesehatan','🏥','Test Kesehatan']]);
   // Manager+ gets Rekrutmen
   if(hasAccess(3)) nav+=navGroup('🔍 Rekrutmen',[['lowongan','📝','Lowongan'],['pipeline','🔄','Pipeline Kanban'],['kandidat','🧑‍💼','Kandidat']]);
   nav+=navGroup('📍 Kehadiran',[['absensi','📍','Absensi IJEF'],['cuti','🏖️','Cuti/Izin/WFH'],['overtime','⏰','Overtime'],['perjalanan-dinas','✈️','Perjalanan Dinas'],['hari-libur','📅','Hari Libur'],['penalty','⚠️','Penalty Point']]);
@@ -220,6 +220,7 @@ function navigateTo(page) {
     'portal-meeting':renderPortalMeeting,'portal-invite':renderPortalInvite,'portal-overtime':renderPortalOvertime,
     'portal-setting':renderPortalSetting,'portal-share':renderPortalShare,
     'perjalanan-dinas':renderPerjalananDinas,'portal-perjalanan-dinas':renderPortalPerjalananDinas,
+    'test-kesehatan':renderTestKesehatan,'portal-test-kesehatan':renderPortalTestKesehatan,
   };
   const fn=routes[page];
   if(fn)fn(); else main.innerHTML=`<div class="empty-state"><div class="icon">🚧</div><p>Halaman "${page}" dalam pengembangan</p></div>`;

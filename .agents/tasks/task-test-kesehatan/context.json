@@ -1,0 +1,32 @@
+{
+  "project_type": "Vanilla JS single-page app with Firebase/Firestore, deployed on Netlify",
+  "language": "JavaScript (ES2021, browser globals)",
+  "build_system": "No build step - direct browser JS. ESLint + Prettier for validation. npm run validate (lint + format:check).",
+  "test_framework": "No automated tests. Validation via ESLint only.",
+  "build_command": "npm run validate",
+  "test_command": "npm run validate",
+  "verification_instructions": "1. Run 'npm run validate' to check lint/format. 2. Verify the new file is under 100KB. 3. Check that all global functions are accessible from the routes object in core.js.",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "npm install (devDependencies: eslint, prettier)",
+  "environment_constraints": "INTEGRATIONS_ONLY network - cannot install npm packages from registry. Use pre-installed eslint/prettier on the system (Node 22 with eslint/prettier available globally). All code is vanilla JS with no transpilation.",
+  "contribution_requirements": "Single quotes, semicolons required, comma-dangle es5, no-unused-vars warn. Files must stay under 100KB. All functions are global. UI in Indonesian.",
+  "key_patterns": {
+    "file_structure": "Each module in its own file: modules-{name}.js. Scripts loaded in index.html with ?v=6.0 cache-busting.",
+    "routing": "navigateTo(page) calls a function from the routes object in core.js. Admin and portal routes coexist.",
+    "navigation": "buildNavItems() in core.js constructs sidebar. navGroup(title, [[page,icon,label],...]) creates collapsible groups.",
+    "data_access": "Firestore via db.collection('hrd_xxx'). No composite indexes - use .get() then filter client-side.",
+    "ui_patterns": "Cards, tables, tabs, modals, badges. Helper functions: escHtml, formatDate, formatCurrency, toast, openModal, closeModalDirect, generateId.",
+    "portal_pattern": "Portal pages for staff/leader: renderPortalXxx() functions. Access via portal-xxx route.",
+    "form_pattern": "modalXxx() opens form via openModal(html). simpanXxx() saves to Firestore.",
+    "tab_pattern": "div.tabs > div.tab (onclick switch), content rendered below",
+    "notification_pattern": "sendNotification(targetUser, title, message, link) to notify users"
+  },
+  "relevant_files": [
+    "core.js - routes object, buildNavItems(), navigateTo()",
+    "index.html - script tags at bottom",
+    "modules-karyawan.js - karyawan data patterns, renderKaryawan, renderKandidat, pipeline",
+    "modules-portal.js - portal page patterns (renderPortalDisc, renderPortalKPI)",
+    "modules-perjalanan-dinas.js - tab-based module pattern with portal variant"
+  ],
+  "directory_structure": "Root-level JS files. No subdirectories for code. .agents/tasks/ for task state. docs/ for history."
+}
