@@ -261,23 +261,28 @@ function getMonthDays(ym){const[y,m]=ym.split('-').map(Number);return new Date(y
 function listenNotifications(){
   // Request notification permission on mobile
   requestNotifPermission();
-  // Listen for notifications targeted to this user's ID
-  const unsub1=db.collection('hrd_notifikasi').where('targetUser','==',currentUser.id).where('read','==',false).onSnapshot(snap=>{
+  // Listen for notifications targeted to this user's ID (single-field query to avoid composite index)
+  const unsub1=db.collection('hrd_notifikasi').where('targetUser','==',currentUser.id).onSnapshot(snap=>{
     updateNotifBadge();
     snap.docChanges().forEach(change=>{
       if(change.type==='added'){
-        playNotificationSound();
         const d=change.doc.data();
-        showSystemNotification(d.title||'Notifikasi',d.message||'');
+        if(d.read===false){
+          playNotificationSound();
+          showSystemNotification(d.title||'Notifikasi',d.message||'');
+        }
       }
     });
   });
   unsubscribers.push(unsub1);
   // Also listen for notifications targeted to this user's role (e.g. 'hr', 'admin')
-  const unsub2=db.collection('hrd_notifikasi').where('targetUser','==',currentUser.role).where('read','==',false).onSnapshot(snap=>{
+  const unsub2=db.collection('hrd_notifikasi').where('targetUser','==',currentUser.role).onSnapshot(snap=>{
     updateNotifBadge();
     snap.docChanges().forEach(change=>{
-      if(change.type==='added') playNotificationSound();
+      if(change.type==='added'){
+        const d=change.doc.data();
+        if(d.read===false) playNotificationSound();
+      }
     });
   });
   unsubscribers.push(unsub2);
@@ -292,10 +297,13 @@ function listenNotifications(){
     });
   });
   unsubscribers.push(unsub3);
-  // Listen for meeting invites
-  const unsub4=db.collection('hrd_meeting_invites').where('targetUser','==',currentUser.id).where('read','==',false).onSnapshot(snap=>{
+  // Listen for meeting invites (single-field query to avoid composite index)
+  const unsub4=db.collection('hrd_meeting_invites').where('targetUser','==',currentUser.id).onSnapshot(snap=>{
     snap.docChanges().forEach(change=>{
-      if(change.type==='added') playNotificationSound();
+      if(change.type==='added'){
+        const d=change.doc.data();
+        if(d.read===false) playNotificationSound();
+      }
     });
   });
   unsubscribers.push(unsub4);
@@ -468,10 +476,12 @@ function showSystemNotification(title,body){
 
 async function updateNotifBadge(){
   const[s1,s2]=await Promise.all([
-    db.collection('hrd_notifikasi').where('targetUser','==',currentUser.id).where('read','==',false).get(),
-    db.collection('hrd_notifikasi').where('targetUser','==',currentUser.role).where('read','==',false).get()
+    db.collection('hrd_notifikasi').where('targetUser','==',currentUser.id).get(),
+    db.collection('hrd_notifikasi').where('targetUser','==',currentUser.role).get()
   ]);
-  const count=s1.size+s2.size;
+  let count=0;
+  s1.forEach(d=>{if(d.data().read===false)count++;});
+  s2.forEach(d=>{if(d.data().read===false)count++;});
   const badge=document.getElementById('notifCount');
   if(badge){badge.textContent=count;badge.style.display=count>0?'block':'none';}
 }

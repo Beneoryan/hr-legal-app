@@ -351,9 +351,10 @@ async function autoDetectLocation(){
         distEl.textContent=`Jarak: ${locStatus.dist.toFixed(0)}m (dalam radius ${locStatus.nearest.radius||locStatus.radius}m)`;
         // Determine: clock in or clock out
         try{
-          const todaySnap=await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).get();
+          const todaySnap=await db.collection('hrd_absensi').where('userId','==',currentUser.id).get();
           let hasMasuk=false,hasPulang=false;
-          todaySnap.forEach(d=>{if(d.data().tipe==='masuk')hasMasuk=true;if(d.data().tipe==='pulang')hasPulang=true;});
+          const todayDate=todayStr();
+          todaySnap.forEach(d=>{const data=d.data();if(data.tanggal===todayDate){if(data.tipe==='masuk')hasMasuk=true;if(data.tipe==='pulang')hasPulang=true;}});
           if(!hasMasuk){
             btn.textContent='⏰ ABSEN MASUK (Selfie + GPS)';btn.style.background='var(--success)';btn.disabled=false;
             if(autoEl)autoEl.innerHTML='<span class="badge badge-info">Belum absen hari ini — Ambil foto lalu klik untuk Clock In</span>';
@@ -392,9 +393,10 @@ async function doAbsenWithSelfie(){
   if(!capturedPhoto) return toast('📸 Ambil foto selfie dulu! Foto wajib sebagai validasi kehadiran.','warning');
   if(!currentGPS) return toast('📍 Lokasi GPS belum terdeteksi. Tunggu sebentar...','warning');
   // Determine action: clock in or clock out
-  const todaySnap=await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).get();
+  const todaySnap=await db.collection('hrd_absensi').where('userId','==',currentUser.id).get();
   let hasMasuk=false,hasPulang=false;
-  todaySnap.forEach(d=>{if(d.data().tipe==='masuk')hasMasuk=true;if(d.data().tipe==='pulang')hasPulang=true;});
+  const todayDate=todayStr();
+  todaySnap.forEach(d=>{const data=d.data();if(data.tanggal===todayDate){if(data.tipe==='masuk')hasMasuk=true;if(data.tipe==='pulang')hasPulang=true;}});
   if(!hasMasuk){
     await doClockIn();
   }else if(!hasPulang){
@@ -462,9 +464,10 @@ async function autoDetectAndReady(){
     try{
       const locStatus=await getNearestOfficeLocation(currentGPS.lat,currentGPS.lng);
       if(locStatus.allowed){
-        const todaySnap=await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).get();
+        const todaySnap=await db.collection('hrd_absensi').where('userId','==',currentUser.id).get();
         let hasMasuk=false,hasPulang=false;
-        todaySnap.forEach(d=>{if(d.data().tipe==='masuk')hasMasuk=true;if(d.data().tipe==='pulang')hasPulang=true;});
+        const todayDate=todayStr();
+        todaySnap.forEach(d=>{const data=d.data();if(data.tanggal===todayDate){if(data.tipe==='masuk')hasMasuk=true;if(data.tipe==='pulang')hasPulang=true;}});
         if(!hasMasuk){
           btn.textContent='⏰ ABSEN MASUK (Selfie + GPS)';btn.style.background='var(--success)';btn.disabled=false;
           if(autoEl)autoEl.innerHTML='<span class="badge badge-success">✅ Foto & lokasi siap — Klik untuk Clock In</span>';
@@ -553,8 +556,11 @@ async function doClockIn() {
 
   const locationStatus = await getNearestOfficeLocation(currentGPS.lat, currentGPS.lng);
   if (!locationStatus.allowed) return toast(`Lokasi di luar radius "${locationStatus.nearest.nama}". Absen hanya boleh dari lokasi kantor terdaftar.`,'warning');
-  const existing=await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).where('tipe','==','masuk').get();
-  if(!existing.empty)return toast('Sudah clock in hari ini','warning');
+  const existing=await db.collection('hrd_absensi').where('userId','==',currentUser.id).get();
+  let alreadyClockedIn=false;
+  const todayDate2=todayStr();
+  existing.forEach(d=>{const data=d.data();if(data.tanggal===todayDate2&&data.tipe==='masuk')alreadyClockedIn=true;});
+  if(alreadyClockedIn)return toast('Sudah clock in hari ini','warning');
   const now=new Date();
 
   // Check flex time settings
@@ -606,8 +612,11 @@ async function doClockOut() {
   if(!currentGPS)return toast('Deteksi lokasi GPS dulu','warning');
   const locationStatus = await getNearestOfficeLocation(currentGPS.lat, currentGPS.lng);
   if (!locationStatus.allowed) return toast(`Lokasi di luar radius "${locationStatus.nearest.nama}". Absen hanya boleh dari lokasi kantor terdaftar.`,'warning');
-  const existing=await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).where('tipe','==','pulang').get();
-  if(!existing.empty)return toast('Sudah clock out hari ini','warning');
+  const existing=await db.collection('hrd_absensi').where('userId','==',currentUser.id).get();
+  let alreadyClockedOut=false;
+  const todayDate2=todayStr();
+  existing.forEach(d=>{const data=d.data();if(data.tanggal===todayDate2&&data.tipe==='pulang')alreadyClockedOut=true;});
+  if(alreadyClockedOut)return toast('Sudah clock out hari ini','warning');
   const now=new Date();
 
   // Check flex time settings
@@ -622,24 +631,28 @@ async function doClockOut() {
   let coreHoursViolation = false;
 
   if (flex.enabled) {
-    // Get today's clock-in record
-    const clockInSnap = await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).where('tipe','==','masuk').get();
-    if (clockInSnap.empty) return toast('Belum clock in hari ini', 'warning');
-    const clockInData = clockInSnap.docs[0].data();
+    // Get today's records for this user (single query, client-side filter)
+    const todayRecordsSnap = await db.collection('hrd_absensi').where('userId','==',currentUser.id).get();
+    const todayDate = todayStr();
+    let clockInData = null;
+    const breakStarts = [];
+    const breakEnds = [];
+    todayRecordsSnap.forEach(d => {
+      const p = d.data();
+      if (p.tanggal !== todayDate) return;
+      if (p.tipe === 'masuk' && !clockInData) clockInData = p;
+      if (p.tipe === 'istirahat_mulai') breakStarts.push(p);
+      if (p.tipe === 'istirahat_selesai') breakEnds.push(p);
+    });
+    if (!clockInData) return toast('Belum clock in hari ini', 'warning');
     const [ciH, ciM] = clockInData.waktu.split(':').map(Number);
     const clockInMinutes = ciH * 60 + ciM;
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
     const totalMinutesPresent = nowMinutes - clockInMinutes;
 
     // Calculate actual break duration from break records
-    const breakStartSnap = await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).where('tipe','==','istirahat_mulai').get();
-    const breakEndSnap = await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).where('tipe','==','istirahat_selesai').get();
     let actualBreakMinutes = 0;
-    if (!breakStartSnap.empty && !breakEndSnap.empty) {
-      const breakStarts = [];
-      breakStartSnap.forEach(d => breakStarts.push(d.data()));
-      const breakEnds = [];
-      breakEndSnap.forEach(d => breakEnds.push(d.data()));
+    if (breakStarts.length && breakEnds.length) {
       for (let i = 0; i < Math.min(breakStarts.length, breakEnds.length); i++) {
         const [bsH, bsM] = breakStarts[i].waktu.split(':').map(Number);
         const [beH, beM] = breakEnds[i].waktu.split(':').map(Number);
@@ -705,9 +718,9 @@ async function doClockOut() {
   capturedPhoto=null;currentGPS=null;loadTodayHistory();checkTodayStatus();loadBreakStatus();loadWeeklyAccumulation();
 }
 
-async function checkTodayStatus(){const snap=await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).get();let masuk=false,pulang=false;snap.forEach(d=>{if(d.data().tipe==='masuk')masuk=true;if(d.data().tipe==='pulang')pulang=true;});const el=document.getElementById('clockStatus');if(el){if(masuk&&pulang)el.innerHTML='<div class="badge badge-success" style="font-size:.9rem;padding:8px 16px">✅ Sudah In & Out</div>';else if(masuk)el.innerHTML='<div class="badge badge-info" style="font-size:.9rem;padding:8px 16px">⏰ Sudah In, belum Out</div>';else el.innerHTML='<div class="badge badge-warning" style="font-size:.9rem;padding:8px 16px">⚠️ Belum absen</div>';}}
+async function checkTodayStatus(){const snap=await db.collection('hrd_absensi').where('userId','==',currentUser.id).get();const todayDate=todayStr();let masuk=false,pulang=false;snap.forEach(d=>{const data=d.data();if(data.tanggal===todayDate){if(data.tipe==='masuk')masuk=true;if(data.tipe==='pulang')pulang=true;}});const el=document.getElementById('clockStatus');if(el){if(masuk&&pulang)el.innerHTML='<div class="badge badge-success" style="font-size:.9rem;padding:8px 16px">✅ Sudah In & Out</div>';else if(masuk)el.innerHTML='<div class="badge badge-info" style="font-size:.9rem;padding:8px 16px">⏰ Sudah In, belum Out</div>';else el.innerHTML='<div class="badge badge-warning" style="font-size:.9rem;padding:8px 16px">⚠️ Belum absen</div>';}}
 
-async function loadTodayHistory(){const snap=await (!hasAccess(3)?db.collection('hrd_absensi').where('tanggal','==',todayStr()).where('userId','==',currentUser.id).get():db.collection('hrd_absensi').where('tanggal','==',todayStr()).get());let h='';if(snap.empty)h='<p class="text-sm" style="color:#999">Belum ada absensi hari ini</p>';else snap.forEach(d=>{const p=d.data();const tipeLabel=p.tipe==='masuk'?'Clock In':p.tipe==='pulang'?'Clock Out':p.tipe==='dinas_luar'?'Dinas Luar':p.tipe==='istirahat_mulai'?'Mulai Istirahat':p.tipe==='istirahat_selesai'?'Selesai Istirahat':p.tipe;const badgeColor=p.tipe==='masuk'?'success':p.tipe==='pulang'?'info':p.tipe==='istirahat_mulai'?'warning':p.tipe==='istirahat_selesai'?'info':'warning';let lemburBadge='';if(p.lembur&&p.lemburJam)lemburBadge=` <span class="badge" style="background:#f3e5f5;color:#7b1fa2">Lembur ${p.lemburJam} jam</span>`;let coreViolBadge='';if(p.coreHoursViolation)coreViolBadge=' <span class="badge badge-warning">⚠️ Core Hours</span>';h+=`<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">${p.foto?`<img src="${p.foto}" style="width:36px;height:36px;border-radius:50%;object-fit:cover">`:'<div style="width:36px;height:36px;border-radius:50%;background:#eee;display:flex;align-items:center;justify-content:center">👤</div>'}<div style="flex:1"><div class="fw-700 text-sm">${escHtml(p.nama)} ${p.tipe==='dinas_luar'?'<span class="badge badge-info">Dinas Luar</span>':''}${lemburBadge}${coreViolBadge}</div><div class="text-xs" style="color:#999">${tipeLabel} — ${p.waktu}</div></div><span class="badge badge-${badgeColor}">${p.status||p.tipe}</span></div>`;});const el=document.getElementById('todayHistory');if(el)el.innerHTML=h;}
+async function loadTodayHistory(){const todayDate=todayStr();const snap=await db.collection('hrd_absensi').get();let h='';let found=false;snap.forEach(d=>{const p=d.data();if(p.tanggal!==todayDate)return;if(!hasAccess(3)&&p.userId!==currentUser.id)return;found=true;const tipeLabel=p.tipe==='masuk'?'Clock In':p.tipe==='pulang'?'Clock Out':p.tipe==='dinas_luar'?'Dinas Luar':p.tipe==='istirahat_mulai'?'Mulai Istirahat':p.tipe==='istirahat_selesai'?'Selesai Istirahat':p.tipe;const badgeColor=p.tipe==='masuk'?'success':p.tipe==='pulang'?'info':p.tipe==='istirahat_mulai'?'warning':p.tipe==='istirahat_selesai'?'info':'warning';let lemburBadge='';if(p.lembur&&p.lemburJam)lemburBadge=` <span class="badge" style="background:#f3e5f5;color:#7b1fa2">Lembur ${p.lemburJam} jam</span>`;let coreViolBadge='';if(p.coreHoursViolation)coreViolBadge=' <span class="badge badge-warning">⚠️ Core Hours</span>';h+=`<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">${p.foto?`<img src="${p.foto}" style="width:36px;height:36px;border-radius:50%;object-fit:cover">`:'<div style="width:36px;height:36px;border-radius:50%;background:#eee;display:flex;align-items:center;justify-content:center">👤</div>'}<div style="flex:1"><div class="fw-700 text-sm">${escHtml(p.nama)} ${p.tipe==='dinas_luar'?'<span class="badge badge-info">Dinas Luar</span>':''}${lemburBadge}${coreViolBadge}</div><div class="text-xs" style="color:#999">${tipeLabel} — ${p.waktu}</div></div><span class="badge badge-${badgeColor}">${p.status||p.tipe}</span></div>`;});if(!found)h='<p class="text-sm" style="color:#999">Belum ada absensi hari ini</p>';const el=document.getElementById('todayHistory');if(el)el.innerHTML=h;}
 
 // ── BREAK TRACKING ────────────────────────────────────────────
 
@@ -716,26 +729,34 @@ async function loadBreakStatus() {
   const breakStatusEl = document.getElementById('breakStatus');
   if (!breakActionsEl || !breakStatusEl) return;
 
-  // Check if clocked in today
-  const masukSnap = await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).where('tipe','==','masuk').get();
-  const pulangSnap = await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).where('tipe','==','pulang').get();
+  // Check if clocked in today (single query + client-side filter)
+  const todayRecords = await db.collection('hrd_absensi').where('userId','==',currentUser.id).get();
+  const todayDate = todayStr();
+  let hasMasuk = false, hasPulang = false;
+  const breakStartsList = [];
+  const breakEndsList = [];
+  todayRecords.forEach(d => {
+    const data = d.data();
+    if (data.tanggal !== todayDate) return;
+    if (data.tipe === 'masuk') hasMasuk = true;
+    if (data.tipe === 'pulang') hasPulang = true;
+    if (data.tipe === 'istirahat_mulai') breakStartsList.push(data);
+    if (data.tipe === 'istirahat_selesai') breakEndsList.push(data);
+  });
 
-  if (masukSnap.empty || !pulangSnap.empty) {
+  if (!hasMasuk || hasPulang) {
     breakActionsEl.innerHTML = '';
     breakStatusEl.innerHTML = '';
     return;
   }
 
   // Check break status
-  const breakStartSnap = await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).where('tipe','==','istirahat_mulai').get();
-  const breakEndSnap = await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).where('tipe','==','istirahat_selesai').get();
-
-  const startCount = breakStartSnap.size;
-  const endCount = breakEndSnap.size;
+  const startCount = breakStartsList.length;
+  const endCount = breakEndsList.length;
   const isOnBreak = startCount > endCount;
 
   if (isOnBreak) {
-    const lastBreakStart = breakStartSnap.docs[breakStartSnap.size - 1].data();
+    const lastBreakStart = breakStartsList[breakStartsList.length - 1];
     breakActionsEl.innerHTML = `<button class="btn btn-info btn-sm" onclick="doEndBreak()">🔙 Selesai Istirahat</button>`;
     breakStatusEl.innerHTML = `<div class="text-xs" style="background:#fff3e0;padding:6px 10px;border-radius:6px">☕ Sedang istirahat sejak ${lastBreakStart.waktu}</div>`;
   } else {
@@ -743,8 +764,8 @@ async function loadBreakStatus() {
     if (endCount > 0) {
       // Calculate total break time
       let totalBreakMin = 0;
-      const starts = []; breakStartSnap.forEach(d => starts.push(d.data()));
-      const ends = []; breakEndSnap.forEach(d => ends.push(d.data()));
+      const starts = breakStartsList;
+      const ends = breakEndsList;
       for (let i = 0; i < Math.min(starts.length, ends.length); i++) {
         const [bsH, bsM] = starts[i].waktu.split(':').map(Number);
         const [beH, beM] = ends[i].waktu.split(':').map(Number);
@@ -796,11 +817,11 @@ async function loadWeeklyAccumulation() {
   const target = flex.weeklyTarget || 40;
   const { start, end } = getWeekDates();
 
-  const snap = await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','>=',start).where('tanggal','<=',end).where('tipe','==','pulang').get();
+  const snap = await db.collection('hrd_absensi').where('userId','==',currentUser.id).get();
   let totalHours = 0;
   snap.forEach(d => {
     const p = d.data();
-    if (p.jamKerjaActual) totalHours += p.jamKerjaActual;
+    if (p.tanggal>=start && p.tanggal<=end && p.tipe==='pulang' && p.jamKerjaActual) totalHours += p.jamKerjaActual;
   });
 
   const pct = Math.min(100, (totalHours / target) * 100);
@@ -839,10 +860,12 @@ async function loadCoreHoursStatus() {
   const flex = sett.flexTime || {};
   if (!flex.coreHoursEnabled) { el.innerHTML = ''; return; }
 
-  const masukSnap = await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).where('tipe','==','masuk').get();
-  if (masukSnap.empty) { el.innerHTML = ''; return; }
+  const masukSnap = await db.collection('hrd_absensi').where('userId','==',currentUser.id).get();
+  const todayDate = todayStr();
+  let clockInData = null;
+  masukSnap.forEach(d => { const data = d.data(); if (data.tanggal === todayDate && data.tipe === 'masuk' && !clockInData) clockInData = data; });
+  if (!clockInData) { el.innerHTML = ''; return; }
 
-  const clockInData = masukSnap.docs[0].data();
   if (clockInData.coreHoursViolation) {
     el.innerHTML = `<div class="text-xs" style="background:#fff3e0;padding:6px 10px;border-radius:6px;color:#e65100">⚠️ Melewati core hours (${flex.coreHoursStart})</div>`;
   } else {

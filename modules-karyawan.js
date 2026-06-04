@@ -37,9 +37,10 @@ async function renderDashboard() {
   document.getElementById('dashWidgets').innerHTML=widgetLeft+widgetRight;
   // Load Daily Task summary for dashboard
   try{
-    const dtSnap=await db.collection('hrd_daily_tasks').where('tanggal','==',todayStr()).where('userId','==',currentUser.id).get();
+    const dtSnap=await db.collection('hrd_daily_tasks').get();
     let totalTask=0,doneTask=0;
-    dtSnap.forEach(d=>{totalTask++;if(d.data().done)doneTask++;});
+    const todayDate=todayStr();
+    dtSnap.forEach(d=>{const data=d.data();if(data.userId===currentUser.id&&data.tanggal===todayDate){totalTask++;if(data.done)doneTask++;}});
     const pendingTask=totalTask-doneTask;
     let dtWidget='<div class="card" style="border-left:4px solid #0d47a1"><div class="card-title mb-8">📋 Daily Task Hari Ini</div>';
     dtWidget+=`<div style="display:flex;gap:16px;margin:8px 0"><div style="text-align:center"><div class="fw-700" style="font-size:1.3rem;color:#0d47a1">${totalTask}</div><div class="text-xs" style="color:#666">Total</div></div><div style="text-align:center"><div class="fw-700" style="font-size:1.3rem;color:#2e7d32">${doneTask}</div><div class="text-xs" style="color:#666">Selesai</div></div><div style="text-align:center"><div class="fw-700" style="font-size:1.3rem;color:#e65100">${pendingTask}</div><div class="text-xs" style="color:#666">Pending</div></div></div>`;

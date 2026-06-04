@@ -1059,8 +1059,8 @@ async function loadUangMukaForReimburse(){
   const noSPPD=sel.options[sel.selectedIndex]?.getAttribute('data-nosppd')||'';
   const el=document.getElementById('rdUangMukaInfo');
   if(!sppdId){el.innerHTML='';return;}
-  const umSnap=await db.collection('hrd_uang_muka_dinas').where('noSPPD','==',noSPPD).where('status','==','dicairkan').get();
-  let totalUM=0;umSnap.forEach(d=>totalUM+=d.data().jumlah||0);
+  const umSnap=await db.collection('hrd_uang_muka_dinas').where('noSPPD','==',noSPPD).get();
+  let totalUM=0;umSnap.forEach(d=>{const data=d.data();if(data.status==='dicairkan')totalUM+=data.jumlah||0;});
   el.innerHTML=`<div class="text-sm" style="background:#e8f5e9;padding:8px 12px;border-radius:6px">💰 Uang Muka Dicairkan: <b>${formatCurrency(totalUM)}</b></div>`;
   window._rdUangMuka=totalUM;
 }
