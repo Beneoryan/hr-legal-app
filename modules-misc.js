@@ -347,49 +347,325 @@ async function renderApprovalCenter(){
   document.getElementById('approvalList').innerHTML=h;
 }
 
-function viewApprovalDetail(col,id){
-  db.collection(col).doc(id).get().then(d=>{
-    const p=d.data();const type=col.replace('hrd_','').replace('_',' ').toUpperCase();
-    let html=`<div class="modal-title">📋 Detail Pengajuan — ${type}</div>`;
-    html+=`<div style="background:#f8f9ff;padding:16px;border-radius:8px;margin-bottom:16px">`;
-    html+=`<div class="grid-2" style="gap:12px">`;
-    html+=`<div><b>Nama:</b> ${escHtml(p.nama||'-')}</div>`;
-    html+=`<div><b>Status:</b> <span class="badge badge-${p.status==='approved'?'success':p.status==='rejected'?'danger':'warning'}">${p.status||'pending'}</span></div>`;
-    html+=`<div><b>Tanggal Ajuan:</b> ${formatDateTime(p.createdAt)}</div>`;
-    if(p.departemen)html+=`<div><b>Departemen:</b> ${escHtml(p.departemen)}</div>`;
-    if(p.userId)html+=`<div><b>User ID:</b> ${escHtml(p.userId)}</div>`;
-    if(p.jenis)html+=`<div><b>Jenis:</b> ${escHtml(p.jenis)}</div>`;
-    if(p.kategori)html+=`<div><b>Kategori:</b> ${escHtml(p.kategori)}</div>`;
-    if(p.tanggal)html+=`<div><b>Tanggal Pelaksanaan:</b> ${formatDate(p.tanggal)}</div>`;
-    if(p.mulai)html+=`<div><b>Mulai:</b> ${formatDate(p.mulai)}</div>`;
-    if(p.selesai)html+=`<div><b>Selesai:</b> ${formatDate(p.selesai)}</div>`;
-    if(p.durasi)html+=`<div><b>Durasi:</b> ${p.durasi} hari</div>`;
-    if(p.jamMulai)html+=`<div><b>Jam Mulai:</b> ${p.jamMulai}</div>`;
-    if(p.jamSelesai)html+=`<div><b>Jam Selesai:</b> ${p.jamSelesai}</div>`;
-    if(p.jumlah)html+=`<div><b>Jumlah:</b> ${formatCurrency(p.jumlah)}</div>`;
-    if(p.cicilan)html+=`<div><b>Cicilan:</b> ${p.cicilan}x</div>`;
-    if(p.tujuan)html+=`<div><b>Tujuan / Lokasi:</b> ${escHtml(p.tujuan)}</div>`;
-    if(p.jamBerangkat)html+=`<div><b>Jam Berangkat:</b> ${p.jamBerangkat}</div>`;
-    if(p.jamKembali)html+=`<div><b>Estimasi Kembali:</b> ${p.jamKembali}</div>`;
-    if(p.approvalStep!==undefined)html+=`<div><b>Step Approval:</b> Step ${p.approvalStep+1}</div>`;
-    if(p.lastApprovedBy)html+=`<div><b>Terakhir disetujui:</b> ${escHtml(p.lastApprovedBy)}</div>`;
-    if(p.approvedBy)html+=`<div><b>Disetujui oleh:</b> ${escHtml(p.approvedBy)}</div>`;
-    html+=`</div></div>`;
-    if(p.keperluan)html+=`<div class="mb-16"><div class="fw-700 mb-4">📝 Keperluan:</div><div style="background:#fff;padding:12px;border-radius:6px;border:1px solid var(--border);white-space:pre-wrap;font-size:.85rem">${escHtml(p.keperluan)}</div></div>`;
-    if(p.keterangan)html+=`<div class="mb-16"><div class="fw-700 mb-4">📝 Keterangan:</div><div style="background:#fff;padding:12px;border-radius:6px;border:1px solid var(--border);white-space:pre-wrap;font-size:.85rem">${escHtml(p.keterangan)}</div></div>`;
-    if(p.alasan)html+=`<div class="mb-16"><div class="fw-700 mb-4">📝 Alasan:</div><div style="background:#fff;padding:12px;border-radius:6px;border:1px solid var(--border);font-size:.85rem">${escHtml(p.alasan)}</div></div>`;
-    if(p.approvalHistory&&p.approvalHistory.length){html+=`<div class="mb-16"><div class="fw-700 mb-8">📋 Riwayat Approval:</div>`;p.approvalHistory.forEach(h2=>{html+=`<div style="padding:6px 10px;margin-bottom:4px;border-radius:6px;font-size:.82rem;background:${h2.action==='approved'?'#e8f5e9':'#ffebee'}"><span class="fw-700">${h2.action==='approved'?'✅':'❌'} ${escHtml(h2.nama)}</span> <span style="color:#666">(${escHtml(h2.role||'')})</span> — <span style="color:#999">${formatDateTime(h2.at)}</span></div>`;});html+=`</div>`;}
-    html+=`<div class="flex gap-8 mt-16"><button class="btn btn-success" onclick="approveItem('${col}','${id}','approved')">✅ Approve</button><button class="btn btn-danger" onclick="approveItem('${col}','${id}','rejected')">❌ Reject</button></div>`;
-    openModal(html,true);
-  });
+// ── APPROVAL DETAIL HELPERS ────────────────────────────────────
+function _buildEmployeeProfile(karyawan,p){
+  let h='<div style="border-left:4px solid var(--accent);background:#f8f9ff;padding:14px 16px;border-radius:0 8px 8px 0;margin-bottom:16px">';
+  h+='<div class="fw-700 mb-8" style="font-size:.9rem">👤 Profil Karyawan</div>';
+  h+='<div class="grid-2" style="gap:8px;font-size:.85rem">';
+  h+=`<div><b>Nama:</b> ${escHtml(p.nama||'-')}</div>`;
+  if(karyawan){
+    h+=`<div><b>Departemen:</b> ${escHtml(karyawan.departemen||'-')}</div>`;
+    h+=`<div><b>Posisi:</b> ${escHtml(karyawan.posisi||'-')}</div>`;
+    h+=`<div><b>Grade:</b> ${escHtml(karyawan.gradeJabatan||karyawan.grade||'-')}</div>`;
+    h+=`<div><b>Masa Kerja:</b> ${hitungMasaKerja(karyawan.tanggalMasuk)}</div>`;
+    h+=`<div><b>NIP:</b> ${escHtml(karyawan.nip||karyawan.id||'-')}</div>`;
+  }else{
+    if(p.departemen)h+=`<div><b>Departemen:</b> ${escHtml(p.departemen)}</div>`;
+    h+=`<div><b>Data karyawan:</b> <span style="color:#999">Tidak ditemukan</span></div>`;
+  }
+  h+='</div></div>';
+  return h;
 }
 
-async function approveItem(col,id,status){
+async function _buildCutiDetail(p,karyawan){
+  let h='<div style="background:#fff;padding:14px;border-radius:8px;border:1px solid var(--border);margin-bottom:16px">';
+  h+='<div class="fw-700 mb-8" style="font-size:.88rem">🏖️ Detail Cuti/Izin</div>';
+  h+='<div class="grid-2" style="gap:8px;font-size:.85rem">';
+  h+=`<div><b>Jenis:</b> ${escHtml(p.jenis||'-')}</div>`;
+  h+=`<div><b>Durasi:</b> ${p.durasi||'-'} hari</div>`;
+  h+=`<div><b>Mulai:</b> ${formatDate(p.mulai)}</div>`;
+  h+=`<div><b>Selesai:</b> ${formatDate(p.selesai)}</div>`;
+  if(p.keterangan)h+=`<div style="grid-column:1/-1"><b>Keterangan:</b> ${escHtml(p.keterangan)}</div>`;
+  h+='</div>';
+  // Leave quota calculation
+  if(karyawan&&(p.jenis||'').toLowerCase().includes('cuti tahunan')){
+    try{
+      const jatah=hitungJatahCuti(karyawan);
+      const cutiSnap=await db.collection('hrd_cuti').where('nama','==',p.nama).where('jenis','==','Cuti Tahunan').where('status','==','approved').get();
+      let terpakai=0;cutiSnap.forEach(d=>{terpakai+=(d.data().durasi||0);});
+      const sisa=Math.max(0,jatah-terpakai);
+      h+='<div style="margin-top:12px;padding:10px;background:#f0f7ff;border-radius:6px;font-size:.83rem">';
+      h+=`<div class="fw-700 mb-4">📊 Sisa Jatah Cuti Tahunan</div>`;
+      h+=`<div>Jatah: <b>${jatah}</b> hari | Terpakai: <b>${terpakai}</b> hari | Sisa: <b style="color:${sisa<=2?'#d32f2f':'#2e7d32'}">${sisa}</b> hari</div>`;
+      if(sisa<(p.durasi||0))h+=`<div style="color:#d32f2f;margin-top:4px;font-weight:700">⚠️ Pengajuan melebihi sisa cuti!</div>`;
+      h+='</div>';
+    }catch(e){console.warn('Error loading cuti quota:',e);}
+  }
+  // Holiday overlap check
+  try{
+    if(p.mulai&&p.selesai){
+      const hSnap=await db.collection('hrd_hari_libur').get();
+      const holidays=[];hSnap.forEach(d=>{const hd=d.data();if(hd.tanggal)holidays.push(hd);});
+      const start=new Date(p.mulai),end=new Date(p.selesai);
+      const overlaps=holidays.filter(hl=>{const ht=new Date(hl.tanggal);return ht>=start&&ht<=end;});
+      if(overlaps.length){
+        h+='<div style="margin-top:8px;padding:8px;background:#fff3e0;border-radius:6px;font-size:.82rem">';
+        h+=`<div class="fw-700">📅 Tanggal bertepatan hari libur (${overlaps.length}):</div>`;
+        overlaps.forEach(ol=>{h+=`<div>• ${formatDate(ol.tanggal)} - ${escHtml(ol.nama||ol.keterangan||'')}</div>`;});
+        h+='</div>';
+      }
+    }
+  }catch(e){console.warn('Error checking holidays:',e);}
+  h+='</div>';
+  return h;
+}
+
+async function _buildOvertimeDetail(p,karyawan){
+  let h='<div style="background:#fff;padding:14px;border-radius:8px;border:1px solid var(--border);margin-bottom:16px">';
+  h+='<div class="fw-700 mb-8" style="font-size:.88rem">⏰ Detail Lembur</div>';
+  h+='<div class="grid-2" style="gap:8px;font-size:.85rem">';
+  h+=`<div><b>Tanggal:</b> ${formatDate(p.tanggal)}</div>`;
+  h+=`<div><b>Durasi:</b> ${p.durasi||'-'} jam</div>`;
+  h+=`<div><b>Jam Mulai:</b> ${p.jamMulai||'-'}</div>`;
+  h+=`<div><b>Jam Selesai:</b> ${p.jamSelesai||'-'}</div>`;
+  if(p.alasan)h+=`<div style="grid-column:1/-1"><b>Alasan:</b> ${escHtml(p.alasan)}</div>`;
+  h+='</div>';
+  // Monthly overtime total
+  try{
+    const tgl=p.tanggal||'';
+    const monthPrefix=tgl.substring(0,7);// YYYY-MM
+    if(monthPrefix&&p.nama){
+      const otSnap=await db.collection('hrd_overtime').where('nama','==',p.nama).where('status','==','approved').get();
+      let totalJam=0;otSnap.forEach(d=>{const od=d.data();if((od.tanggal||'').startsWith(monthPrefix))totalJam+=(parseFloat(od.durasi)||0);});
+      h+='<div style="margin-top:12px;padding:10px;background:#f0f7ff;border-radius:6px;font-size:.83rem">';
+      h+=`<div class="fw-700 mb-4">📊 Total Lembur Bulan Ini (Approved)</div>`;
+      h+=`<div>Total: <b>${totalJam}</b> jam</div>`;
+      h+='</div>';
+    }
+  }catch(e){console.warn('Error loading monthly OT:',e);}
+  // Estimated overtime pay
+  if(karyawan&&karyawan.gajiPokok){
+    const gaji=parseFloat(karyawan.gajiPokok)||0;
+    const hariKerja=22;
+    const gajiPerJam=gaji/(hariKerja*8);
+    const durasi=parseFloat(p.durasi)||0;
+    let lemburNominal=0;
+    if(durasi>0){lemburNominal+=gajiPerJam*1.5;if(durasi>1)lemburNominal+=gajiPerJam*2*(durasi-1);}
+    h+='<div style="margin-top:8px;padding:10px;background:#e8f5e9;border-radius:6px;font-size:.83rem">';
+    h+=`<div class="fw-700 mb-4">💰 Estimasi Upah Lembur</div>`;
+    h+=`<div>Gaji/jam: ${formatCurrency(Math.round(gajiPerJam))} | 1 jam pertama: 1.5x | Jam berikutnya: 2x</div>`;
+    h+=`<div class="fw-700" style="margin-top:4px">Estimasi: ${formatCurrency(Math.round(lemburNominal))}</div>`;
+    h+='</div>';
+  }
+  h+='</div>';
+  return h;
+}
+
+async function _buildDinasDetail(p,karyawan){
+  let h='<div style="background:#fff;padding:14px;border-radius:8px;border:1px solid var(--border);margin-bottom:16px">';
+  h+='<div class="fw-700 mb-8" style="font-size:.88rem">✈️ Detail Perjalanan Dinas</div>';
+  h+='<div class="grid-2" style="gap:8px;font-size:.85rem">';
+  const tglMulai=p.tanggalMulai||p.tanggal||'';
+  const tglSelesai=p.tanggalSelesai||p.tanggal||'';
+  h+=`<div><b>Tanggal:</b> ${formatDate(tglMulai)}${tglSelesai&&tglSelesai!==tglMulai?' s/d '+formatDate(tglSelesai):''}</div>`;
+  h+=`<div><b>Tujuan:</b> ${escHtml(p.tujuan||'-')}</div>`;
+  if(p.keperluan)h+=`<div style="grid-column:1/-1"><b>Keperluan:</b> ${escHtml(p.keperluan)}</div>`;
+  const grade=p.gradeJabatan||(karyawan&&(karyawan.gradeJabatan||karyawan.grade))||'';
+  h+=`<div><b>Grade:</b> ${escHtml(grade||'-')}</div>`;
+  // Duration
+  if(tglMulai&&tglSelesai){
+    const dur=Math.max(1,Math.ceil((new Date(tglSelesai)-new Date(tglMulai))/86400000)+1);
+    h+=`<div><b>Durasi:</b> ${dur} hari</div>`;
+  }
+  h+='</div>';
+  // Grade-based benefit entitlement
+  try{
+    const gradeConfig=await getGradeConfig(grade);
+    if(gradeConfig){
+      h+='<div style="margin-top:12px;padding:10px;background:#f0f7ff;border-radius:6px;font-size:.83rem">';
+      h+=`<div class="fw-700 mb-4">📋 Hak Benefit (${escHtml(gradeConfig.label||resolveGradeKey(grade))})</div>`;
+      h+='<div class="grid-2" style="gap:6px">';
+      h+=`<div>Uang Harian: ${formatCurrency(gradeConfig.uangHarian||0)}</div>`;
+      h+=`<div>Max Transport: ${formatCurrency(gradeConfig.maxTransport||0)}</div>`;
+      h+=`<div>Max Hotel: ${formatCurrency(gradeConfig.maxHotel||0)}</div>`;
+      h+=`<div>Max Makan: ${formatCurrency(gradeConfig.maxMakan||0)}</div>`;
+      h+='</div></div>';
+      // Cost comparison
+      const costs=[
+        {label:'Biaya Harian',submitted:parseFloat(p.biayaHarian)||0,max:gradeConfig.uangHarian||0},
+        {label:'Transport PP',submitted:parseFloat(p.biayaTransportPP)||0,max:gradeConfig.maxTransport||0},
+        {label:'Penginapan',submitted:parseFloat(p.biayaPenginapan)||0,max:gradeConfig.maxHotel||0},
+        {label:'Makan',submitted:parseFloat(p.biayaMakan)||0,max:gradeConfig.maxMakan||0}
+      ];
+      const hasAnyCost=costs.some(c=>c.submitted>0);
+      if(hasAnyCost){
+        h+='<div style="margin-top:8px;padding:10px;background:#fff;border-radius:6px;border:1px solid var(--border);font-size:.83rem">';
+        h+='<div class="fw-700 mb-4">💰 Perbandingan Biaya vs Limit</div>';
+        costs.forEach(c=>{
+          if(c.submitted>0||c.max>0){
+            const exceed=c.submitted>c.max;
+            h+=`<div style="margin-bottom:4px;${exceed?'color:#d32f2f;font-weight:700':''}">`;
+            h+=`${exceed?'⚠️ ':''}${c.label}: ${formatCurrency(c.submitted)} / ${formatCurrency(c.max)}`;
+            if(exceed)h+=' (MELEBIHI LIMIT)';
+            h+='</div>';
+          }
+        });
+        if(p.totalEstimasi)h+=`<div style="margin-top:6px;font-weight:700">Total Estimasi: ${formatCurrency(parseFloat(p.totalEstimasi)||0)}</div>`;
+        h+='</div>';
+      }
+    }
+  }catch(e){console.warn('Error loading grade config:',e);}
+  h+='</div>';
+  return h;
+}
+
+async function _buildReimbDetail(p){
+  let h='<div style="background:#fff;padding:14px;border-radius:8px;border:1px solid var(--border);margin-bottom:16px">';
+  h+='<div class="fw-700 mb-8" style="font-size:.88rem">🧾 Detail Reimbursement</div>';
+  h+='<div class="grid-2" style="gap:8px;font-size:.85rem">';
+  h+=`<div><b>Kategori:</b> ${escHtml(p.kategori||'-')}</div>`;
+  h+=`<div><b>Jumlah:</b> ${formatCurrency(parseFloat(p.jumlah)||0)}</div>`;
+  if(p.keterangan)h+=`<div style="grid-column:1/-1"><b>Keterangan:</b> ${escHtml(p.keterangan)}</div>`;
+  h+='</div>';
+  // Claim history
+  try{
+    if(p.nama){
+      const rSnap=await db.collection('hrd_reimbursement').where('nama','==',p.nama).where('status','==','approved').get();
+      let totalBulan=0,totalTahun=0;const now=new Date();const bulanIni=now.toISOString().substring(0,7);const tahunIni=now.getFullYear().toString();
+      const byCategory={};
+      rSnap.forEach(d=>{const rd=d.data();const amt=parseFloat(rd.jumlah)||0;const cr=rd.createdAt||'';if(cr.startsWith(bulanIni))totalBulan+=amt;if(cr.startsWith(tahunIni))totalTahun+=amt;const cat=rd.kategori||'Lainnya';byCategory[cat]=(byCategory[cat]||0)+amt;});
+      h+='<div style="margin-top:12px;padding:10px;background:#f0f7ff;border-radius:6px;font-size:.83rem">';
+      h+=`<div class="fw-700 mb-4">📊 Riwayat Klaim (Approved)</div>`;
+      h+=`<div>Bulan ini: <b>${formatCurrency(totalBulan)}</b> | Tahun ini: <b>${formatCurrency(totalTahun)}</b></div>`;
+      const cats=Object.keys(byCategory);
+      if(cats.length){
+        h+='<div style="margin-top:6px"><b>Per Kategori (tahun ini):</b></div>';
+        cats.forEach(cat=>{h+=`<div>• ${escHtml(cat)}: ${formatCurrency(byCategory[cat])}</div>`;});
+      }
+      h+='</div>';
+    }
+  }catch(e){console.warn('Error loading reimb history:',e);}
+  h+='</div>';
+  return h;
+}
+
+async function _buildKasbonDetail(p,karyawan){
+  let h='<div style="background:#fff;padding:14px;border-radius:8px;border:1px solid var(--border);margin-bottom:16px">';
+  h+='<div class="fw-700 mb-8" style="font-size:.88rem">💳 Detail Kasbon/Pinjaman</div>';
+  h+='<div class="grid-2" style="gap:8px;font-size:.85rem">';
+  h+=`<div><b>Jenis:</b> ${escHtml(p.jenis||'-')}</div>`;
+  h+=`<div><b>Jumlah:</b> ${formatCurrency(parseFloat(p.jumlah)||0)}</div>`;
+  h+=`<div><b>Cicilan:</b> ${p.cicilan||'-'}x</div>`;
+  if(p.angsuran)h+=`<div><b>Angsuran/bulan:</b> ${formatCurrency(parseFloat(p.angsuran)||0)}</div>`;
+  h+='</div>';
+  // Existing active loans
+  try{
+    if(p.nama){
+      const kSnap=await db.collection('hrd_kasbon').where('nama','==',p.nama).where('status','==','approved').get();
+      let totalOutstanding=0;let activeCount=0;
+      kSnap.forEach(d=>{const kd=d.data();const jumlah=parseFloat(kd.jumlah)||0;const sudahBayar=parseFloat(kd.sudahBayar)||0;const sisa=jumlah-sudahBayar;if(sisa>0){totalOutstanding+=sisa;activeCount++;}});
+      h+='<div style="margin-top:12px;padding:10px;background:#f0f7ff;border-radius:6px;font-size:.83rem">';
+      h+=`<div class="fw-700 mb-4">📊 Pinjaman Aktif</div>`;
+      h+=`<div>Jumlah pinjaman aktif: <b>${activeCount}</b> | Total sisa: <b>${formatCurrency(totalOutstanding)}</b></div>`;
+      // Loan-to-salary ratio
+      if(karyawan&&karyawan.gajiPokok){
+        const gaji=parseFloat(karyawan.gajiPokok)||0;
+        const pinjBaru=parseFloat(p.jumlah)||0;
+        const ratio=gaji>0?Math.round((pinjBaru/gaji)*100):0;
+        h+=`<div style="margin-top:6px">Rasio pinjaman/gaji: <b style="color:${ratio>50?'#d32f2f':'#2e7d32'}">${ratio}%</b>${ratio>50?' ⚠️ Melebihi 50%':''}</div>`;
+      }
+      h+='</div>';
+    }
+  }catch(e){console.warn('Error loading kasbon history:',e);}
+  h+='</div>';
+  return h;
+}
+
+function _buildGenericDetail(p){
+  let h='<div style="background:#fff;padding:14px;border-radius:8px;border:1px solid var(--border);margin-bottom:16px">';
+  h+='<div class="fw-700 mb-8" style="font-size:.88rem">📄 Detail Pengajuan</div>';
+  h+='<div class="grid-2" style="gap:8px;font-size:.85rem">';
+  if(p.jenis)h+=`<div><b>Jenis:</b> ${escHtml(p.jenis)}</div>`;
+  if(p.kategori)h+=`<div><b>Kategori:</b> ${escHtml(p.kategori)}</div>`;
+  if(p.tanggal)h+=`<div><b>Tanggal:</b> ${formatDate(p.tanggal)}</div>`;
+  if(p.mulai)h+=`<div><b>Mulai:</b> ${formatDate(p.mulai)}</div>`;
+  if(p.selesai)h+=`<div><b>Selesai:</b> ${formatDate(p.selesai)}</div>`;
+  if(p.durasi)h+=`<div><b>Durasi:</b> ${p.durasi}</div>`;
+  if(p.jumlah)h+=`<div><b>Jumlah:</b> ${formatCurrency(parseFloat(p.jumlah)||0)}</div>`;
+  if(p.tujuan)h+=`<div><b>Tujuan:</b> ${escHtml(p.tujuan)}</div>`;
+  if(p.keterangan)h+=`<div style="grid-column:1/-1"><b>Keterangan:</b> ${escHtml(p.keterangan)}</div>`;
+  if(p.alasan)h+=`<div style="grid-column:1/-1"><b>Alasan:</b> ${escHtml(p.alasan)}</div>`;
+  if(p.keperluan)h+=`<div style="grid-column:1/-1"><b>Keperluan:</b> ${escHtml(p.keperluan)}</div>`;
+  h+='</div></div>';
+  return h;
+}
+
+function _buildApprovalTimeline(p){
+  if(!p.approvalHistory||!p.approvalHistory.length)return '';
+  let h='<div style="margin-bottom:16px"><div class="fw-700 mb-8" style="font-size:.88rem">📋 Riwayat Approval</div>';
+  h+='<div style="padding-left:16px;border-left:2px solid #e0e0e0">';
+  p.approvalHistory.forEach(function(entry,i){
+    const isLast=i===p.approvalHistory.length-1;
+    const color=entry.action==='approved'?'#2e7d32':entry.action==='rejected'?'#d32f2f':'#ff9800';
+    h+=`<div style="position:relative;padding:8px 0 12px 16px;${isLast?'':'border-bottom:none'}">`;
+    h+=`<div style="position:absolute;left:-9px;top:12px;width:14px;height:14px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 0 0 2px ${color}"></div>`;
+    h+=`<div style="font-size:.83rem"><span class="fw-700" style="color:${color}">${entry.action==='approved'?'✅ Disetujui':'❌ Ditolak'}</span> oleh <b>${escHtml(entry.nama||'')}</b> <span style="color:#666">(${escHtml(entry.role||'')})</span></div>`;
+    h+=`<div style="font-size:.75rem;color:#999;margin-top:2px">${formatDateTime(entry.at)}</div>`;
+    if(entry.catatan)h+=`<div style="font-size:.8rem;color:#555;margin-top:4px;padding:4px 8px;background:#f5f5f5;border-radius:4px">💬 ${escHtml(entry.catatan)}</div>`;
+    h+='</div>';
+  });
+  h+='</div></div>';
+  return h;
+}
+
+function _buildApprovalActions(col,id){
+  let h='<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">';
+  h+='<div class="form-group"><label class="fw-700" style="font-size:.85rem">💬 Catatan (opsional)</label>';
+  h+='<textarea class="form-control" id="approvalCatatan" rows="2" placeholder="Tambahkan catatan untuk pemohon..." style="font-size:.85rem"></textarea></div>';
+  h+='<div class="flex gap-8 mt-8">';
+  h+=`<button class="btn btn-success" onclick="_doApprovalAction('${col}','${id}','approved')">✅ Approve</button>`;
+  h+=`<button class="btn btn-danger" onclick="_doApprovalAction('${col}','${id}','rejected')">❌ Reject</button>`;
+  h+='</div></div>';
+  return h;
+}
+
+function _doApprovalAction(col,id,status){
+  const el=document.getElementById('approvalCatatan');
+  const catatan=el?el.value.trim():'';
+  approveItem(col,id,status,catatan);
+}
+
+async function viewApprovalDetail(col,id){
+  try{
+    const d=await db.collection(col).doc(id).get();
+    const p=d.data();
+    const type=col.replace('hrd_','').replace('_',' ').toUpperCase();
+    // Fetch employee data
+    let karyawan=null;
+    try{
+      const kSnap=await db.collection('hrd_karyawan').where('nama','==',p.nama).limit(1).get();
+      if(!kSnap.empty){const kDoc=kSnap.docs[0];karyawan={id:kDoc.id,...kDoc.data()};}
+    }catch(e){console.warn('Error fetching karyawan:',e);}
+    let html=`<div class="modal-title">📋 Detail Pengajuan - ${type}</div>`;
+    html+=`<div style="max-height:70vh;overflow-y:auto;padding-right:4px">`;
+    // Employee profile
+    html+=_buildEmployeeProfile(karyawan,p);
+    // Status badge
+    html+=`<div style="margin-bottom:12px"><b>Status:</b> <span class="badge badge-${p.status==='approved'?'success':p.status==='rejected'?'danger':'warning'}">${escHtml(p.status||'pending')}</span> | <b>Diajukan:</b> ${formatDateTime(p.createdAt)}</div>`;
+    // Type-specific details
+    if(col==='hrd_cuti')html+=await _buildCutiDetail(p,karyawan);
+    else if(col==='hrd_overtime')html+=await _buildOvertimeDetail(p,karyawan);
+    else if(col==='hrd_dinas_luar')html+=await _buildDinasDetail(p,karyawan);
+    else if(col==='hrd_reimbursement')html+=await _buildReimbDetail(p);
+    else if(col==='hrd_kasbon')html+=await _buildKasbonDetail(p,karyawan);
+    else html+=_buildGenericDetail(p);
+    // Approval timeline
+    html+=_buildApprovalTimeline(p);
+    html+='</div>';
+    // Action buttons with catatan
+    html+=_buildApprovalActions(col,id);
+    openModal(html,true);
+  }catch(e){console.error('viewApprovalDetail error:',e);toast('Gagal memuat detail','error');}
+}
+
+async function approveItem(col,id,status,catatan){
   const doc=await db.collection(col).doc(id).get();
   const data=doc.data();
   const currentStep=data.approvalStep||0;
   const history=data.approvalHistory||[];
-  history.push({nama:currentUser.nama,role:currentUser.role,action:status,at:new Date().toISOString()});
+  const entry={nama:currentUser.nama,role:currentUser.role,action:status,at:new Date().toISOString()};
+  if(catatan)entry.catatan=catatan;
+  history.push(entry);
   if(status==='rejected'){
     await db.collection(col).doc(id).update({status:'rejected',approvedBy:currentUser.nama,approvedAt:new Date().toISOString(),approvalHistory:history});
     if(data.userId)await sendNotification(data.userId,'❌ Ditolak',`Pengajuan ${data.jenis||col.replace('hrd_','')} ditolak oleh ${currentUser.nama}`);
