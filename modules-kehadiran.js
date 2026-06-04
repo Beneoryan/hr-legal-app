@@ -236,38 +236,9 @@ async function loadHariLiburView() {
   const holidays = [];
   snap.forEach(d => holidays.push({ id: d.id, ...d.data() }));
 
-  // Load user reminders: try Firestore first, fallback to localStorage cache
+  // Load user reminders: replaced with Google Calendar integration
   window._hariLiburUserReminders = [];
-  try {
-    const reminderSnap = await db.collection('hrd_hari_libur_reminders').get();
-    reminderSnap.forEach(d => {const r=d.data();if(r.userId===currentUser.id)window._hariLiburUserReminders.push({id:d.id,...r});});
-    if(window._hariLiburUserReminders.length)localStorage.setItem('hrd_hl_reminders_cache_'+currentUser.id,JSON.stringify(window._hariLiburUserReminders));
-  } catch(e) {
-    console.warn('[HariLibur] Reminders Firestore failed, using cache:', e.message);
-    window._hariLiburUserReminders = JSON.parse(localStorage.getItem('hrd_hl_reminders_cache_'+currentUser.id)||'[]');
-  }
-  // Merge with localStorage cache (in case Firestore returned empty but cache has data)
-  if(!window._hariLiburUserReminders.length){
-    const cached=JSON.parse(localStorage.getItem('hrd_hl_reminders_cache_'+currentUser.id)||'[]');
-    if(cached.length)window._hariLiburUserReminders=cached;
-  }
-
-  // Load user notes: try Firestore first, fallback to localStorage cache
   window._hariLiburUserNotes = [];
-  try {
-    const noteSnap = await db.collection('hrd_hari_libur_notes').get();
-    noteSnap.forEach(d => {const n=d.data();if(n.userId===currentUser.id)window._hariLiburUserNotes.push({id:d.id,...n});});
-    if(window._hariLiburUserNotes.length)localStorage.setItem('hrd_hl_notes_cache_'+currentUser.id,JSON.stringify(window._hariLiburUserNotes));
-  } catch(e) {
-    console.warn('[HariLibur] Notes Firestore failed, using cache:', e.message);
-    window._hariLiburUserNotes = JSON.parse(localStorage.getItem('hrd_hl_notes_cache_'+currentUser.id)||'[]');
-  }
-  // Merge with localStorage cache
-  if(!window._hariLiburUserNotes.length){
-    const cached=JSON.parse(localStorage.getItem('hrd_hl_notes_cache_'+currentUser.id)||'[]');
-    if(cached.length)window._hariLiburUserNotes=cached;
-  }
-  console.log('[HariLibur] Loaded notes:', window._hariLiburUserNotes.length, 'reminders:', window._hariLiburUserReminders.length);
 
   const container = document.getElementById('hariLiburContent');
   if (!container) return;
@@ -347,11 +318,7 @@ function renderHariLiburCalendar(container, year, month, holidays) {
     html += `<div class="hl-cal-day">${day}</div>`;
     if (dayHolidays.length > 0) {
       html += `<div class="hl-cal-name">${escHtml(dayHolidays[0].nama)}</div>`;
-      const hasReminder = dayHolidays.some(dh=>(window._hariLiburUserReminders||[]).some(r=>r.holidayId===dh.id));
-      if(hasReminder) html += '<div style="position:absolute;top:2px;right:4px;font-size:.6rem">🔔</div>';
     }
-    const hasNote = (window._hariLiburUserNotes||[]).some(n=>n.tanggal===dateStr);
-    if(hasNote) html += '<div style="position:absolute;bottom:2px;right:4px;font-size:.55rem">📝</div>';
     html += '</div>';
   }
 
@@ -376,16 +343,14 @@ function renderHariLiburList(container, year, month, holidays) {
     holidays.forEach(h => {
       const tipeBadge = h.tipe === 'nasional' ? 'badge-danger' : h.tipe === 'cuti_bersama' ? 'badge-warning' : 'badge-info';
       const tipeLabel = h.tipe === 'nasional' ? 'Nasional' : h.tipe === 'cuti_bersama' ? 'Cuti Bersama' : 'Perusahaan';
-      const hasReminder = (window._hariLiburUserReminders||[]).some(r=>r.holidayId===h.id);
       html += `<tr>
         <td>${formatDate(h.tanggal)}</td>
         <td class="fw-700">${escHtml(h.nama)}</td>
         <td><span class="badge ${tipeBadge}">${tipeLabel}</span></td>
         <td class="text-sm">${escHtml(h.noted||h.catatan||'-')}</td>
         <td>
-          <button class="btn btn-xs btn-info" onclick="editHariLiburNoted('${h.id}')" title="Edit Catatan">✏️</button>
-          <button class="btn btn-xs btn-${hasReminder?'warning':'outline'}" onclick="setHariLiburReminder('${h.id}','${h.tanggal}','${escHtml(h.nama).replace(/'/g,"\\'")}')" title="Set Reminder">${hasReminder?'🔔':'🔕'}</button>
-          <button class="btn btn-xs btn-danger" onclick="hapusHariLibur('${h.id}')">🗑️</button>
+          <a href="https://calendar.google.com/calendar/render?action=TEMPLATE&dates=${h.tanggal.replace(/-/g,'')}/${h.tanggal.replace(/-/g,'')}&text=${encodeURIComponent(h.nama)}" target="_blank" class="btn btn-xs btn-info" title="Tambah ke Google Calendar">📅</a>
+          ${hasAccess(6)?'<button class="btn btn-xs btn-danger" onclick="hapusHariLibur(\''+h.id+'\')">🗑️</button>':''}
         </td>
       </tr>`;
     });
@@ -427,109 +392,20 @@ async function simpanHariLibur() {
   loadHariLiburView();
 }
 
-async function editHariLiburNoted(id) {
-  const doc = await db.collection('hrd_hari_libur').doc(id).get();
-  if (!doc.exists) return toast('Data tidak ditemukan', 'warning');
-  const p = doc.data();
-  openModal(`<div class="modal-title">Edit Catatan Hari Libur</div>
-    <div class="form-group"><label>Nama</label><input class="form-control" value="${escHtml(p.nama||'')}" disabled></div>
-    <div class="form-group"><label>Catatan</label><textarea class="form-control" id="hlNotedText" style="min-height:80px">${escHtml(p.noted||p.catatan||'')}</textarea></div>
-    <button class="btn btn-primary" onclick="simpanHariLiburNoted('${id}')">Simpan</button>`);
-}
 
-async function simpanHariLiburNoted(id) {
-  const noted = document.getElementById('hlNotedText').value;
-  await db.collection('hrd_hari_libur').doc(id).update({ noted });
-  closeModalDirect();
-  toast('Catatan disimpan', 'success');
-  loadHariLiburView();
-}
 
-function setHariLiburReminder(id, tanggal, nama) {
-  const existing = (window._hariLiburUserReminders||[]).find(r=>r.holidayId===id);
-  openModal(`<div class="modal-title">🔔 Set Reminder</div>
-    <p class="text-sm mb-16">Hari libur: <b>${nama}</b> (${formatDate(tanggal)})</p>
-    <div class="form-group"><label>Ingatkan</label>
-      <select class="form-control" id="hlReminderOpt" onchange="document.getElementById('hlReminderCustomWrap').style.display=this.value==='custom'?'block':'none'">
-        <option value="1">1 hari sebelumnya</option>
-        <option value="3">3 hari sebelumnya</option>
-        <option value="7">1 minggu sebelumnya</option>
-        <option value="custom">Tanggal custom</option>
-      </select>
-    </div>
-    <div class="form-group" id="hlReminderCustomWrap" style="display:none"><label>Tanggal Reminder</label><input class="form-control" type="date" id="hlReminderCustomDate"></div>
-    ${existing?'<p class="text-xs mb-8" style="color:var(--warning)">Reminder sudah ada. Simpan akan mengganti yang lama.</p>':''}
-    <div class="flex gap-8">
-      <button class="btn btn-primary" onclick="simpanHariLiburReminder('${id}','${tanggal}','${nama.replace(/'/g,"\\'")}')">Simpan</button>
-      ${existing?`<button class="btn btn-danger" onclick="hapusHariLiburReminder('${existing.id}')">Hapus Reminder</button>`:''}
-    </div>`);
-}
-
-async function simpanHariLiburReminder(holidayId, tanggal, holidayNama) {
-  const opt = document.getElementById('hlReminderOpt').value;
-  let reminderDate;
-  if (opt === 'custom') {
-    reminderDate = document.getElementById('hlReminderCustomDate').value;
-    if (!reminderDate) return toast('Pilih tanggal reminder', 'warning');
-  } else {
-    const d = new Date(tanggal + 'T00:00:00');
-    d.setDate(d.getDate() - parseInt(opt));
-    reminderDate = d.toISOString().split('T')[0];
-  }
-  // Remove existing reminder for same holiday
-  const existing = (window._hariLiburUserReminders||[]).find(r=>r.holidayId===holidayId);
-  if (existing) await db.collection('hrd_hari_libur_reminders').doc(existing.id).delete();
-  await db.collection('hrd_hari_libur_reminders').add({
-    holidayId, holidayNama, userId: currentUser.id, reminderDate, createdAt: new Date().toISOString()
-  });
-  closeModalDirect();
-  toast('Reminder disimpan', 'success');
-  loadHariLiburView();
-}
-
-async function hapusHariLiburReminder(reminderId) {
-  await db.collection('hrd_hari_libur_reminders').doc(reminderId).delete();
-  closeModalDirect();
-  toast('Reminder dihapus', 'success');
-  loadHariLiburView();
-}
-
-async function checkHariLiburReminders(){
-  try {
-    const reminderSnap = await db.collection('hrd_hari_libur_reminders').get();
-    const today=todayStr();
-    reminderSnap.forEach(d=>{
-      const r=d.data();
-      if(r.userId===currentUser.id && r.reminderDate===today){
-        toast('🔔 Pengingat: '+r.tanggal,'info');
-      }
-    });
-  } catch(e) { /* ignore */ }
-}
+async function checkHariLiburReminders(){}
 
 async function openHariLiburDayDetail(dateStr, holidayIdsStr){
   const holidayIds=holidayIdsStr?holidayIdsStr.split(','):[];
   const holidays=[];
   for(const hid of holidayIds){
     if(!hid)continue;
-    const d=await db.collection('hrd_hari_libur').doc(hid).get();
-    if(d.exists)holidays.push({id:d.id,...d.data()});
+    try{const d=await db.collection('hrd_hari_libur').doc(hid).get();if(d.exists)holidays.push({id:d.id,...d.data()});}catch(e){}
   }
-
-  // Load user's personal notes for this date
-  let userNote='';
-  let noteDocId='';
-  // Use cached notes from window._hariLiburUserNotes (already loaded in loadHariLiburView)
-  const cachedNote=(window._hariLiburUserNotes||[]).find(n=>n.tanggal===dateStr);
-  if(cachedNote){userNote=cachedNote.note||'';noteDocId=cachedNote.id||'';}
-
-  // Check existing reminder
-  const existingReminder=(window._hariLiburUserReminders||[]).find(r=>r.tanggal===dateStr||holidayIds.includes(r.holidayId));
-
   const dayName=new Date(dateStr+'T00:00:00').toLocaleDateString('id-ID',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
-
+  const dateFormatted=dateStr.replace(/-/g,'');
   let html=`<div class="modal-title">📅 ${dayName}</div>`;
-
   if(holidays.length){
     html+=`<div style="padding:10px;background:#ffebee;border-radius:8px;margin-bottom:12px">`;
     holidays.forEach(h=>{
@@ -539,128 +415,22 @@ async function openHariLiburDayDetail(dateStr, holidayIdsStr){
     });
     html+=`</div>`;
   }
-
-  html+=`<div class="form-group"><label>📝 Catatan Pribadi</label><textarea class="form-control" id="hlDayNote" rows="3" placeholder="Tambahkan catatan untuk tanggal ini...">${escHtml(userNote)}</textarea></div>`;
-
-  html+=`<div class="form-group"><label>🔔 Pengingat</label><div class="flex gap-8 flex-wrap">`;
-  html+=`<button class="btn btn-sm ${existingReminder?'btn-warning':'btn-outline'}" onclick="setDayReminder('${dateStr}','${holidayIds[0]||''}','1')">1 Hari Sebelum</button>`;
-  html+=`<button class="btn btn-sm btn-outline" onclick="setDayReminder('${dateStr}','${holidayIds[0]||''}','3')">3 Hari</button>`;
-  html+=`<button class="btn btn-sm btn-outline" onclick="setDayReminder('${dateStr}','${holidayIds[0]||''}','7')">1 Minggu</button>`;
-  if(existingReminder)html+=`<button class="btn btn-sm btn-danger" onclick="removeDayReminder('${existingReminder.tanggal}')">Hapus Pengingat</button>`;
+  html+=`<div style="margin-top:16px"><p class="text-sm" style="color:var(--text-light);margin-bottom:12px">Gunakan Google Calendar untuk menambahkan catatan, event, atau pengingat:</p>`;
+  const eventTitle=holidays.length?encodeURIComponent(holidays[0].nama):'';
+  const gcalCreateUrl=`https://calendar.google.com/calendar/render?action=TEMPLATE&dates=${dateFormatted}/${dateFormatted}&text=${eventTitle}`;
+  html+=`<div style="display:flex;flex-direction:column;gap:8px">`;
+  html+=`<a href="${gcalCreateUrl}" target="_blank" class="btn btn-primary" style="text-decoration:none;text-align:center">📅 Buat Event di Google Calendar</a>`;
+  html+=`<a href="https://calendar.google.com/calendar/r/day/${dateStr.replace(/-/g,'/')}" target="_blank" class="btn btn-info" style="text-decoration:none;text-align:center">🔍 Lihat Tanggal di Google Calendar</a>`;
   html+=`</div></div>`;
-
-  html+=`<div class="flex gap-8 mt-16"><button class="btn btn-primary" onclick="saveDayNote('${dateStr}','${noteDocId}')">💾 Simpan Catatan</button><button class="btn btn-outline" onclick="closeModalDirect()">Tutup</button></div>`;
-
+  html+=`<div class="flex gap-8 mt-16"><button class="btn btn-outline" onclick="closeModalDirect()">Tutup</button></div>`;
   openModal(html);
 }
 
-async function saveDayNote(dateStr, existingDocId){
-  const note=document.getElementById('hlDayNote').value.trim();
-  
-  // Always update localStorage cache immediately for instant UI feedback
-  const cachedNotes=JSON.parse(localStorage.getItem('hrd_hl_notes_cache_'+currentUser.id)||'[]');
-  const cacheIdx=cachedNotes.findIndex(n=>n.tanggal===dateStr);
-  if(note){
-    if(cacheIdx>=0){cachedNotes[cacheIdx].note=note;cachedNotes[cacheIdx].updatedAt=new Date().toISOString();}
-    else{cachedNotes.push({id:'local_'+Date.now(),tanggal:dateStr,note,userId:currentUser.id,createdAt:new Date().toISOString()});}
-  } else {
-    if(cacheIdx>=0)cachedNotes.splice(cacheIdx,1);
-  }
-  localStorage.setItem('hrd_hl_notes_cache_'+currentUser.id,JSON.stringify(cachedNotes));
-  window._hariLiburUserNotes=cachedNotes;
-  
-  // Also write to Firestore for cross-device sync (fire and forget with error log)
-  try{
-    const existing=(window._hariLiburUserNotes||[]).find(n=>n.tanggal===dateStr && n.id && !n.id.startsWith('local_'));
-    if(existing && existing.id){
-      if(note) await db.collection('hrd_hari_libur_notes').doc(existing.id).update({note,updatedAt:new Date().toISOString()});
-      else await db.collection('hrd_hari_libur_notes').doc(existing.id).delete();
-    } else if(note){
-      const docRef=await db.collection('hrd_hari_libur_notes').add({userId:currentUser.id,tanggal:dateStr,note,createdAt:new Date().toISOString()});
-      // Update cache with real Firestore ID
-      const ci=cachedNotes.findIndex(n=>n.tanggal===dateStr);
-      if(ci>=0){cachedNotes[ci].id=docRef.id;localStorage.setItem('hrd_hl_notes_cache_'+currentUser.id,JSON.stringify(cachedNotes));}
-    }
-  }catch(e){console.warn('[HariLibur] Firestore note sync failed:',e.message);}
-  
-  console.log('[HariLibur] Note saved for',dateStr,'cache size:',cachedNotes.length);
-  toast('Catatan disimpan','success');
-  closeModalDirect();
-  // Re-render calendar directly from in-memory data (don't re-fetch from Firestore)
-  const container=document.getElementById('hariLiburContent');
-  if(container && hariLiburCalendarMonth){
-    const y=hariLiburCalendarMonth.year,m=hariLiburCalendarMonth.month;
-    const startDate2=`${y}-${String(m+1).padStart(2,'0')}-01`;
-    const endDate2=`${y}-${String(m+1).padStart(2,'0')}-${String(new Date(y,m+1,0).getDate()).padStart(2,'0')}`;
-    const snap2=await db.collection('hrd_hari_libur').where('tanggal','>=',startDate2).where('tanggal','<=',endDate2).get();
-    const holidays2=[];snap2.forEach(d=>holidays2.push({id:d.id,...d.data()}));
-    if(hariLiburViewMode==='kalender')renderHariLiburCalendar(container,y,m,holidays2);
-    else renderHariLiburList(container,y,m,holidays2);
-  }
-}
 
-async function setDayReminder(dateStr, holidayId, daysBefore){
-  const targetDate=new Date(dateStr+'T00:00:00');
-  const reminderDate=new Date(targetDate);
-  reminderDate.setDate(reminderDate.getDate()-parseInt(daysBefore));
-  const reminderDateStr=reminderDate.getFullYear()+'-'+String(reminderDate.getMonth()+1).padStart(2,'0')+'-'+String(reminderDate.getDate()).padStart(2,'0');
-  
-  // Update localStorage cache immediately
-  const cachedReminders=JSON.parse(localStorage.getItem('hrd_hl_reminders_cache_'+currentUser.id)||'[]');
-  const filtered=cachedReminders.filter(r=>r.tanggal!==dateStr);
-  const newReminder={id:'local_'+Date.now(),tanggal:dateStr,holidayId:holidayId||'',reminderDate:reminderDateStr,daysBefore:parseInt(daysBefore),userId:currentUser.id,createdAt:new Date().toISOString()};
-  filtered.push(newReminder);
-  localStorage.setItem('hrd_hl_reminders_cache_'+currentUser.id,JSON.stringify(filtered));
-  window._hariLiburUserReminders=filtered;
-  
-  // Also write to Firestore
-  try{
-    const existing=(window._hariLiburUserReminders||[]).find(r=>r.tanggal===dateStr && r.id && !r.id.startsWith('local_'));
-    if(existing && existing.id) await db.collection('hrd_hari_libur_reminders').doc(existing.id).delete();
-    await db.collection('hrd_hari_libur_reminders').add({userId:currentUser.id,holidayId:holidayId||'',tanggal:dateStr,reminderDate:reminderDateStr,daysBefore:parseInt(daysBefore),createdAt:new Date().toISOString()});
-  }catch(e){console.warn('[HariLibur] Firestore reminder sync failed:',e.message);}
-  
-  console.log('[HariLibur] Reminder set for',dateStr);
-  toast('Pengingat diset '+daysBefore+' hari sebelumnya','success');
-  closeModalDirect();
-  const container=document.getElementById('hariLiburContent');
-  if(container && hariLiburCalendarMonth){
-    const y=hariLiburCalendarMonth.year,m=hariLiburCalendarMonth.month;
-    const startDate2=`${y}-${String(m+1).padStart(2,'0')}-01`;
-    const endDate2=`${y}-${String(m+1).padStart(2,'0')}-${String(new Date(y,m+1,0).getDate()).padStart(2,'0')}`;
-    const snap2=await db.collection('hrd_hari_libur').where('tanggal','>=',startDate2).where('tanggal','<=',endDate2).get();
-    const holidays2=[];snap2.forEach(d=>holidays2.push({id:d.id,...d.data()}));
-    if(hariLiburViewMode==='kalender')renderHariLiburCalendar(container,y,m,holidays2);
-    else renderHariLiburList(container,y,m,holidays2);
-  }
-}
 
-async function removeDayReminder(reminderTanggal){
-  // Update localStorage cache immediately
-  const cachedReminders=JSON.parse(localStorage.getItem('hrd_hl_reminders_cache_'+currentUser.id)||'[]');
-  const toRemove=cachedReminders.find(r=>r.tanggal===reminderTanggal);
-  const filtered=cachedReminders.filter(r=>r.tanggal!==reminderTanggal);
-  localStorage.setItem('hrd_hl_reminders_cache_'+currentUser.id,JSON.stringify(filtered));
-  window._hariLiburUserReminders=filtered;
-  
-  // Also delete from Firestore
-  try{
-    if(toRemove && toRemove.id && !toRemove.id.startsWith('local_')) await db.collection('hrd_hari_libur_reminders').doc(toRemove.id).delete();
-  }catch(e){console.warn('[HariLibur] Firestore reminder delete failed:',e.message);}
-  
-  toast('Pengingat dihapus','success');
-  closeModalDirect();
-  const container=document.getElementById('hariLiburContent');
-  if(container && hariLiburCalendarMonth){
-    const y=hariLiburCalendarMonth.year,m=hariLiburCalendarMonth.month;
-    const startDate2=`${y}-${String(m+1).padStart(2,'0')}-01`;
-    const endDate2=`${y}-${String(m+1).padStart(2,'0')}-${String(new Date(y,m+1,0).getDate()).padStart(2,'0')}`;
-    const snap2=await db.collection('hrd_hari_libur').where('tanggal','>=',startDate2).where('tanggal','<=',endDate2).get();
-    const holidays2=[];snap2.forEach(d=>holidays2.push({id:d.id,...d.data()}));
-    if(hariLiburViewMode==='kalender')renderHariLiburCalendar(container,y,m,holidays2);
-    else renderHariLiburList(container,y,m,holidays2);
-  }
-}
+
+
+
 
 async function syncHariLiburNasional() {
   const year = hariLiburCalendarMonth.year;
