@@ -1302,11 +1302,11 @@ async function loadRekapGrid(){
       const isLibur=liburSet.has(i);
       let color='#eee',text='-',title='';
       if(isLibur&&!st){color='#9e9e9e';text='H';title=' title="Hari Libur"';}
-      else if(cutiStatus&&!st){
+      else if(cutiStatus){
         if(cutiStatus==='WFH'){color='#009688';text='W';title=' title="WFH"';ut++;}
         else{color='#00bcd4';text='C';title=` title="${cutiStatus}"`;ut++;}
       }
-      else if(dinasLuarMap[u.id]?.[i]&&!st||dinasLuarMap[u.nama]?.[i]&&!st||dinasLuarMap[namaLow]?.[i]&&!st){color='#2196f3';text='D';title=' title="Dinas Luar (SPPD)"';ut++;totalD++;}
+      else if(dinasLuarMap[u.id]?.[i]||dinasLuarMap[u.nama]?.[i]||dinasLuarMap[namaLow]?.[i]){color='#2196f3';text='D';title=' title="Dinas Luar (SPPD)"';ut++;totalD++;}
       else if(st==='lembur'||isOT){color='#7b1fa2';text='L';ut++;totalLembur++;if(lemburJam){userLemburJam+=lemburJam;totalLemburJam+=lemburJam;}}
       else if(st==='tepat_waktu'||st==='hadir'){color='#4caf50';text='✓';ut++;totalH++;}
       else if(st==='terlambat'){color='#ff9800';text='T';ut++;totalT++;}
