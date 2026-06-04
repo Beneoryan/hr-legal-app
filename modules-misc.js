@@ -609,6 +609,7 @@ function _buildApprovalTimeline(p){
 }
 
 function _buildApprovalActions(col,id){
+  if(!hasAccess(3))return '<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)"><p style="color:var(--text-secondary);font-size:.85rem">⏳ Menunggu approval</p></div>';
   let h='<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">';
   h+='<div class="form-group"><label class="fw-700" style="font-size:.85rem">💬 Catatan (opsional)</label>';
   h+='<textarea class="form-control" id="approvalCatatan" rows="2" placeholder="Tambahkan catatan untuk pemohon..." style="font-size:.85rem"></textarea></div>';
