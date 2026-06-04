@@ -236,10 +236,18 @@ async function loadHariLiburView() {
   const holidays = [];
   snap.forEach(d => holidays.push({ id: d.id, ...d.data() }));
 
-  // Load user reminders from localStorage
-  window._hariLiburUserReminders = JSON.parse(localStorage.getItem('hrd_hl_reminders_'+currentUser.id)||'[]');
-  // Load user personal notes from localStorage
-  window._hariLiburUserNotes = JSON.parse(localStorage.getItem('hrd_hl_notes_'+currentUser.id)||'[]');
+  // Load user reminders from Firestore (load all, filter by userId client-side)
+  window._hariLiburUserReminders = [];
+  try {
+    const reminderSnap = await db.collection('hrd_hari_libur_reminders').get();
+    reminderSnap.forEach(d => {const r=d.data();if(r.userId===currentUser.id)window._hariLiburUserReminders.push({id:d.id,...r});});
+  } catch(e) { console.warn('[HariLibur] Reminders load failed:', e.message); }
+  // Load user personal notes from Firestore (load all, filter by userId client-side)
+  window._hariLiburUserNotes = [];
+  try {
+    const noteSnap = await db.collection('hrd_hari_libur_notes').get();
+    noteSnap.forEach(d => {const n=d.data();if(n.userId===currentUser.id)window._hariLiburUserNotes.push({id:d.id,...n});});
+  } catch(e) { console.warn('[HariLibur] Notes load failed:', e.message); }
   console.log('[HariLibur] Loaded notes:', window._hariLiburUserNotes.length, 'reminders:', window._hariLiburUserReminders.length);
 
   const container = document.getElementById('hariLiburContent');
@@ -469,10 +477,11 @@ async function hapusHariLiburReminder(reminderId) {
 
 async function checkHariLiburReminders(){
   try {
-    const reminders=JSON.parse(localStorage.getItem('hrd_hl_reminders_'+currentUser.id)||'[]');
+    const reminderSnap = await db.collection('hrd_hari_libur_reminders').get();
     const today=todayStr();
-    reminders.forEach(r=>{
-      if(r.reminderDate===today){
+    reminderSnap.forEach(d=>{
+      const r=d.data();
+      if(r.userId===currentUser.id && r.reminderDate===today){
         toast('🔔 Pengingat: '+r.tanggal,'info');
       }
     });
@@ -493,7 +502,7 @@ async function openHariLiburDayDetail(dateStr, holidayIdsStr){
   let noteDocId='';
   // Use cached notes from window._hariLiburUserNotes (already loaded in loadHariLiburView)
   const cachedNote=(window._hariLiburUserNotes||[]).find(n=>n.tanggal===dateStr);
-  if(cachedNote){userNote=cachedNote.note||'';noteDocId=cachedNote.tanggal;}
+  if(cachedNote){userNote=cachedNote.note||'';noteDocId=cachedNote.id||'';}
 
   // Check existing reminder
   const existingReminder=(window._hariLiburUserReminders||[]).find(r=>r.tanggal===dateStr||holidayIds.includes(r.holidayId));
@@ -528,55 +537,55 @@ async function openHariLiburDayDetail(dateStr, holidayIdsStr){
 
 async function saveDayNote(dateStr, existingDocId){
   const note=document.getElementById('hlDayNote').value.trim();
-  const notes=JSON.parse(localStorage.getItem('hrd_hl_notes_'+currentUser.id)||'[]');
-  const idx=notes.findIndex(n=>n.tanggal===dateStr);
-  if(note){
-    if(idx>=0){notes[idx].note=note;notes[idx].updatedAt=new Date().toISOString();}
-    else{notes.push({tanggal:dateStr,note,userId:currentUser.id,createdAt:new Date().toISOString()});}
-  } else {
-    if(idx>=0)notes.splice(idx,1);
+  try{
+    const existing=(window._hariLiburUserNotes||[]).find(n=>n.tanggal===dateStr);
+    if(existing && existing.id){
+      if(note){
+        await db.collection('hrd_hari_libur_notes').doc(existing.id).update({note,updatedAt:new Date().toISOString()});
+      } else {
+        await db.collection('hrd_hari_libur_notes').doc(existing.id).delete();
+      }
+    } else if(note){
+      await db.collection('hrd_hari_libur_notes').add({userId:currentUser.id,tanggal:dateStr,note,createdAt:new Date().toISOString()});
+    }
+    console.log('[HariLibur] Note saved for',dateStr);
+    toast('Catatan disimpan','success');
+  }catch(e){
+    console.error('[HariLibur] Save note error:',e);
+    toast('Gagal menyimpan: '+e.message,'error');
   }
-  localStorage.setItem('hrd_hl_notes_'+currentUser.id,JSON.stringify(notes));
-  window._hariLiburUserNotes=notes;
-  console.log('[HariLibur] Note saved for',dateStr,'total notes:',notes.length);
-  toast('Catatan disimpan','success');
   closeModalDirect();
   await loadHariLiburView();
 }
 
 async function setDayReminder(dateStr, holidayId, daysBefore){
-  const reminders=JSON.parse(localStorage.getItem('hrd_hl_reminders_'+currentUser.id)||'[]');
-  // Remove existing for this date
-  const filtered=reminders.filter(r=>r.tanggal!==dateStr);
-
-  const targetDate=new Date(dateStr+'T00:00:00');
-  const reminderDate=new Date(targetDate);
-  reminderDate.setDate(reminderDate.getDate()-parseInt(daysBefore));
-  const reminderDateStr=reminderDate.getFullYear()+'-'+String(reminderDate.getMonth()+1).padStart(2,'0')+'-'+String(reminderDate.getDate()).padStart(2,'0');
-
-  filtered.push({
-    tanggal:dateStr,
-    holidayId:holidayId||'',
-    reminderDate:reminderDateStr,
-    daysBefore:parseInt(daysBefore),
-    userId:currentUser.id,
-    createdAt:new Date().toISOString()
-  });
-
-  localStorage.setItem('hrd_hl_reminders_'+currentUser.id,JSON.stringify(filtered));
-  window._hariLiburUserReminders=filtered;
-  console.log('[HariLibur] Reminder set for',dateStr,'days before:',daysBefore);
-  toast('Pengingat diset '+daysBefore+' hari sebelumnya','success');
+  try{
+    const targetDate=new Date(dateStr+'T00:00:00');
+    const reminderDate=new Date(targetDate);
+    reminderDate.setDate(reminderDate.getDate()-parseInt(daysBefore));
+    const reminderDateStr=reminderDate.getFullYear()+'-'+String(reminderDate.getMonth()+1).padStart(2,'0')+'-'+String(reminderDate.getDate()).padStart(2,'0');
+    const existing=(window._hariLiburUserReminders||[]).find(r=>r.tanggal===dateStr);
+    if(existing && existing.id) await db.collection('hrd_hari_libur_reminders').doc(existing.id).delete();
+    await db.collection('hrd_hari_libur_reminders').add({userId:currentUser.id,holidayId:holidayId||'',tanggal:dateStr,reminderDate:reminderDateStr,daysBefore:parseInt(daysBefore),createdAt:new Date().toISOString()});
+    console.log('[HariLibur] Reminder set for',dateStr);
+    toast('Pengingat diset '+daysBefore+' hari sebelumnya','success');
+  }catch(e){
+    console.error('[HariLibur] Set reminder error:',e);
+    toast('Gagal: '+e.message,'error');
+  }
   closeModalDirect();
   await loadHariLiburView();
 }
 
-async function removeDayReminder(reminderId){
-  const reminders=JSON.parse(localStorage.getItem('hrd_hl_reminders_'+currentUser.id)||'[]');
-  const filtered=reminders.filter(r=>r.tanggal!==reminderId);
-  localStorage.setItem('hrd_hl_reminders_'+currentUser.id,JSON.stringify(filtered));
-  window._hariLiburUserReminders=filtered;
-  toast('Pengingat dihapus','success');
+async function removeDayReminder(reminderTanggal){
+  try{
+    const existing=(window._hariLiburUserReminders||[]).find(r=>r.tanggal===reminderTanggal);
+    if(existing && existing.id) await db.collection('hrd_hari_libur_reminders').doc(existing.id).delete();
+    toast('Pengingat dihapus','success');
+  }catch(e){
+    console.error('[HariLibur] Remove reminder error:',e);
+    toast('Gagal: '+e.message,'error');
+  }
   closeModalDirect();
   await loadHariLiburView();
 }
