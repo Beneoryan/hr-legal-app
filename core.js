@@ -137,6 +137,8 @@ function renderApp() {
   }).catch(()=>{});
   // Auto-load national holidays if not yet populated
   autoLoadHariLiburNasional().catch(()=>{});
+  // Start task reminder checker
+  if(typeof startTaskReminderCheck==='function') startTaskReminderCheck();
 }
 
 function buildNavItems(isPortalUser) {

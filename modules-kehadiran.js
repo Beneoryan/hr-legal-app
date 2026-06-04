@@ -478,7 +478,7 @@ async function loadDailyTasks(filter){
     if(isToday2&&!t.done)html+=`<span class="badge badge-info" style="font-size:.6rem">Hari Ini</span>`;
     html+=`</div>`;
     if(t.description)html+=`<div style="font-size:.8rem;color:var(--text-light);margin-top:4px;${t.done?'text-decoration:line-through':''}">${escHtml(t.description)}</div>`;
-    html+=`<div style="font-size:.7rem;color:#999;margin-top:4px">📅 ${formatDate(t.tanggal)}${t.waktu?' ⏰ '+t.waktu:''}${t.reminder?' 🔔 '+t.reminder:''}</div></div>`;
+    html+=`<div style="font-size:.7rem;color:#999;margin-top:4px">📅 ${formatDate(t.tanggal)}${t.waktu?' ⏰ '+t.waktu:''}${t.reminder?' 🔔 '+t.reminder:''}${t.assignedByName?' | 👤 Ditugaskan oleh: '+escHtml(t.assignedByName):''}</div></div>`;
     html+=`<div style="display:flex;gap:4px"><button class="btn btn-xs btn-warning" onclick="editDailyTask('${t.id}')">✏️</button><button class="btn btn-xs btn-danger" onclick="hapusDailyTask('${t.id}')">🗑️</button></div></div>`;
   });
   listEl.innerHTML=html;
@@ -486,8 +486,19 @@ async function loadDailyTasks(filter){
 
 function filterDailyTasks(f){loadDailyTasks(f);}
 
-function modalAddTask(){
+async function modalAddTask(){
+  // If admin/manager/head/bod, show user assignment dropdown
+  let assignHtml='';
+  if(hasAccess(3)){
+    try{
+      const usersSnap=await db.collection('hrd_users').get();
+      let opts='<option value="">-- Untuk Diri Sendiri --</option>';
+      usersSnap.forEach(d=>{const u=d.data();if(u.status!=='nonaktif')opts+=`<option value="${d.id}">${escHtml(u.nama)} (${u.role})</option>`;});
+      assignHtml=`<div class="form-group"><label>Assign Ke Karyawan</label><select class="form-control" id="dtAssignUser">${opts}</select></div>`;
+    }catch(_e){assignHtml='';}
+  }
   openModal(`<div class="modal-title">+ Tambah Task</div>
+    ${assignHtml}
     <div class="form-group"><label>Judul Task *</label><input class="form-control" id="dtTitle" placeholder="Contoh: Meeting dengan klien"></div>
     <div class="form-group"><label>Deskripsi</label><textarea class="form-control" id="dtDesc" rows="2" placeholder="Detail task..."></textarea></div>
     <div class="grid-2"><div class="form-group"><label>Tanggal *</label><input class="form-control" type="date" id="dtDate" value="${todayStr()}"></div><div class="form-group"><label>Waktu</label><input class="form-control" type="time" id="dtTime"></div></div>
@@ -500,9 +511,17 @@ async function simpanDailyTask(){
   const title=document.getElementById('dtTitle').value.trim();
   const tanggal=document.getElementById('dtDate').value;
   if(!title||!tanggal)return toast('Judul dan tanggal wajib','warning');
+  const assignEl=document.getElementById('dtAssignUser');
+  const targetUserId=assignEl&&assignEl.value?assignEl.value:currentUser.id;
+  const assignedBy=targetUserId!==currentUser.id?currentUser.id:'';
+  const assignedByName=targetUserId!==currentUser.id?currentUser.nama:'';
   try{
-    await db.collection('hrd_daily_tasks').add({title,description:document.getElementById('dtDesc').value.trim(),tanggal,waktu:document.getElementById('dtTime').value||'',priority:document.getElementById('dtPriority').value,reminder:document.getElementById('dtReminder').value,repeat:document.getElementById('dtRepeat').value||'',done:false,userId:currentUser.id,createdAt:new Date().toISOString()});
+    await db.collection('hrd_daily_tasks').add({title,description:document.getElementById('dtDesc').value.trim(),tanggal,waktu:document.getElementById('dtTime').value||'',priority:document.getElementById('dtPriority').value,reminder:document.getElementById('dtReminder').value,repeat:document.getElementById('dtRepeat').value||'',done:false,userId:targetUserId,assignedBy,assignedByName,createdAt:new Date().toISOString()});
     toast('Task ditambahkan','success');
+    // Notify target user if assigned to someone else
+    if(targetUserId!==currentUser.id){
+      await db.collection('hrd_notifikasi').add({targetUser:targetUserId,title:'📋 Task Baru Ditugaskan',message:`${currentUser.nama} menugaskan: ${title}`,read:false,type:'daily-task',createdAt:new Date().toISOString()});
+    }
   }catch(e){toast('Gagal: '+e.message,'error');}
   closeModalDirect();
   await loadDailyTasks(_dailyTaskFilter);
@@ -535,4 +554,71 @@ async function hapusDailyTask(id){
   if(!confirm('Hapus task ini?'))return;
   try{await db.collection('hrd_daily_tasks').doc(id).delete();toast('Dihapus','success');}catch(e){toast('Gagal: '+e.message,'error');}
   await loadDailyTasks(_dailyTaskFilter);
+}
+
+// ── TASK REMINDER SYSTEM ──────────────────────────────────────
+let _reminderCheckInterval=null;
+
+async function checkTaskReminders(){
+  if(!currentUser)return;
+  try{
+    const snap=await db.collection('hrd_daily_tasks').get();
+    const now=new Date();
+    const today=todayStr();
+    const tasks=[];
+    snap.forEach(d=>{const t=d.data();if(t.userId===currentUser.id&&!t.done)tasks.push({id:d.id,...t});});
+
+    for(const task of tasks){
+      if(!task.reminder||!task.tanggal)continue;
+      // Calculate reminder time
+      const taskDateTime=new Date(task.tanggal+'T'+(task.waktu||'09:00')+':00');
+      let reminderMs=0;
+      if(task.reminder==='15 menit')reminderMs=15*60*1000;
+      else if(task.reminder==='30 menit')reminderMs=30*60*1000;
+      else if(task.reminder==='1 jam')reminderMs=60*60*1000;
+      else if(task.reminder==='1 hari')reminderMs=24*60*60*1000;
+      const reminderTime=new Date(taskDateTime.getTime()-reminderMs);
+      // Check if reminder should fire (within last 5 minutes window)
+      const diffMs=now.getTime()-reminderTime.getTime();
+      if(diffMs>=0&&diffMs<5*60*1000){
+        // Check if we already sent this reminder (use localStorage to avoid duplicates)
+        const reminderKey='task_reminder_'+task.id+'_'+task.tanggal;
+        if(localStorage.getItem(reminderKey))continue;
+        localStorage.setItem(reminderKey,'1');
+        // Create notification in Firestore
+        await db.collection('hrd_notifikasi').add({
+          targetUser:currentUser.id,
+          title:'⏰ Pengingat Task',
+          message:task.title+(task.waktu?' ('+task.waktu+')':''),
+          read:false,
+          type:'task-reminder',
+          createdAt:new Date().toISOString()
+        });
+        // Show browser notification
+        showSystemNotification('⏰ Pengingat Task',task.title+(task.waktu?' - '+task.waktu:''));
+        toast('⏰ Pengingat: '+task.title,'info');
+      }
+      // Also check overdue tasks (past the task date+time and not reminded as overdue)
+      if(task.tanggal<today){
+        const overdueKey='task_overdue_'+task.id+'_'+today;
+        if(localStorage.getItem(overdueKey))continue;
+        localStorage.setItem(overdueKey,'1');
+        await db.collection('hrd_notifikasi').add({
+          targetUser:currentUser.id,
+          title:'⚠️ Task Terlambat',
+          message:task.title+' (tenggat: '+formatDate(task.tanggal)+')',
+          read:false,
+          type:'task-overdue',
+          createdAt:new Date().toISOString()
+        });
+      }
+    }
+  }catch(_e){/* silent */}
+}
+
+function startTaskReminderCheck(){
+  if(_reminderCheckInterval)clearInterval(_reminderCheckInterval);
+  // Check immediately then every 2 minutes
+  checkTaskReminders();
+  _reminderCheckInterval=setInterval(checkTaskReminders,2*60*1000);
 }
