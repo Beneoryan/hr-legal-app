@@ -1,4 +1,5 @@
 ﻿'use strict';
+console.log('[ABSENSI-IJEF] v2.1 loaded');
 // ============================================================
 // ABSENSI-IJEF.JS — Selfie+GPS + Dinas Luar + Setting + Rekap
 // ============================================================
@@ -1257,7 +1258,7 @@ async function loadRekapGrid(){
   cutiSnap.forEach(d=>{const c=d.data();if(c.status!=='approved')return;if(!c.mulai||!c.selesai)return;const uid=c.userId||'';const namaRaw=(c.nama||'').trim();const nama=namaRaw.toLowerCase();const start=new Date(c.mulai+'T00:00:00');const end=new Date(c.selesai+'T00:00:00');for(let dt=new Date(start);dt<=end;dt.setDate(dt.getDate()+1)){const day=dt.getDate();const m=dt.getMonth()+1;const y=dt.getFullYear();const ds=y+'-'+String(m).padStart(2,'0')+'-'+String(day).padStart(2,'0');if(ds>=startDate&&ds<=endDate){if(uid){if(!cutiMap[uid])cutiMap[uid]={};cutiMap[uid][day]=c.jenis||'Cuti';}if(nama){if(!cutiMap[nama])cutiMap[nama]={};cutiMap[nama][day]=c.jenis||'Cuti';}if(namaRaw){if(!cutiMap[namaRaw])cutiMap[namaRaw]={};cutiMap[namaRaw][day]=c.jenis||'Cuti';}}}});
   // Build overtime map: userId -> {day: true}
   const otMap={};
-  overtimeSnap.forEach(d=>{const o=d.data();if(o.tanggal&&o.tanggal>=startDate&&o.tanggal<=endDate&&o.status==='approved'){const uid=o.userId||'';const nama=(o.nama||'').toLowerCase();const day=parseInt(o.tanggal.split('-')[2]);if(uid){if(!otMap[uid])otMap[uid]={};otMap[uid][day]=true;}if(nama){if(!otMap[nama])otMap[nama]={};otMap[nama][day]=true;}}});
+  overtimeSnap.forEach(d=>{const o=d.data();if(!o.tanggal||o.tanggal<startDate||o.tanggal>endDate||o.status!=='approved')return;const uid=o.userId||'';const namaRaw=(o.nama||'').trim();const nama=namaRaw.toLowerCase();const day=parseInt(o.tanggal.split('-')[2]);if(uid){if(!otMap[uid])otMap[uid]={};otMap[uid][day]=true;}if(nama){if(!otMap[nama])otMap[nama]={};otMap[nama][day]=true;}if(namaRaw){if(!otMap[namaRaw])otMap[namaRaw]={};otMap[namaRaw][day]=true;}});
   // Build dinas luar map: userId -> {day: true}
   const dinasLuarMap={};
   dinasLuarSnap.forEach(d=>{const dl=d.data();if(dl.status!=='approved')return;const uid=dl.userId||'';const dlNamaRaw=(dl.nama||'').trim();const dlNama=dlNamaRaw.toLowerCase();const startD=dl.tanggalMulai||dl.tanggal;const endD=dl.tanggalSelesai||dl.tanggal;if(!startD)return;const endDt=new Date((endD||startD)+'T00:00:00');let maxIter=366;for(let dt=new Date(startD+'T00:00:00');dt<=endDt;dt.setDate(dt.getDate()+1)){if(--maxIter<0)break;const day=dt.getDate();const m=dt.getMonth()+1;const y=dt.getFullYear();const ds=y+'-'+String(m).padStart(2,'0')+'-'+String(day).padStart(2,'0');if(ds>=startDate&&ds<=endDate){if(uid){if(!dinasLuarMap[uid])dinasLuarMap[uid]={};dinasLuarMap[uid][day]=true;}if(dlNama){if(!dinasLuarMap[dlNama])dinasLuarMap[dlNama]={};dinasLuarMap[dlNama][day]=true;}if(dlNamaRaw){if(!dinasLuarMap[dlNamaRaw])dinasLuarMap[dlNamaRaw]={};dinasLuarMap[dlNamaRaw][day]=true;}}}});
@@ -1298,7 +1299,7 @@ async function loadRekapGrid(){
       const lemburJam=userLemburMap2[i];
       // Check cuti/izin first (by userId or nama)
       const cutiStatus=cutiMap[u.id]?.[i]||cutiMap[u.nama]?.[i]||cutiMap[(u.nama||'').trim()]?.[i]||cutiMap[(u.nama||'').trim().toLowerCase()]?.[i];
-      const isOT=otMap[u.id]?.[i]||otMap[u.nama]?.[i];
+      const isOT=otMap[u.id]?.[i]||otMap[u.nama]?.[i]||otMap[(u.nama||'').trim().toLowerCase()]?.[i];
       const isLibur=liburSet.has(i);
       let color='#eee',text='-',title='';
       if(isLibur&&!st){color='#9e9e9e';text='H';title=' title="Hari Libur"';}
