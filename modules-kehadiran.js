@@ -164,7 +164,7 @@ const HARI_LIBUR_NASIONAL_2026 = [
   { tanggal: '2026-05-29', nama: 'Cuti Bersama Idul Adha', tipe: 'cuti_bersama' },
   { tanggal: '2026-05-31', nama: 'Hari Raya Waisak 2570 BE', tipe: 'nasional' },
   { tanggal: '2026-06-01', nama: 'Hari Lahir Pancasila', tipe: 'nasional' },
-  { tanggal: '2026-06-17', nama: 'Tahun Baru Islam 1448 H', tipe: 'nasional' },
+  { tanggal: '2026-06-16', nama: 'Tahun Baru Islam 1448 H', tipe: 'nasional' },
   { tanggal: '2026-08-17', nama: 'Hari Kemerdekaan RI', tipe: 'nasional' },
   { tanggal: '2026-08-26', nama: 'Maulid Nabi Muhammad SAW', tipe: 'nasional' },
   { tanggal: '2026-12-24', nama: 'Cuti Bersama Natal', tipe: 'cuti_bersama' },
@@ -249,6 +249,7 @@ async function loadHariLiburView() {
     window._hariLiburUserNotes = [];
     noteSnap.forEach(d => {const n=d.data();if(n.userId===currentUser.id)window._hariLiburUserNotes.push({id:d.id,...n});});
   } catch(e) { window._hariLiburUserNotes = []; }
+  console.log('[HariLibur] Loaded notes:', window._hariLiburUserNotes.length, 'reminders:', window._hariLiburUserReminders.length);
 
   const container = document.getElementById('hariLiburContent');
   if (!container) return;
@@ -547,9 +548,11 @@ async function saveDayNote(dateStr, existingDocId){
     } else if(note){
       await db.collection('hrd_hari_libur_notes').add({userId:currentUser.id,tanggal:dateStr,note,createdAt:new Date().toISOString()});
     }
+    console.log('[HariLibur] Note saved for', dateStr, 'note:', note);
     toast('Catatan disimpan','success');
-  }catch(e){console.error('Save note error:',e);toast('Gagal menyimpan','error');}
-  closeModalDirect();loadHariLiburView();
+  }catch(e){console.error('[HariLibur] Save note error:', e);toast('Gagal menyimpan: '+e.message,'error');}
+  closeModalDirect();
+  await loadHariLiburView();
 }
 
 async function setDayReminder(dateStr, holidayId, daysBefore){
@@ -559,7 +562,6 @@ async function setDayReminder(dateStr, holidayId, daysBefore){
     reminderDate.setDate(reminderDate.getDate()-parseInt(daysBefore));
     const reminderDateStr=reminderDate.getFullYear()+'-'+String(reminderDate.getMonth()+1).padStart(2,'0')+'-'+String(reminderDate.getDate()).padStart(2,'0');
 
-    // Remove existing reminder for this date if any
     const existing=(window._hariLiburUserReminders||[]).find(r=>r.tanggal===dateStr||(holidayId&&r.holidayId===holidayId));
     if(existing)await db.collection('hrd_hari_libur_reminders').doc(existing.id).delete();
 
@@ -571,9 +573,11 @@ async function setDayReminder(dateStr, holidayId, daysBefore){
       daysBefore:parseInt(daysBefore),
       createdAt:new Date().toISOString()
     });
-    toast(`Pengingat diset ${daysBefore} hari sebelumnya`,'success');
-  }catch(e){console.error('Set reminder error:',e);toast('Gagal set pengingat','error');}
-  closeModalDirect();loadHariLiburView();
+    console.log('[HariLibur] Reminder set for', dateStr, 'days before:', daysBefore);
+    toast('Pengingat diset '+daysBefore+' hari sebelumnya','success');
+  }catch(e){console.error('[HariLibur] Set reminder error:', e);toast('Gagal: '+e.message,'error');}
+  closeModalDirect();
+  await loadHariLiburView();
 }
 
 async function removeDayReminder(reminderId){

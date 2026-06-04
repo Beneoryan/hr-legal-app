@@ -502,15 +502,16 @@ async function updateOnboarding(id){
 }
 
 async function toggleOnboardingCheck(id,index){
-  const ref=db.collection('hrd_onboarding').doc(id);
-  await db.runTransaction(async(t)=>{
-    const doc=await t.get(ref);
+  try{
+    const ref=db.collection('hrd_onboarding').doc(id);
+    const doc=await ref.get();
     if(!doc.exists)return;
     const p=doc.data();
     const checklist=p.checklist||[];
     if(checklist[index])checklist[index].done=!checklist[index].done;
-    t.update(ref,{checklist});
-  });
+    await ref.update({checklist});
+    console.log('[Onboarding] Toggled check', id, index, '->', checklist[index]?.done);
+  }catch(e){console.error('[Onboarding] Toggle error:', e);toast('Gagal menyimpan: '+e.message,'error');}
   renderOnboarding();
 }
 
@@ -617,15 +618,16 @@ async function updateOffboarding(id){
 }
 
 async function toggleOffboardingCheck(id,index){
-  const ref=db.collection('hrd_offboarding').doc(id);
-  await db.runTransaction(async(t)=>{
-    const doc=await t.get(ref);
+  try{
+    const ref=db.collection('hrd_offboarding').doc(id);
+    const doc=await ref.get();
     if(!doc.exists)return;
     const p=doc.data();
     const checklist=p.checklist||[];
     if(checklist[index])checklist[index].done=!checklist[index].done;
-    t.update(ref,{checklist});
-  });
+    await ref.update({checklist});
+    console.log('[Offboarding] Toggled check', id, index, '->', checklist[index]?.done);
+  }catch(e){console.error('[Offboarding] Toggle error:', e);toast('Gagal menyimpan: '+e.message,'error');}
   renderOffboarding();
 }
 
