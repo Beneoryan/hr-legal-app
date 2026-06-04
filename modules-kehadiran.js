@@ -492,14 +492,14 @@ async function loadDailyTasks(filter){
 function filterDailyTasks(f){loadDailyTasks(f);}
 
 async function modalAddTask(){
-  // If admin/manager/head/bod, show user assignment dropdown (required)
+  // If admin/manager/head/bod, show user assignment dropdown with self option
   let assignHtml='';
   if(hasAccess(3)){
     try{
       const usersSnap=await db.collection('hrd_users').get();
-      let opts='<option value="">-- Pilih Karyawan * --</option>';
+      let opts='<option value="self">\u{1F4DD} Untuk Diri Sendiri (Catatan Pribadi)</option><option disabled>\u2500\u2500 Tugaskan ke Karyawan \u2500\u2500</option>';
       usersSnap.forEach(d=>{const u=d.data();if(u.status!=='nonaktif')opts+=`<option value="${d.id}" data-nama="${escHtml(u.nama)}">${escHtml(u.nama)} (${u.role})</option>`;});
-      assignHtml=`<div class="form-group"><label>Assign Ke Karyawan <span style="color:#c62828">*</span></label><select class="form-control" id="dtAssignUser" required>${opts}</select></div>`;
+      assignHtml=`<div class="form-group"><label>Untuk Siapa</label><select class="form-control" id="dtAssignUser">${opts}</select></div>`;
     }catch(_e){assignHtml='';}
   }
   openModal(`<div class="modal-title">+ Tambah Task</div>
@@ -517,10 +517,10 @@ async function simpanDailyTask(){
   const tanggal=document.getElementById('dtDate').value;
   if(!title||!tanggal)return toast('Judul dan tanggal wajib','warning');
   const assignEl=document.getElementById('dtAssignUser');
-  // Admin must select a target user
-  if(hasAccess(3)&&assignEl&&!assignEl.value)return toast('Pilih karyawan terlebih dahulu','warning');
-  const targetUserId=assignEl&&assignEl.value?assignEl.value:currentUser.id;
-  const targetUserName=assignEl&&assignEl.value?assignEl.options[assignEl.selectedIndex].getAttribute('data-nama')||assignEl.options[assignEl.selectedIndex].text:currentUser.nama;
+  // Determine target user: self if no dropdown, value is 'self', or empty
+  const isSelf=!assignEl||assignEl.value==='self';
+  const targetUserId=isSelf?currentUser.id:assignEl.value;
+  const targetUserName=isSelf?currentUser.nama:(assignEl.options[assignEl.selectedIndex].getAttribute('data-nama')||assignEl.options[assignEl.selectedIndex].text);
   const assignedBy=targetUserId!==currentUser.id?currentUser.id:'';
   const assignedByName=targetUserId!==currentUser.id?currentUser.nama:'';
   try{
@@ -547,9 +547,9 @@ async function editDailyTask(id){
   if(hasAccess(3)){
     try{
       const usersSnap=await db.collection('hrd_users').get();
-      let opts='';
-      usersSnap.forEach(d=>{const u=d.data();if(u.status!=='nonaktif')opts+=`<option value="${d.id}" data-nama="${escHtml(u.nama)}" ${d.id===task.userId?'selected':''}>${escHtml(u.nama)} (${u.role})</option>`;});
-      reassignHtml=`<div class="form-group"><label>Assign Ke Karyawan <span style="color:#c62828">*</span></label><select class="form-control" id="dtEditAssignUser">${opts}</select></div>`;
+      let opts=`<option value="self" ${task.userId===currentUser.id?'selected':''}>\u{1F4DD} Untuk Diri Sendiri (Catatan Pribadi)</option><option disabled>\u2500\u2500 Tugaskan ke Karyawan \u2500\u2500</option>`;
+      usersSnap.forEach(d=>{const u=d.data();if(u.status!=='nonaktif')opts+=`<option value="${d.id}" data-nama="${escHtml(u.nama)}" ${d.id===task.userId&&d.id!==currentUser.id?'selected':''}>${escHtml(u.nama)} (${u.role})</option>`;});
+      reassignHtml=`<div class="form-group"><label>Untuk Siapa</label><select class="form-control" id="dtEditAssignUser">${opts}</select></div>`;
     }catch(_e){reassignHtml='';}
   }
   openModal(`<div class="modal-title">✏️ Edit Task</div>
@@ -568,16 +568,17 @@ async function updateDailyTask(id){
   const updateData={title,description:document.getElementById('dtEditDesc').value.trim(),tanggal,waktu:document.getElementById('dtEditTime').value||'',priority:document.getElementById('dtEditPriority').value,reminder:document.getElementById('dtEditReminder').value,repeat:document.getElementById('dtEditRepeat').value||'',updatedAt:new Date().toISOString()};
   // Handle re-assignment for admin
   const reassignEl=document.getElementById('dtEditAssignUser');
-  if(reassignEl&&reassignEl.value){
+  if(reassignEl){
     const task=_dailyTaskData.find(t=>t.id===id);
-    const newUserId=reassignEl.value;
-    const newUserName=reassignEl.options[reassignEl.selectedIndex].getAttribute('data-nama')||reassignEl.options[reassignEl.selectedIndex].text;
+    const isSelf=reassignEl.value==='self';
+    const newUserId=isSelf?currentUser.id:reassignEl.value;
+    const newUserName=isSelf?currentUser.nama:(reassignEl.options[reassignEl.selectedIndex].getAttribute('data-nama')||reassignEl.options[reassignEl.selectedIndex].text);
     updateData.userId=newUserId;
     updateData.targetUserName=newUserName;
-    if(newUserId!==currentUser.id){updateData.assignedBy=currentUser.id;updateData.assignedByName=currentUser.nama;}
+    if(newUserId!==currentUser.id){updateData.assignedBy=currentUser.id;updateData.assignedByName=currentUser.nama;}else{updateData.assignedBy='';updateData.assignedByName='';}
     // Notify if re-assigned to different user
-    if(task&&newUserId!==task.userId){
-      try{await db.collection('hrd_notifikasi').add({targetUser:newUserId,title:'📋 Task Dialihkan',message:`${currentUser.nama} mengalihkan task: ${title}`,read:false,type:'daily-task',createdAt:new Date().toISOString()});}catch(_e){}
+    if(task&&newUserId!==task.userId&&newUserId!==currentUser.id){
+      try{await db.collection('hrd_notifikasi').add({targetUser:newUserId,title:'\u{1F4CB} Task Dialihkan',message:`${currentUser.nama} mengalihkan task: ${title}`,read:false,type:'daily-task',createdAt:new Date().toISOString()});}catch(_e){}
     }
   }
   try{await db.collection('hrd_daily_tasks').doc(id).update(updateData);toast('Diperbarui','success');}catch(e){toast('Gagal: '+e.message,'error');}
