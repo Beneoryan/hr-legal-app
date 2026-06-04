@@ -408,7 +408,45 @@ async function renderStrukturOrg(){
 }
 
 // ── ONBOARDING ────────────────────────────────────────────────
-async function renderOnboarding(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>🚀 Onboarding</span><button class="btn btn-primary btn-sm" onclick="modalOnboarding()">+ Tambah</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Mulai</th><th>Checklist</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="tblOnboard"></tbody></table></div></div>`;const snap=await db.collection('hrd_onboarding').get();let h='';if(snap.empty)h='<tr><td colspan="5" class="text-center">Belum ada</td></tr>';else snap.forEach(d=>{const p=d.data();const done=(p.checklist||[]).filter(c=>c.done).length,total=(p.checklist||[]).length;h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggalMulai)}</td><td>${done}/${total}</td><td><span class="badge badge-${done===total?'success':'warning'}">${done===total?'Selesai':'Proses'}</span></td><td><button class="btn btn-xs btn-info" onclick="viewOnboarding('${d.id}')" title="Lihat">👁️</button> <button class="btn btn-xs btn-warning" onclick="editOnboarding('${d.id}')" title="Edit">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusOnboarding('${d.id}')" title="Hapus">🗑️</button></td></tr>`;});document.getElementById('tblOnboard').innerHTML=h;}
+async function renderOnboarding(){
+  const main=document.getElementById('mainContent');
+  const snap=await db.collection('hrd_onboarding').get();
+  const items=[];snap.forEach(d=>items.push({id:d.id,...d.data()}));
+
+  // Collect all unique checklist task names (ordered by first appearance)
+  const allTasks=[];
+  items.forEach(p=>{
+    (p.checklist||[]).forEach(c=>{
+      if(!allTasks.includes(c.task))allTasks.push(c.task);
+    });
+  });
+
+  let h=`<div class="page-title"><span>🚀 Onboarding</span><button class="btn btn-primary btn-sm" onclick="modalOnboarding()">+ Tambah</button></div><div class="card"><div class="table-wrap" style="overflow-x:auto"><table><thead><tr><th style="min-width:120px">Karyawan</th><th>Mulai</th>`;
+  allTasks.forEach(t=>{h+=`<th style="text-align:center;font-size:.65rem;min-width:40px;writing-mode:vertical-rl;transform:rotate(180deg);padding:8px 4px">${escHtml(t)}</th>`;});
+  h+=`<th>Status</th><th>Aksi</th></tr></thead><tbody>`;
+
+  if(!items.length){
+    h+=`<tr><td colspan="${allTasks.length+4}" class="text-center">Belum ada</td></tr>`;
+  } else {
+    items.forEach(p=>{
+      const done=(p.checklist||[]).filter(c=>c.done).length,total=(p.checklist||[]).length;
+      h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggalMulai)}</td>`;
+      allTasks.forEach(task=>{
+        const checkItem=(p.checklist||[]).find(c=>c.task===task);
+        const idx=(p.checklist||[]).findIndex(c=>c.task===task);
+        if(checkItem){
+          h+=`<td style="text-align:center"><input type="checkbox" ${checkItem.done?'checked':''} onchange="toggleOnboardingCheck('${p.id}',${idx})"></td>`;
+        } else {
+          h+=`<td style="text-align:center;color:#ccc">-</td>`;
+        }
+      });
+      h+=`<td><span class="badge badge-${done===total&&total>0?'success':'warning'}">${done===total&&total>0?'Selesai':'Proses'}</span></td>`;
+      h+=`<td><button class="btn btn-xs btn-info" onclick="viewOnboarding('${p.id}')" title="Lihat">👁️</button> <button class="btn btn-xs btn-warning" onclick="editOnboarding('${p.id}')" title="Edit">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusOnboarding('${p.id}')" title="Hapus">🗑️</button></td></tr>`;
+    });
+  }
+  h+='</tbody></table></div></div>';
+  main.innerHTML=h;
+}
 function modalOnboarding(){openModal(`<div class="modal-title">Tambah Onboarding</div><div class="form-group"><label>Nama</label><input class="form-control" id="obNama"></div><div class="form-group"><label>Tanggal Mulai</label><input class="form-control" type="date" id="obTgl" value="${todayStr()}"></div><div class="form-group"><label>Checklist (per baris)</label><textarea class="form-control" id="obCheck">Orientasi perusahaan\nSetup email & akun\nTraining SOP\nPerkenalan tim\nSerah terima perlengkapan</textarea></div><button class="btn btn-primary" onclick="simpanOnboarding()">Simpan</button>`);}
 async function simpanOnboarding(){const nama=document.getElementById('obNama').value;if(!nama)return toast('Nama wajib','warning');const items=document.getElementById('obCheck').value.split('\n').filter(x=>x.trim()).map(x=>({task:x.trim(),done:false}));await db.collection('hrd_onboarding').add({nama,tanggalMulai:document.getElementById('obTgl').value,checklist:items,createdAt:new Date().toISOString()});closeModalDirect();toast('Ditambahkan','success');renderOnboarding();}
 
@@ -468,7 +506,7 @@ async function toggleOnboardingCheck(id,index){
     if(checklist[index])checklist[index].done=!checklist[index].done;
     t.update(ref,{checklist});
   });
-  viewOnboarding(id);
+  renderOnboarding();
 }
 
 async function hapusOnboarding(id){
@@ -478,7 +516,45 @@ async function hapusOnboarding(id){
 }
 
 // ── OFFBOARDING ───────────────────────────────────────────────
-async function renderOffboarding(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>📦 Offboarding</span><button class="btn btn-primary btn-sm" onclick="modalOffboarding()">+ Tambah</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Tgl Keluar</th><th>Alasan</th><th>Status</th><th>Checklist</th><th>Aksi</th></tr></thead><tbody id="tblOff"></tbody></table></div></div>`;const snap=await db.collection('hrd_offboarding').get();let h='';if(snap.empty)h='<tr><td colspan="6" class="text-center">Belum ada</td></tr>';else snap.forEach(d=>{const p=d.data();const done=(p.checklist||[]).filter(c=>c.done).length,total=(p.checklist||[]).length;h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggalKeluar)}</td><td>${escHtml(p.alasan||'-')}</td><td><span class="badge badge-${p.status==='selesai'?'success':'warning'}">${p.status||'proses'}</span></td><td>${total?done+'/'+total:'-'}</td><td><button class="btn btn-xs btn-info" onclick="viewOffboarding('${d.id}')" title="Lihat">👁️</button> <button class="btn btn-xs btn-warning" onclick="editOffboarding('${d.id}')" title="Edit">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusOffboarding('${d.id}')" title="Hapus">🗑️</button></td></tr>`;});document.getElementById('tblOff').innerHTML=h;}
+async function renderOffboarding(){
+  const main=document.getElementById('mainContent');
+  const snap=await db.collection('hrd_offboarding').get();
+  const items=[];snap.forEach(d=>items.push({id:d.id,...d.data()}));
+
+  // Collect all unique checklist task names (ordered by first appearance)
+  const allTasks=[];
+  items.forEach(p=>{
+    (p.checklist||[]).forEach(c=>{
+      if(!allTasks.includes(c.task))allTasks.push(c.task);
+    });
+  });
+
+  let h=`<div class="page-title"><span>📦 Offboarding</span><button class="btn btn-primary btn-sm" onclick="modalOffboarding()">+ Tambah</button></div><div class="card"><div class="table-wrap" style="overflow-x:auto"><table><thead><tr><th style="min-width:120px">Karyawan</th><th>Tgl Keluar</th><th>Alasan</th>`;
+  allTasks.forEach(t=>{h+=`<th style="text-align:center;font-size:.65rem;min-width:40px;writing-mode:vertical-rl;transform:rotate(180deg);padding:8px 4px">${escHtml(t)}</th>`;});
+  h+=`<th>Status</th><th>Aksi</th></tr></thead><tbody>`;
+
+  if(!items.length){
+    h+=`<tr><td colspan="${allTasks.length+5}" class="text-center">Belum ada</td></tr>`;
+  } else {
+    items.forEach(p=>{
+      const done=(p.checklist||[]).filter(c=>c.done).length,total=(p.checklist||[]).length;
+      h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggalKeluar)}</td><td>${escHtml(p.alasan||'-')}</td>`;
+      allTasks.forEach(task=>{
+        const checkItem=(p.checklist||[]).find(c=>c.task===task);
+        const idx=(p.checklist||[]).findIndex(c=>c.task===task);
+        if(checkItem){
+          h+=`<td style="text-align:center"><input type="checkbox" ${checkItem.done?'checked':''} onchange="toggleOffboardingCheck('${p.id}',${idx})"></td>`;
+        } else {
+          h+=`<td style="text-align:center;color:#ccc">-</td>`;
+        }
+      });
+      h+=`<td><span class="badge badge-${p.status==='selesai'||done===total&&total>0?'success':'warning'}">${p.status==='selesai'||done===total&&total>0?'Selesai':'Proses'}</span></td>`;
+      h+=`<td><button class="btn btn-xs btn-info" onclick="viewOffboarding('${p.id}')" title="Lihat">👁️</button> <button class="btn btn-xs btn-warning" onclick="editOffboarding('${p.id}')" title="Edit">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusOffboarding('${p.id}')" title="Hapus">🗑️</button></td></tr>`;
+    });
+  }
+  h+='</tbody></table></div></div>';
+  main.innerHTML=h;
+}
 function modalOffboarding(){openModal(`<div class="modal-title">Tambah Offboarding</div><div class="form-group"><label>Nama</label><input class="form-control" id="offNama"></div><div class="form-group"><label>Tgl Keluar</label><input class="form-control" type="date" id="offTgl" value="${todayStr()}"></div><div class="form-group"><label>Alasan</label><select class="form-control" id="offAlasan"><option>Resign</option><option>PHK</option><option>Kontrak Habis</option><option>Pensiun</option></select></div><div class="form-group"><label>Checklist (per baris)</label><textarea class="form-control" id="offCheck" style="min-height:100px">Serah terima tugas\nPengembalian aset\nDeaktivasi akun\nExit interview\nSurat referensi</textarea></div><button class="btn btn-primary" onclick="simpanOffboarding()">Simpan</button>`);}
 async function simpanOffboarding(){const checklist=document.getElementById('offCheck').value.split('\n').filter(x=>x.trim()).map(x=>({task:x.trim(),done:false}));const data={nama:document.getElementById('offNama').value,tanggalKeluar:document.getElementById('offTgl').value,alasan:document.getElementById('offAlasan').value,status:'proses',checklist,createdAt:new Date().toISOString()};if(!data.nama)return toast('Nama wajib','warning');await db.collection('hrd_offboarding').add(data);closeModalDirect();toast('Ditambahkan','success');renderOffboarding();}
 
@@ -540,7 +616,7 @@ async function toggleOffboardingCheck(id,index){
     if(checklist[index])checklist[index].done=!checklist[index].done;
     t.update(ref,{checklist});
   });
-  viewOffboarding(id);
+  renderOffboarding();
 }
 
 async function hapusOffboarding(id){
