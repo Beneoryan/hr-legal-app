@@ -1255,7 +1255,6 @@ async function loadRekapGrid(){
   // Build cuti map: userId -> {day: jenis}
   const cutiMap={};
   cutiSnap.forEach(d=>{const c=d.data();if(c.status!=='approved')return;if(!c.mulai||!c.selesai)return;const uid=c.userId||'';const namaRaw=(c.nama||'').trim();const nama=namaRaw.toLowerCase();const start=new Date(c.mulai+'T00:00:00');const end=new Date(c.selesai+'T00:00:00');for(let dt=new Date(start);dt<=end;dt.setDate(dt.getDate()+1)){const day=dt.getDate();const m=dt.getMonth()+1;const y=dt.getFullYear();const ds=y+'-'+String(m).padStart(2,'0')+'-'+String(day).padStart(2,'0');if(ds>=startDate&&ds<=endDate){if(uid){if(!cutiMap[uid])cutiMap[uid]={};cutiMap[uid][day]=c.jenis||'Cuti';}if(nama){if(!cutiMap[nama])cutiMap[nama]={};cutiMap[nama][day]=c.jenis||'Cuti';}if(namaRaw){if(!cutiMap[namaRaw])cutiMap[namaRaw]={};cutiMap[namaRaw][day]=c.jenis||'Cuti';}}}});
-  console.log('[RekapAbsen] cutiMap keys:', Object.keys(cutiMap), 'entries:', Object.entries(cutiMap).map(([k,v])=>k+':'+JSON.stringify(v)));
   // Build overtime map: userId -> {day: true}
   const otMap={};
   overtimeSnap.forEach(d=>{const o=d.data();if(o.tanggal&&o.tanggal>=startDate&&o.tanggal<=endDate&&o.status==='approved'){const uid=o.userId||'';const nama=(o.nama||'').toLowerCase();const day=parseInt(o.tanggal.split('-')[2]);if(uid){if(!otMap[uid])otMap[uid]={};otMap[uid][day]=true;}if(nama){if(!otMap[nama])otMap[nama]={};otMap[nama][day]=true;}}});
@@ -1274,9 +1273,9 @@ async function loadRekapGrid(){
   const lemburMap={};
   absenSnap.forEach(d=>{const p=d.data();if(!p.tanggal||p.tanggal<startDate||p.tanggal>endDate)return;const uid=p.userId||'';const pNama=(p.nama||'').toLowerCase();const day=parseInt(p.tanggal.split('-')[2]);
     // Index by userId
-    if(uid){if(!absenMap[uid])absenMap[uid]={};if(p.tipe==='masuk')absenMap[uid][day]=p.status||'hadir';else if(p.tipe==='pulang'&&p.lembur){absenMap[uid][day]='lembur';if(!lemburMap[uid])lemburMap[uid]={};lemburMap[uid][day]=p.lemburJam||0;}else if(p.tipe==='pulang'&&(p.status==='kurang_jam'||p.status==='lengkap'))absenMap[uid][day]=p.status;else if(p.tipe==='pulang'&&p.jamKerjaActual){if(!jamKerjaMap[uid])jamKerjaMap[uid]={};jamKerjaMap[uid][day]=p.jamKerjaActual;}else if(p.tipe==='dinas_luar'&&!absenMap[uid][day])absenMap[uid][day]='dinas';}
+    if(uid){if(!absenMap[uid])absenMap[uid]={};if(p.tipe==='masuk')absenMap[uid][day]=p.status||'hadir';else if(p.tipe==='pulang'&&p.lembur){absenMap[uid][day]='lembur';if(!lemburMap[uid])lemburMap[uid]={};lemburMap[uid][day]=p.lemburJam||0;}else if(p.tipe==='pulang'&&(p.status==='kurang_jam'||p.status==='lengkap'))absenMap[uid][day]=p.status;else if(p.tipe==='pulang'&&p.jamKerjaActual){if(!jamKerjaMap[uid])jamKerjaMap[uid]={};jamKerjaMap[uid][day]=p.jamKerjaActual;}}
     // Index by lowercase nama
-    if(pNama){if(!absenMap[pNama])absenMap[pNama]={};if(p.tipe==='masuk'&&!absenMap[pNama][day])absenMap[pNama][day]=p.status||'hadir';else if(p.tipe==='dinas_luar'&&!absenMap[pNama][day])absenMap[pNama][day]='dinas';else if(p.tipe==='pulang'&&p.lembur&&!absenMap[pNama][day])absenMap[pNama][day]='lembur';else if(p.tipe==='pulang'&&p.status==='lengkap'&&!absenMap[pNama][day])absenMap[pNama][day]='lengkap';else if(p.tipe==='pulang'&&p.status==='kurang_jam'&&!absenMap[pNama][day])absenMap[pNama][day]='kurang_jam';}
+    if(pNama){if(!absenMap[pNama])absenMap[pNama]={};if(p.tipe==='masuk'&&!absenMap[pNama][day])absenMap[pNama][day]=p.status||'hadir';else if(p.tipe==='pulang'&&p.lembur&&!absenMap[pNama][day])absenMap[pNama][day]='lembur';else if(p.tipe==='pulang'&&p.status==='lengkap'&&!absenMap[pNama][day])absenMap[pNama][day]='lengkap';else if(p.tipe==='pulang'&&p.status==='kurang_jam'&&!absenMap[pNama][day])absenMap[pNama][day]='kurang_jam';}
   });
 
   let h='<div class="table-wrap"><table><thead><tr><th style="min-width:120px">Nama</th>';
@@ -1311,7 +1310,6 @@ async function loadRekapGrid(){
       else if(st==='lembur'||isOT){color='#7b1fa2';text='L';ut++;totalLembur++;if(lemburJam){userLemburJam+=lemburJam;totalLemburJam+=lemburJam;}}
       else if(st==='tepat_waktu'||st==='hadir'){color='#4caf50';text='✓';ut++;totalH++;}
       else if(st==='terlambat'){color='#ff9800';text='T';ut++;totalT++;}
-      else if(st==='dinas'){color='#2196f3';text='D';ut++;totalD++;}
       else if(st==='lengkap'){color='#4caf50';text='✓';ut++;totalL++;}
       else if(st==='kurang_jam'){color='#ff5722';text='K';ut++;totalK++;}
       if(flex.enabled&&jamKerja){title=` title="${jamKerja.toFixed(1)} jam"`;}
