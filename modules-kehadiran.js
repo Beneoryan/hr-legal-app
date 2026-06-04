@@ -307,7 +307,7 @@ async function renderMyCalendarView(container) {
       <button class="btn btn-sm btn-outline" onclick="hariLiburNextMonth()">&gt;</button>
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <span style="font-size:.75rem;color:var(--text-light)">🔴 Libur &nbsp; 🔵 Pending &nbsp; 🟢 Selesai &nbsp; 🔴 Terlambat</span>
+      <span style="font-size:.75rem;color:var(--text-light)">🔴 Libur &nbsp; 🔵 Pending &nbsp; 🟢 Selesai &nbsp; 🔴 Terlambat &nbsp; 🟣 Ditugaskan</span>
     </div>
   </div>`;
 
@@ -322,10 +322,18 @@ async function renderMyCalendarView(container) {
   try {
     const [holSnap, taskSnap] = await Promise.all([
       db.collection('hrd_hari_libur').where('tanggal','>=',startDate).where('tanggal','<=',endDate).get(),
-      db.collection('hrd_daily_tasks').where('userId','==',currentUser.id).where('tanggal','>=',startDate).where('tanggal','<=',endDate).get()
+      db.collection('hrd_daily_tasks').get()
     ]);
     holSnap.forEach(d => holidays.push({ id: d.id, ...d.data() }));
-    taskSnap.forEach(d => tasks.push({ id: d.id, ...d.data() }));
+    taskSnap.forEach(d => {
+      const t = d.data();
+      if (t.userId === currentUser.id && t.tanggal >= startDate && t.tanggal <= endDate) {
+        tasks.push({ id: d.id, ...t });
+      }
+      if (hasAccess(3) && t.assignedBy === currentUser.id && t.userId !== currentUser.id && t.tanggal >= startDate && t.tanggal <= endDate) {
+        tasks.push({ id: d.id, ...t, _isAssigned: true });
+      }
+    });
   } catch(e) { console.warn('Failed to load calendar data:', e); }
 
   // Build calendar grid
@@ -382,12 +390,13 @@ async function renderMyCalendarView(container) {
     // Show tasks
     dayTasks.forEach(t => {
       let bgTask;
-      if (t.done) { bgTask = '#4caf50'; }
+      if (t._isAssigned) { bgTask = '#7b1fa2'; }
+      else if (t.done) { bgTask = '#4caf50'; }
       else if (t.tanggal < today) { bgTask = '#c62828'; }
       else { bgTask = '#1565c0'; }
       const priorityMark = t.priority === 'high' ? '! ' : '';
       const taskLabel = (priorityMark + t.title).length > 14 ? (priorityMark + t.title).substring(0, 14) + '...' : priorityMark + t.title;
-      calHtml += `<div style="font-size:.6rem;background:${bgTask};color:#fff;padding:1px 4px;border-radius:3px;margin-top:2px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escHtml(t.title)}" onclick="navigateTo('daily-task')">${escHtml(taskLabel)}</div>`;
+      calHtml += `<div style="font-size:.6rem;background:${bgTask};color:#fff;padding:1px 4px;border-radius:3px;margin-top:2px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escHtml(t.title)}${t._isAssigned?' (ditugaskan ke '+escHtml(t.targetUserName||'')+')':''}" onclick="navigateTo('daily-task')">${escHtml(taskLabel)}</div>`;
     });
 
     calHtml += '</div>';
@@ -530,6 +539,7 @@ async function simpanPenalty(){const data={nama:document.getElementById('penNama
 // ── DAILY TASK & REMINDER ─────────────────────────────────────
 async function renderDailyTask(){
   const main=document.getElementById('mainContent');
+  const assignedTab=hasAccess(3)?'<div class="tab" onclick="filterDailyTasks(\'assigned\')">Ditugaskan</div>':'';
   main.innerHTML=`
     <div class="page-title"><span>📋 Daily Task & Reminder</span><button class="btn btn-primary btn-sm" onclick="modalAddTask()">+ Tambah Task</button></div>
     <div class="stats-grid mb-16" id="taskStats"></div>
@@ -540,6 +550,7 @@ async function renderDailyTask(){
         <div class="tab" onclick="filterDailyTasks('upcoming')">Mendatang</div>
         <div class="tab" onclick="filterDailyTasks('done')">Selesai</div>
         <div class="tab" onclick="filterDailyTasks('overdue')">Terlambat</div>
+        ${assignedTab}
       </div>
       <div id="taskList">Loading...</div>
     </div>`;
@@ -553,14 +564,14 @@ async function loadDailyTasks(filter){
   _dailyTaskFilter=filter||'all';
   document.querySelectorAll('#taskTabs .tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('#taskTabs .tab').forEach(t=>{
-    const map={all:'Semua',today:'Hari Ini',upcoming:'Mendatang',done:'Selesai',overdue:'Terlambat'};
+    const map={all:'Semua',today:'Hari Ini',upcoming:'Mendatang',done:'Selesai',overdue:'Terlambat',assigned:'Ditugaskan'};
     if(t.textContent.trim()===map[filter])t.classList.add('active');
   });
   try{
     const snap=await db.collection('hrd_daily_tasks').get();
     _dailyTaskData=[];
     const isAdmin=hasAccess(3);
-    snap.forEach(d=>{const t=d.data();if(isAdmin||t.userId===currentUser.id)_dailyTaskData.push({id:d.id,...t});});
+    snap.forEach(d=>{const t=d.data();if(isAdmin){if(t.userId===currentUser.id||t.assignedBy===currentUser.id)_dailyTaskData.push({id:d.id,...t});}else{if(t.userId===currentUser.id)_dailyTaskData.push({id:d.id,...t});}});
   }catch(e){_dailyTaskData=[];}
   const today=todayStr();
   let filtered=_dailyTaskData;
@@ -568,6 +579,7 @@ async function loadDailyTasks(filter){
   else if(filter==='upcoming')filtered=_dailyTaskData.filter(t=>t.tanggal>today&&!t.done);
   else if(filter==='done')filtered=_dailyTaskData.filter(t=>t.done);
   else if(filter==='overdue')filtered=_dailyTaskData.filter(t=>t.tanggal<today&&!t.done);
+  else if(filter==='assigned')filtered=_dailyTaskData.filter(t=>t.assignedBy===currentUser.id&&t.userId!==currentUser.id);
   const priorityOrder={high:0,medium:1,low:2};
   filtered.sort((a,b)=>{
     if(!a.done&&!b.done){if(a.tanggal<today&&b.tanggal>=today)return -1;if(b.tanggal<today&&a.tanggal>=today)return 1;}
@@ -602,12 +614,39 @@ async function loadDailyTasks(filter){
     if(isAdmin&&t.targetUserName)html+=`👤 Untuk: <strong>${escHtml(t.targetUserName)}</strong> | `;
     html+=`📅 ${formatDate(t.tanggal)}${t.waktu?' ⏰ '+t.waktu:''}${t.reminder?' 🔔 '+t.reminder:''}${t.assignedByName?' | 👤 Ditugaskan oleh: '+escHtml(t.assignedByName):''}`;
     html+=`</div></div>`;
-    html+=`<div style="display:flex;gap:4px"><button class="btn btn-xs btn-warning" onclick="editDailyTask('${t.id}')">✏️</button><button class="btn btn-xs btn-danger" onclick="hapusDailyTask('${t.id}')">🗑️</button></div></div>`;
+    // Determine action buttons: admin always gets edit+delete, assigned tasks from others get view only
+    const isAssignedByOther=t.assignedBy&&t.assignedBy!==currentUser.id&&t.userId===currentUser.id;
+    if(isAdmin||!isAssignedByOther){
+      html+=`<div style="display:flex;gap:4px"><button class="btn btn-xs btn-info" onclick="viewDailyTask('${t.id}')" title="Lihat">👁️</button><button class="btn btn-xs btn-warning" onclick="editDailyTask('${t.id}')">✏️</button><button class="btn btn-xs btn-danger" onclick="hapusDailyTask('${t.id}')">🗑️</button></div></div>`;
+    }else{
+      html+=`<div style="display:flex;gap:4px"><button class="btn btn-xs btn-info" onclick="viewDailyTask('${t.id}')" title="Lihat">👁️</button></div></div>`;
+    }
   });
   listEl.innerHTML=html;
 }
 
 function filterDailyTasks(f){loadDailyTasks(f);}
+
+function viewDailyTask(id){
+  const task=_dailyTaskData.find(t=>t.id===id);if(!task)return;
+  const priorityLabel=task.priority==='high'?'Tinggi':task.priority==='low'?'Rendah':'Sedang';
+  const priorityColor=task.priority==='high'?'#c62828':task.priority==='low'?'#666':'#f57f17';
+  const statusLabel=task.done?'<span class="badge badge-success">Selesai</span>':task.tanggal<todayStr()?'<span class="badge badge-danger">Terlambat</span>':'<span class="badge badge-info">Aktif</span>';
+  openModal(`<div class="modal-title">📋 Detail Task</div>
+    <table style="width:100%;border-collapse:collapse">
+      <tr><td style="padding:8px;font-weight:700;width:140px">Judul</td><td style="padding:8px">${escHtml(task.title)}</td></tr>
+      <tr><td style="padding:8px;font-weight:700">Deskripsi</td><td style="padding:8px">${escHtml(task.description||'-')}</td></tr>
+      <tr><td style="padding:8px;font-weight:700">Tanggal</td><td style="padding:8px">${formatDate(task.tanggal)}</td></tr>
+      <tr><td style="padding:8px;font-weight:700">Waktu</td><td style="padding:8px">${task.waktu||'-'}</td></tr>
+      <tr><td style="padding:8px;font-weight:700">Prioritas</td><td style="padding:8px"><span style="color:${priorityColor};font-weight:600">${priorityLabel}</span></td></tr>
+      <tr><td style="padding:8px;font-weight:700">Pengingat</td><td style="padding:8px">${task.reminder||'Tidak ada'}</td></tr>
+      <tr><td style="padding:8px;font-weight:700">Status</td><td style="padding:8px">${statusLabel}</td></tr>
+      ${task.assignedByName?`<tr><td style="padding:8px;font-weight:700">Ditugaskan oleh</td><td style="padding:8px">${escHtml(task.assignedByName)}</td></tr>`:''}
+      ${task.targetUserName?`<tr><td style="padding:8px;font-weight:700">Untuk</td><td style="padding:8px">${escHtml(task.targetUserName)}</td></tr>`:''}
+      ${task.doneAt?`<tr><td style="padding:8px;font-weight:700">Selesai pada</td><td style="padding:8px">${formatDate(task.doneAt.split('T')[0])} ${task.doneAt.split('T')[1]?task.doneAt.split('T')[1].substring(0,5):''}</td></tr>`:''}
+    </table>
+    <div style="margin-top:16px;text-align:right"><button class="btn btn-sm btn-outline" onclick="closeModalDirect()">Tutup</button></div>`);
+}
 
 async function modalAddTask(){
   // If admin/manager/head/bod, show user assignment dropdown with self option
