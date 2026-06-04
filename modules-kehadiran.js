@@ -185,24 +185,12 @@ async function renderHariLibur() {
     <div class="page-title"><span>📅 Hari Libur</span></div>
     <div class="card">
       <div class="tabs mb-16" id="hariLiburTabs">
-        <div class="tab ${hariLiburViewMode==='kalender'?'active':''}" onclick="switchHariLiburView('kalender')">📅 Kalender</div>
-        <div class="tab ${hariLiburViewMode==='daftar'?'active':''}" onclick="switchHariLiburView('daftar')">📋 Daftar</div>
-      </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:16px">
-        <div style="display:flex;align-items:center;gap:8px">
-          <button class="btn btn-sm btn-outline" onclick="hariLiburPrevMonth()">&lt;</button>
-          <span class="fw-700 color-primary" id="hariLiburMonthLabel" style="min-width:140px;text-align:center"></span>
-          <button class="btn btn-sm btn-outline" onclick="hariLiburNextMonth()">&gt;</button>
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          ${hasAccess(6)?'<button class="btn btn-info btn-sm" onclick="syncHariLiburNasional()">🔄 Sinkron Nasional</button>':''}
-          ${hasAccess(6)?'<button class="btn btn-primary btn-sm" onclick="modalHariLibur()">+ Tambah Custom</button>':''}
-        </div>
+        <div class="tab ${hariLiburViewMode==='kalender'?'active':''}" onclick="switchHariLiburView('kalender')">📅 Google Calendar</div>
+        <div class="tab ${hariLiburViewMode==='daftar'?'active':''}" onclick="switchHariLiburView('daftar')">📋 Daftar Libur</div>
       </div>
       <div id="hariLiburContent"></div>
     </div>`;
   await loadHariLiburView();
-  checkHariLiburReminders();
 }
 
 function switchHariLiburView(mode) {
@@ -225,120 +213,63 @@ function hariLiburNextMonth() {
 async function loadHariLiburView() {
   const y = hariLiburCalendarMonth.year;
   const m = hariLiburCalendarMonth.month;
-  const monthNames = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
-  const label = document.getElementById('hariLiburMonthLabel');
-  if (label) label.textContent = `${monthNames[m]} ${y}`;
-
-  // Load holidays from Firestore
-  const startDate = `${y}-${String(m+1).padStart(2,'0')}-01`;
-  const endDate = `${y}-${String(m+1).padStart(2,'0')}-${String(new Date(y, m+1, 0).getDate()).padStart(2,'0')}`;
-  const snap = await db.collection('hrd_hari_libur').where('tanggal','>=',startDate).where('tanggal','<=',endDate).get();
-  const holidays = [];
-  snap.forEach(d => holidays.push({ id: d.id, ...d.data() }));
-
-  // Load user reminders: replaced with Google Calendar integration
+  const container = document.getElementById('hariLiburContent');
+  if (!container) return;
   window._hariLiburUserReminders = [];
   window._hariLiburUserNotes = [];
 
-  const container = document.getElementById('hariLiburContent');
-  if (!container) return;
-
   if (hariLiburViewMode === 'kalender') {
-    renderHariLiburCalendar(container, y, m, holidays);
+    renderGoogleCalendarEmbed(container);
   } else {
-    renderHariLiburList(container, y, m, holidays);
+    const monthNames = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+    const startDate = `${y}-${String(m+1).padStart(2,'0')}-01`;
+    const endDate = `${y}-${String(m+1).padStart(2,'0')}-${String(new Date(y, m+1, 0).getDate()).padStart(2,'0')}`;
+    let holidays = [];
+    try {
+      const snap = await db.collection('hrd_hari_libur').where('tanggal','>=',startDate).where('tanggal','<=',endDate).get();
+      snap.forEach(d => holidays.push({ id: d.id, ...d.data() }));
+    } catch(e) { console.warn('Failed to load holidays:', e); }
+    let navHtml = `<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="btn btn-sm btn-outline" onclick="hariLiburPrevMonth()">&lt;</button>
+        <span class="fw-700 color-primary" style="min-width:140px;text-align:center">${monthNames[m]} ${y}</span>
+        <button class="btn btn-sm btn-outline" onclick="hariLiburNextMonth()">&gt;</button>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${hasAccess(6)?'<button class="btn btn-info btn-sm" onclick="syncHariLiburNasional()">🔄 Sinkron Nasional</button>':''}
+        ${hasAccess(6)?'<button class="btn btn-primary btn-sm" onclick="modalHariLibur()">+ Tambah Custom</button>':''}
+      </div>
+    </div>`;
+    container.innerHTML = navHtml;
+    const listDiv = document.createElement('div');
+    container.appendChild(listDiv);
+    renderHariLiburList(listDiv, y, m, holidays);
   }
 }
 
-function renderHariLiburCalendar(container, year, month, holidays) {
-  const today = new Date();
-  const todayStr2 = today.toISOString().split('T')[0];
-  const firstDay = new Date(year, month, 1);
-  const lastDay = new Date(year, month + 1, 0);
-  const daysInMonth = lastDay.getDate();
-  // Monday = 0, Sunday = 6
-  let startDayOfWeek = firstDay.getDay() - 1;
-  if (startDayOfWeek < 0) startDayOfWeek = 6;
-
-  const holidayMap = {};
-  holidays.forEach(h => {
-    const day = parseInt(h.tanggal.split('-')[2]);
-    if (!holidayMap[day]) holidayMap[day] = [];
-    holidayMap[day].push(h);
-  });
-
-  let html = `<style>
-    .hl-calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-top:8px}
-    .hl-cal-header{padding:8px 4px;text-align:center;font-size:.75rem;font-weight:700;color:var(--primary);background:#f0f4ff;border-radius:4px}
-    .hl-cal-cell{min-height:70px;padding:4px 6px;border-radius:6px;border:1.5px solid transparent;position:relative;cursor:pointer;transition:all .15s}
-    .hl-cal-cell:hover{box-shadow:0 2px 8px rgba(0,0,0,.1)}
-    .hl-cal-cell.hl-empty{background:transparent;border:none;min-height:auto}
-    .hl-cal-cell.hl-weekend{background:#f5f5f5;color:#999}
-    .hl-cal-cell.hl-holiday{background:#ffebee;border-color:#ef5350}
-    .hl-cal-cell.hl-cuti-bersama{background:#fff3e0;border-color:#ff9800}
-    .hl-cal-cell.hl-today{border-color:#1565c0;box-shadow:0 0 0 2px rgba(21,101,192,.3)}
-    .hl-cal-day{font-size:.85rem;font-weight:700}
-    .hl-cal-cell.hl-holiday .hl-cal-day{color:#c62828}
-    .hl-cal-cell.hl-cuti-bersama .hl-cal-day{color:#e65100}
-    .hl-cal-cell.hl-today .hl-cal-day{color:#1565c0}
-    .hl-cal-name{font-size:.6rem;color:#c62828;margin-top:2px;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-    .hl-cal-cell.hl-cuti-bersama .hl-cal-name{color:#e65100}
-  </style>
-  <div class="hl-calendar">
-    <div class="hl-cal-header">Sen</div>
-    <div class="hl-cal-header">Sel</div>
-    <div class="hl-cal-header">Rab</div>
-    <div class="hl-cal-header">Kam</div>
-    <div class="hl-cal-header">Jum</div>
-    <div class="hl-cal-header" style="color:var(--text-light)">Sab</div>
-    <div class="hl-cal-header" style="color:var(--danger)">Min</div>`;
-
-  // Empty cells for days before month start
-  for (let i = 0; i < startDayOfWeek; i++) {
-    html += '<div class="hl-cal-cell hl-empty"></div>';
-  }
-
-  for (let day = 1; day <= daysInMonth; day++) {
-    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-    const dayOfWeek = (startDayOfWeek + day - 1) % 7; // 0=Mon, 5=Sat, 6=Sun
-    const isWeekend = dayOfWeek >= 5;
-    const isToday = dateStr === todayStr2;
-    const dayHolidays = holidayMap[day] || [];
-    const hasHoliday = dayHolidays.some(h => h.tipe === 'nasional' || h.tipe === 'perusahaan');
-    const hasCutiBersama = dayHolidays.some(h => h.tipe === 'cuti_bersama');
-
-    let classes = 'hl-cal-cell';
-    if (hasHoliday) classes += ' hl-holiday';
-    else if (hasCutiBersama) classes += ' hl-cuti-bersama';
-    else if (isWeekend) classes += ' hl-weekend';
-    if (isToday) classes += ' hl-today';
-
-    const title = dayHolidays.map(h => h.nama).join(', ');
-    html += `<div class="${classes}" title="${escHtml(title)}" onclick="openHariLiburDayDetail('${dateStr}','${dayHolidays.map(h=>h.id).join(',')}')">`;
-    html += `<div class="hl-cal-day">${day}</div>`;
-    if (dayHolidays.length > 0) {
-      html += `<div class="hl-cal-name">${escHtml(dayHolidays[0].nama)}</div>`;
-    }
-    html += '</div>';
-  }
-
+function renderGoogleCalendarEmbed(container) {
+  const calendarId = 'id.indonesian%23holiday%40group.v.calendar.google.com';
+  const embedUrl = 'https://calendar.google.com/calendar/embed?src='+calendarId+'&ctz=Asia/Jakarta&mode=MONTH&showTitle=0&showNav=1&showDate=1&showPrint=0&showTabs=0&showCalendars=0&showTz=0&wkst=2';
+  let html = '<div style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">';
+  html += '<p class="text-sm" style="color:var(--text-light)">Kalender Indonesia terintegrasi dengan Google Calendar. Klik event untuk detail, atau tambahkan ke kalender pribadi.</p>';
+  html += '<div style="display:flex;gap:8px">';
+  html += hasAccess(6)?'<button class="btn btn-info btn-sm" onclick="syncHariLiburNasional()">🔄 Sinkron</button>':'';
+  html += hasAccess(6)?'<button class="btn btn-primary btn-sm" onclick="modalHariLibur()">+ Tambah</button>':'';
+  html += '</div></div>';
+  html += '<div style="border-radius:8px;overflow:hidden;border:1px solid var(--border);background:#fff">';
+  html += '<iframe src="'+embedUrl+'" style="border:0;width:100%;height:600px" frameborder="0" scrolling="no"></iframe>';
   html += '</div>';
-
-  // Legend
-  html += `<div style="margin-top:16px;display:flex;gap:16px;flex-wrap:wrap;align-items:center">
-    <span class="text-xs"><span style="display:inline-block;width:14px;height:14px;background:#ffebee;border:1.5px solid #ef5350;border-radius:3px;vertical-align:middle"></span> Hari Libur</span>
-    <span class="text-xs"><span style="display:inline-block;width:14px;height:14px;background:#fff3e0;border:1.5px solid #ff9800;border-radius:3px;vertical-align:middle"></span> Cuti Bersama</span>
-    <span class="text-xs"><span style="display:inline-block;width:14px;height:14px;background:#f5f5f5;border:1.5px solid #ddd;border-radius:3px;vertical-align:middle"></span> Weekend</span>
-    <span class="text-xs"><span style="display:inline-block;width:14px;height:14px;background:#fff;border:2px solid #1565c0;border-radius:3px;vertical-align:middle"></span> Hari Ini</span>
-  </div>`;
-
+  html += '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">';
+  html += '<a href="https://calendar.google.com/calendar/r?cid='+calendarId+'" target="_blank" class="btn btn-sm btn-primary" style="text-decoration:none">+ Tambahkan ke Google Calendar Saya</a>';
+  html += '<a href="https://calendar.google.com/calendar/r" target="_blank" class="btn btn-sm btn-outline" style="text-decoration:none">Buka Google Calendar</a>';
+  html += '</div>';
   container.innerHTML = html;
 }
 
 function renderHariLiburList(container, year, month, holidays) {
-  let html = '<div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Nama</th><th>Tipe</th><th>Catatan</th><th style="min-width:140px">Aksi</th></tr></thead><tbody>';
+  let html = '<div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Nama</th><th>Tipe</th><th>Aksi</th></tr></thead><tbody>';
   if (!holidays.length) {
-    html += '<tr><td colspan="5" class="text-center">Tidak ada hari libur bulan ini</td></tr>';
+    html += '<tr><td colspan="4" class="text-center">Tidak ada hari libur bulan ini</td></tr>';
   } else {
     holidays.forEach(h => {
       const tipeBadge = h.tipe === 'nasional' ? 'badge-danger' : h.tipe === 'cuti_bersama' ? 'badge-warning' : 'badge-info';
@@ -347,7 +278,6 @@ function renderHariLiburList(container, year, month, holidays) {
         <td>${formatDate(h.tanggal)}</td>
         <td class="fw-700">${escHtml(h.nama)}</td>
         <td><span class="badge ${tipeBadge}">${tipeLabel}</span></td>
-        <td class="text-sm">${escHtml(h.noted||h.catatan||'-')}</td>
         <td>
           <a href="https://calendar.google.com/calendar/render?action=TEMPLATE&dates=${h.tanggal.replace(/-/g,'')}/${h.tanggal.replace(/-/g,'')}&text=${encodeURIComponent(h.nama)}" target="_blank" class="btn btn-xs btn-info" title="Tambah ke Google Calendar">📅</a>
           ${hasAccess(6)?'<button class="btn btn-xs btn-danger" onclick="hapusHariLibur(\''+h.id+'\')">🗑️</button>':''}
@@ -395,36 +325,6 @@ async function simpanHariLibur() {
 
 
 async function checkHariLiburReminders(){}
-
-async function openHariLiburDayDetail(dateStr, holidayIdsStr){
-  const holidayIds=holidayIdsStr?holidayIdsStr.split(','):[];
-  const holidays=[];
-  for(const hid of holidayIds){
-    if(!hid)continue;
-    try{const d=await db.collection('hrd_hari_libur').doc(hid).get();if(d.exists)holidays.push({id:d.id,...d.data()});}catch(e){}
-  }
-  const dayName=new Date(dateStr+'T00:00:00').toLocaleDateString('id-ID',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
-  const dateFormatted=dateStr.replace(/-/g,'');
-  let html=`<div class="modal-title">📅 ${dayName}</div>`;
-  if(holidays.length){
-    html+=`<div style="padding:10px;background:#ffebee;border-radius:8px;margin-bottom:12px">`;
-    holidays.forEach(h=>{
-      const tipeBadge=h.tipe==='nasional'?'badge-danger':h.tipe==='cuti_bersama'?'badge-warning':'badge-info';
-      const tipeLabel=h.tipe==='nasional'?'Nasional':h.tipe==='cuti_bersama'?'Cuti Bersama':'Perusahaan';
-      html+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span class="badge ${tipeBadge}">${tipeLabel}</span> <span class="fw-700">${escHtml(h.nama)}</span></div>`;
-    });
-    html+=`</div>`;
-  }
-  html+=`<div style="margin-top:16px"><p class="text-sm" style="color:var(--text-light);margin-bottom:12px">Gunakan Google Calendar untuk menambahkan catatan, event, atau pengingat:</p>`;
-  const eventTitle=holidays.length?encodeURIComponent(holidays[0].nama):'';
-  const gcalCreateUrl=`https://calendar.google.com/calendar/render?action=TEMPLATE&dates=${dateFormatted}/${dateFormatted}&text=${eventTitle}`;
-  html+=`<div style="display:flex;flex-direction:column;gap:8px">`;
-  html+=`<a href="${gcalCreateUrl}" target="_blank" class="btn btn-primary" style="text-decoration:none;text-align:center">📅 Buat Event di Google Calendar</a>`;
-  html+=`<a href="https://calendar.google.com/calendar/r/day/${dateStr.replace(/-/g,'/')}" target="_blank" class="btn btn-info" style="text-decoration:none;text-align:center">🔍 Lihat Tanggal di Google Calendar</a>`;
-  html+=`</div></div>`;
-  html+=`<div class="flex gap-8 mt-16"><button class="btn btn-outline" onclick="closeModalDirect()">Tutup</button></div>`;
-  openModal(html);
-}
 
 
 
