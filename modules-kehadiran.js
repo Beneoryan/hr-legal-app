@@ -173,7 +173,7 @@ const HARI_LIBUR_NASIONAL_2026 = [
 ];
 
 let hariLiburCalendarMonth = null;
-let hariLiburViewMode = 'kalender'; // 'kalender' or 'daftar'
+let hariLiburViewMode = 'kalender'; // 'kalender', 'myCalendar', or 'daftar'
 
 async function renderHariLibur() {
   const main = document.getElementById('mainContent');
@@ -186,6 +186,7 @@ async function renderHariLibur() {
     <div class="card">
       <div class="tabs mb-16" id="hariLiburTabs">
         <div class="tab ${hariLiburViewMode==='kalender'?'active':''}" onclick="switchHariLiburView('kalender')">📅 Google Calendar</div>
+        <div class="tab ${hariLiburViewMode==='myCalendar'?'active':''}" onclick="switchHariLiburView('myCalendar')">📋 Kalender Saya</div>
         <div class="tab ${hariLiburViewMode==='daftar'?'active':''}" onclick="switchHariLiburView('daftar')">📋 Daftar Libur</div>
       </div>
       <div id="hariLiburContent"></div>
@@ -220,6 +221,8 @@ async function loadHariLiburView() {
 
   if (hariLiburViewMode === 'kalender') {
     renderGoogleCalendarEmbed(container);
+  } else if (hariLiburViewMode === 'myCalendar') {
+    renderMyCalendarView(container);
   } else {
     const monthNames = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
     const startDate = `${y}-${String(m+1).padStart(2,'0')}-01`;
@@ -287,6 +290,121 @@ function renderHariLiburList(container, year, month, holidays) {
   }
   html += '</tbody></table></div>';
   container.innerHTML = html;
+}
+
+async function renderMyCalendarView(container) {
+  const y = hariLiburCalendarMonth.year;
+  const m = hariLiburCalendarMonth.month;
+  const monthNames = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const dayNames = ['Sen','Sel','Rab','Kam','Jum','Sab','Min'];
+  const today = todayStr();
+
+  // Navigation
+  let navHtml = `<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <button class="btn btn-sm btn-outline" onclick="hariLiburPrevMonth()">&lt;</button>
+      <span class="fw-700 color-primary" style="min-width:140px;text-align:center">${monthNames[m]} ${y}</span>
+      <button class="btn btn-sm btn-outline" onclick="hariLiburNextMonth()">&gt;</button>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:.75rem;color:var(--text-light)">🔴 Libur &nbsp; 🔵 Pending &nbsp; 🟢 Selesai &nbsp; 🔴 Terlambat</span>
+    </div>
+  </div>`;
+
+  container.innerHTML = navHtml + '<div style="text-align:center;padding:24px;color:var(--text-light)">Memuat kalender...</div>';
+
+  // Load holidays and tasks for this month
+  const startDate = `${y}-${String(m+1).padStart(2,'0')}-01`;
+  const endDate = `${y}-${String(m+1).padStart(2,'0')}-${String(new Date(y, m+1, 0).getDate()).padStart(2,'0')}`;
+  let holidays = [];
+  let tasks = [];
+
+  try {
+    const [holSnap, taskSnap] = await Promise.all([
+      db.collection('hrd_hari_libur').where('tanggal','>=',startDate).where('tanggal','<=',endDate).get(),
+      db.collection('hrd_daily_tasks').where('userId','==',currentUser.id).where('tanggal','>=',startDate).where('tanggal','<=',endDate).get()
+    ]);
+    holSnap.forEach(d => holidays.push({ id: d.id, ...d.data() }));
+    taskSnap.forEach(d => tasks.push({ id: d.id, ...d.data() }));
+  } catch(e) { console.warn('Failed to load calendar data:', e); }
+
+  // Build calendar grid
+  const firstDay = new Date(y, m, 1).getDay(); // 0=Sun,1=Mon,...
+  const daysInMonth = new Date(y, m+1, 0).getDate();
+  const daysInPrevMonth = new Date(y, m, 0).getDate();
+  // Adjust to Monday start: Mon=0, Tue=1,...Sun=6
+  const startOffset = (firstDay === 0) ? 6 : firstDay - 1;
+
+  // Map holidays and tasks by day
+  const holidayMap = {};
+  holidays.forEach(h => {
+    const day = parseInt(h.tanggal.split('-')[2]);
+    if (!holidayMap[day]) holidayMap[day] = [];
+    holidayMap[day].push(h);
+  });
+  const taskMap = {};
+  tasks.forEach(t => {
+    const day = parseInt(t.tanggal.split('-')[2]);
+    if (!taskMap[day]) taskMap[day] = [];
+    taskMap[day].push(t);
+  });
+
+  let calHtml = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:#e0e0e0;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden">';
+  // Header
+  dayNames.forEach(dn => {
+    calHtml += `<div style="background:#f5f5f5;padding:8px;text-align:center;font-weight:700;font-size:.8rem">${dn}</div>`;
+  });
+
+  // Previous month padding days
+  for (let i = startOffset - 1; i >= 0; i--) {
+    const d = daysInPrevMonth - i;
+    calHtml += `<div style="background:#fafafa;min-height:80px;padding:4px;opacity:.4"><div style="font-size:.8rem;color:#999">${d}</div></div>`;
+  }
+
+  // Current month days
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const isToday = dateStr === today;
+    const dayHolidays = holidayMap[day] || [];
+    const dayTasks = taskMap[day] || [];
+    const bgColor = isToday ? '#e3f2fd' : '#fff';
+    const borderStyle = isToday ? 'box-shadow:inset 0 0 0 2px #1565c0;' : '';
+
+    calHtml += `<div style="background:${bgColor};min-height:80px;padding:4px;${borderStyle}position:relative">`;
+    calHtml += `<div style="font-weight:700;font-size:.85rem;${isToday?'color:#1565c0':''}">${day}</div>`;
+
+    // Show holidays
+    dayHolidays.forEach(h => {
+      const label = h.nama.length > 15 ? h.nama.substring(0, 15) + '...' : h.nama;
+      calHtml += `<div style="font-size:.6rem;background:#c62828;color:#fff;padding:1px 4px;border-radius:3px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escHtml(h.nama)}">${escHtml(label)}</div>`;
+    });
+
+    // Show tasks
+    dayTasks.forEach(t => {
+      let bgTask;
+      if (t.done) { bgTask = '#4caf50'; }
+      else if (t.tanggal < today) { bgTask = '#c62828'; }
+      else { bgTask = '#1565c0'; }
+      const priorityMark = t.priority === 'high' ? '! ' : '';
+      const taskLabel = (priorityMark + t.title).length > 14 ? (priorityMark + t.title).substring(0, 14) + '...' : priorityMark + t.title;
+      calHtml += `<div style="font-size:.6rem;background:${bgTask};color:#fff;padding:1px 4px;border-radius:3px;margin-top:2px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escHtml(t.title)}" onclick="navigateTo('daily-task')">${escHtml(taskLabel)}</div>`;
+    });
+
+    calHtml += '</div>';
+  }
+
+  // Next month padding days
+  const totalCells = startOffset + daysInMonth;
+  const remainder = totalCells % 7;
+  if (remainder > 0) {
+    for (let i = 1; i <= 7 - remainder; i++) {
+      calHtml += `<div style="background:#fafafa;min-height:80px;padding:4px;opacity:.4"><div style="font-size:.8rem;color:#999">${i}</div></div>`;
+    }
+  }
+
+  calHtml += '</div>';
+
+  container.innerHTML = navHtml + calHtml;
 }
 
 async function hapusHariLibur(id) {
