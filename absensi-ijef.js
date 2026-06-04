@@ -1305,6 +1305,9 @@ async function loadRekapGrid(){
       if(isLibur&&!st){color='#9e9e9e';text='H';title=' title="Hari Libur"';}
       else if(cutiStatus){
         if(cutiStatus==='WFH'){color='#009688';text='W';title=' title="WFH"';ut++;}
+        else if(cutiStatus==='Cuti Sakit'){color='#e91e63';text='S';title=' title="Cuti Sakit"';ut++;}
+        else if(cutiStatus==='Izin Pribadi'){color='#ff9800';text='I';title=' title="Izin Pribadi"';ut++;}
+        else if(cutiStatus==='Cuti Melahirkan'){color='#9c27b0';text='M';title=' title="Cuti Melahirkan"';ut++;}
         else{color='#00bcd4';text='C';title=` title="${cutiStatus}"`;ut++;}
       }
       else if(dinasLuarMap[u.id]?.[i]||dinasLuarMap[u.nama]?.[i]||dinasLuarMap[namaLow]?.[i]){color='#2196f3';text='D';title=' title="Dinas Luar (SPPD)"';ut++;totalD++;}
@@ -1336,8 +1339,11 @@ async function loadRekapGrid(){
   if(flex.enabled) summaryHtml += `<span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#ff5722;border-radius:2px"></span> Kurang Jam</span>`;
   summaryHtml += `<span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#7b1fa2;border-radius:2px"></span> Lembur</span>
       <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#2196f3;border-radius:2px"></span> Dinas Luar</span>
-      <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#00bcd4;border-radius:2px"></span> Cuti/Izin</span>
-      <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#009688;border-radius:2px"></span> WFH</span>
+      <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#00bcd4;border-radius:2px"></span> Cuti Tahunan (C)</span>
+      <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#e91e63;border-radius:2px"></span> Cuti Sakit (S)</span>
+      <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#ff9800;border-radius:2px"></span> Izin Pribadi (I)</span>
+      <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#009688;border-radius:2px"></span> WFH (W)</span>
+      <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#9c27b0;border-radius:2px"></span> Cuti Melahirkan (M)</span>
       <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#9e9e9e;border-radius:2px"></span> Hari Libur</span>
       <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#eee;border-radius:2px"></span> Tidak Hadir</span>
     </div>`;

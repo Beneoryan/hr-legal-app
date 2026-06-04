@@ -36,7 +36,7 @@ async function renderCuti(){
       const quota=kary?hitungJatahCuti(kary):12;
       const used=cutiUsed[uid]||0;
       const sisa=Math.max(0,quota-used);
-      h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.jenis)}</td><td>${formatDate(p.mulai)}-${formatDate(p.selesai)}</td><td>${p.durasi||1}h</td><td><span class="badge badge-${sisa<=2?'danger':sisa<=5?'warning':'success'}">${sisa}/${quota}</span></td><td><span class="badge ${badge}">${p.status}</span></td><td>${p.status==='pending'&&hasAccess(3)?`<button class="btn btn-xs btn-success" onclick="approveCuti('${p.id}','approved')">✅</button> <button class="btn btn-xs btn-danger" onclick="approveCuti('${p.id}','rejected')">❌</button>`:''} ${hasAccess(6)?`<button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_cuti','${p.id}','cuti')">🗑️</button>`:''}</td></tr>`;
+      h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.jenis)}</td><td>${formatDate(p.mulai)}-${formatDate(p.selesai)}</td><td>${p.durasi||1}h</td><td><span class="badge badge-${sisa<=2?'danger':sisa<=5?'warning':'success'}">${sisa}/${quota}</span></td><td><span class="badge ${badge}">${p.status}</span></td><td><button class="btn btn-xs btn-info" onclick="viewCutiDetail('${p.id}')" title="Lihat Detail">👁️</button> ${p.status==='pending'&&hasAccess(3)?`<button class="btn btn-xs btn-success" onclick="approveCuti('${p.id}','approved')">✅</button> <button class="btn btn-xs btn-danger" onclick="approveCuti('${p.id}','rejected')">❌</button>`:''} ${hasAccess(6)||(p.userId===currentUser.id&&p.status==='pending')?`<button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_cuti','${p.id}','cuti')">🗑️</button>`:''}</td></tr>`;
     });
   }
   document.getElementById('tblCuti').innerHTML=h;
@@ -92,6 +92,25 @@ async function simpanCuti(){
   closeModalDirect();toast('Diajukan ke atasan & HR','success');renderCuti();
 }
 async function approveCuti(id,status){await db.collection('hrd_cuti').doc(id).update({status,approvedBy:currentUser.nama,approvedAt:new Date().toISOString()});toast('Updated','success');renderCuti();}
+
+async function viewCutiDetail(id){
+  const doc=await db.collection('hrd_cuti').doc(id).get();
+  if(!doc.exists)return toast('Data tidak ditemukan','warning');
+  const p=doc.data();
+  openModal(`<div class="modal-title">Detail Cuti/Izin</div>
+    <table style="width:100%;border-collapse:collapse">
+      <tr><td class="fw-700" style="padding:6px 8px;width:120px">Nama</td><td style="padding:6px 8px">${escHtml(p.nama||'-')}</td></tr>
+      <tr><td class="fw-700" style="padding:6px 8px">Jenis</td><td style="padding:6px 8px">${escHtml(p.jenis||'-')}</td></tr>
+      <tr><td class="fw-700" style="padding:6px 8px">Mulai</td><td style="padding:6px 8px">${formatDate(p.mulai)}</td></tr>
+      <tr><td class="fw-700" style="padding:6px 8px">Selesai</td><td style="padding:6px 8px">${formatDate(p.selesai)}</td></tr>
+      <tr><td class="fw-700" style="padding:6px 8px">Durasi</td><td style="padding:6px 8px">${p.durasi||1} hari</td></tr>
+      <tr><td class="fw-700" style="padding:6px 8px">Keterangan</td><td style="padding:6px 8px">${escHtml(p.keterangan||'-')}</td></tr>
+      <tr><td class="fw-700" style="padding:6px 8px">Status</td><td style="padding:6px 8px"><span class="badge badge-${p.status==='approved'?'success':p.status==='rejected'?'danger':'warning'}">${p.status||'pending'}</span></td></tr>
+      <tr><td class="fw-700" style="padding:6px 8px">Approved By</td><td style="padding:6px 8px">${escHtml(p.approvedBy||'-')}</td></tr>
+      <tr><td class="fw-700" style="padding:6px 8px">Created At</td><td style="padding:6px 8px">${p.createdAt?formatDate(p.createdAt.split('T')[0]):'-'}</td></tr>
+    </table>
+    <div class="mt-16"><button class="btn btn-outline" onclick="closeModalDirect()">Tutup</button></div>`);
+}
 
 // ── OVERTIME ──────────────────────────────────────────────────
 async function renderOvertime(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>⏰ Overtime</span><button class="btn btn-primary btn-sm" onclick="modalOvertime()">+ Pengajuan</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Tanggal</th><th>Jam</th><th>Durasi</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="tblOT"></tbody></table></div></div>`;const snap=await (!hasAccess(3)?db.collection('hrd_overtime').where('userId','==',currentUser.id).get():db.collection('hrd_overtime').get());let h='';if(snap.empty)h='<tr><td colspan="6" class="text-center">Belum ada</td></tr>';else snap.forEach(d=>{const p=d.data();const badge=p.status==='approved'?'badge-success':p.status==='rejected'?'badge-danger':'badge-warning';h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggal)}</td><td>${p.jamMulai||'-'}-${p.jamSelesai||'-'}</td><td>${p.durasi||0}j</td><td><span class="badge ${badge}">${p.status}</span></td><td>${p.status==='pending'&&hasAccess(3)?`<button class="btn btn-xs btn-success" onclick="approveOT('${d.id}','approved')">✅</button> <button class="btn btn-xs btn-danger" onclick="approveOT('${d.id}','rejected')">❌</button>`:''} ${hasAccess(6)?`<button class="btn btn-xs btn-warning" onclick="editOTDoc('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_overtime','${d.id}','overtime')">🗑️</button>`:''}</td></tr>`;});document.getElementById('tblOT').innerHTML=h;}
@@ -183,6 +202,7 @@ async function renderHariLibur() {
       <div id="hariLiburContent"></div>
     </div>`;
   await loadHariLiburView();
+  checkHariLiburReminders();
 }
 
 function switchHariLiburView(mode) {
@@ -215,6 +235,13 @@ async function loadHariLiburView() {
   const snap = await db.collection('hrd_hari_libur').where('tanggal','>=',startDate).where('tanggal','<=',endDate).get();
   const holidays = [];
   snap.forEach(d => holidays.push({ id: d.id, ...d.data() }));
+
+  // Load user reminders for this month
+  try {
+    const reminderSnap = await db.collection('hrd_hari_libur_reminders').where('userId','==',currentUser.id).get();
+    window._hariLiburUserReminders = [];
+    reminderSnap.forEach(d => window._hariLiburUserReminders.push({id:d.id,...d.data()}));
+  } catch(e) { window._hariLiburUserReminders = []; }
 
   const container = document.getElementById('hariLiburContent');
   if (!container) return;
@@ -294,6 +321,8 @@ function renderHariLiburCalendar(container, year, month, holidays) {
     html += `<div class="hl-cal-day">${day}</div>`;
     if (dayHolidays.length > 0) {
       html += `<div class="hl-cal-name">${escHtml(dayHolidays[0].nama)}</div>`;
+      const hasReminder = dayHolidays.some(dh=>(window._hariLiburUserReminders||[]).some(r=>r.holidayId===dh.id));
+      if(hasReminder) html += '<div style="position:absolute;top:2px;right:4px;font-size:.6rem">🔔</div>';
     }
     html += '</div>';
   }
@@ -312,18 +341,24 @@ function renderHariLiburCalendar(container, year, month, holidays) {
 }
 
 function renderHariLiburList(container, year, month, holidays) {
-  let html = '<div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Nama</th><th>Tipe</th><th>Aksi</th></tr></thead><tbody>';
+  let html = '<div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Nama</th><th>Tipe</th><th>Catatan</th><th style="min-width:140px">Aksi</th></tr></thead><tbody>';
   if (!holidays.length) {
-    html += '<tr><td colspan="4" class="text-center">Tidak ada hari libur bulan ini</td></tr>';
+    html += '<tr><td colspan="5" class="text-center">Tidak ada hari libur bulan ini</td></tr>';
   } else {
     holidays.forEach(h => {
       const tipeBadge = h.tipe === 'nasional' ? 'badge-danger' : h.tipe === 'cuti_bersama' ? 'badge-warning' : 'badge-info';
       const tipeLabel = h.tipe === 'nasional' ? 'Nasional' : h.tipe === 'cuti_bersama' ? 'Cuti Bersama' : 'Perusahaan';
+      const hasReminder = (window._hariLiburUserReminders||[]).some(r=>r.holidayId===h.id);
       html += `<tr>
         <td>${formatDate(h.tanggal)}</td>
         <td class="fw-700">${escHtml(h.nama)}</td>
         <td><span class="badge ${tipeBadge}">${tipeLabel}</span></td>
-        <td><button class="btn btn-xs btn-danger" onclick="hapusHariLibur('${h.id}')">🗑️</button></td>
+        <td class="text-sm">${escHtml(h.noted||h.catatan||'-')}</td>
+        <td>
+          <button class="btn btn-xs btn-info" onclick="editHariLiburNoted('${h.id}')" title="Edit Catatan">✏️</button>
+          <button class="btn btn-xs btn-${hasReminder?'warning':'outline'}" onclick="setHariLiburReminder('${h.id}','${h.tanggal}','${escHtml(h.nama).replace(/'/g,"\\'")}')" title="Set Reminder">${hasReminder?'🔔':'🔕'}</button>
+          <button class="btn btn-xs btn-danger" onclick="hapusHariLibur('${h.id}')">🗑️</button>
+        </td>
       </tr>`;
     });
   }
@@ -362,6 +397,85 @@ async function simpanHariLibur() {
   closeModalDirect();
   toast('Hari libur ditambahkan', 'success');
   loadHariLiburView();
+}
+
+async function editHariLiburNoted(id) {
+  const doc = await db.collection('hrd_hari_libur').doc(id).get();
+  if (!doc.exists) return toast('Data tidak ditemukan', 'warning');
+  const p = doc.data();
+  openModal(`<div class="modal-title">Edit Catatan Hari Libur</div>
+    <div class="form-group"><label>Nama</label><input class="form-control" value="${escHtml(p.nama||'')}" disabled></div>
+    <div class="form-group"><label>Catatan</label><textarea class="form-control" id="hlNotedText" style="min-height:80px">${escHtml(p.noted||p.catatan||'')}</textarea></div>
+    <button class="btn btn-primary" onclick="simpanHariLiburNoted('${id}')">Simpan</button>`);
+}
+
+async function simpanHariLiburNoted(id) {
+  const noted = document.getElementById('hlNotedText').value;
+  await db.collection('hrd_hari_libur').doc(id).update({ noted });
+  closeModalDirect();
+  toast('Catatan disimpan', 'success');
+  loadHariLiburView();
+}
+
+function setHariLiburReminder(id, tanggal, nama) {
+  const existing = (window._hariLiburUserReminders||[]).find(r=>r.holidayId===id);
+  openModal(`<div class="modal-title">🔔 Set Reminder</div>
+    <p class="text-sm mb-16">Hari libur: <b>${nama}</b> (${formatDate(tanggal)})</p>
+    <div class="form-group"><label>Ingatkan</label>
+      <select class="form-control" id="hlReminderOpt">
+        <option value="1">1 hari sebelumnya</option>
+        <option value="3">3 hari sebelumnya</option>
+        <option value="7">1 minggu sebelumnya</option>
+        <option value="custom">Tanggal custom</option>
+      </select>
+    </div>
+    <div class="form-group" id="hlReminderCustomWrap" style="display:none"><label>Tanggal Reminder</label><input class="form-control" type="date" id="hlReminderCustomDate"></div>
+    <script>document.getElementById('hlReminderOpt').onchange=function(){document.getElementById('hlReminderCustomWrap').style.display=this.value==='custom'?'block':'none';}<\/script>
+    ${existing?'<p class="text-xs mb-8" style="color:var(--warning)">Reminder sudah ada. Simpan akan mengganti yang lama.</p>':''}
+    <div class="flex gap-8">
+      <button class="btn btn-primary" onclick="simpanHariLiburReminder('${id}','${tanggal}','${nama.replace(/'/g,"\\'")}')">Simpan</button>
+      ${existing?`<button class="btn btn-danger" onclick="hapusHariLiburReminder('${existing.id}')">Hapus Reminder</button>`:''}
+    </div>`);
+}
+
+async function simpanHariLiburReminder(holidayId, tanggal, holidayNama) {
+  const opt = document.getElementById('hlReminderOpt').value;
+  let reminderDate;
+  if (opt === 'custom') {
+    reminderDate = document.getElementById('hlReminderCustomDate').value;
+    if (!reminderDate) return toast('Pilih tanggal reminder', 'warning');
+  } else {
+    const d = new Date(tanggal + 'T00:00:00');
+    d.setDate(d.getDate() - parseInt(opt));
+    reminderDate = d.toISOString().split('T')[0];
+  }
+  // Remove existing reminder for same holiday
+  const existing = (window._hariLiburUserReminders||[]).find(r=>r.holidayId===holidayId);
+  if (existing) await db.collection('hrd_hari_libur_reminders').doc(existing.id).delete();
+  await db.collection('hrd_hari_libur_reminders').add({
+    holidayId, holidayNama, userId: currentUser.id, reminderDate, createdAt: new Date().toISOString()
+  });
+  closeModalDirect();
+  toast('Reminder disimpan', 'success');
+  loadHariLiburView();
+}
+
+async function hapusHariLiburReminder(reminderId) {
+  await db.collection('hrd_hari_libur_reminders').doc(reminderId).delete();
+  closeModalDirect();
+  toast('Reminder dihapus', 'success');
+  loadHariLiburView();
+}
+
+async function checkHariLiburReminders() {
+  try {
+    const today = todayStr();
+    const snap = await db.collection('hrd_hari_libur_reminders').where('userId','==',currentUser.id).where('reminderDate','<=',today).get();
+    snap.forEach(d => {
+      const r = d.data();
+      toast(`🔔 Reminder: ${r.holidayNama} segera tiba!`, 'info');
+    });
+  } catch(e) { /* ignore */ }
 }
 
 async function syncHariLiburNasional() {

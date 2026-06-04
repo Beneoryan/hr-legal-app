@@ -1,0 +1,30 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Four UI enhancements: (1) Leave type abbreviations in attendance recap grid, (2) View/Delete buttons on cuti recap per user, (3) Onboarding/Offboarding View/Edit/Delete with interactive checklist, (4) Hari Libur edit notes and reminder options",
+  "status": "in_progress",
+  "steps": [
+    "ISSUE #1 - Leave type abbreviations in absensi-ijef.js, loadRekapGrid() function (around line 1295 in the cell rendering loop). Currently all leave types show 'C' (cuti) except WFH which shows 'W'. Change the logic so each leave type gets its own abbreviation: Cuti Sakit='S', Izin Pribadi='I', WFH='W', Cuti Tahunan='C', Cuti Melahirkan='M'. The cutiStatus variable already contains the jenis string (e.g., 'Cuti Sakit'). Add a mapping function or inline logic to determine the letter. Also update the legend/summary section at the bottom to show the individual abbreviations with distinct colors.",
+    "ISSUE #2 - View/Delete buttons on the cuti/izin recap in modules-kehadiran.js, renderCuti() function. Currently the table shows approve/reject buttons for admins and a delete button for level 6. Add a 'View' (eye icon) button for each row that opens a detail modal showing: nama, jenis, mulai, selesai, durasi, keterangan, status, approvedBy, createdAt. Also ensure the existing delete button is available for users on their own submissions (check p.userId===currentUser.id) in addition to admin level 6.",
+    "ISSUE #3 - Onboarding/Offboarding enhancements in modules-karyawan.js. For renderOnboarding() (line 410): Add a new 'Aksi' column to the table with View, Edit, Delete buttons. The View button opens a modal showing all details plus the checklist with interactive checkboxes that can be toggled (each toggle saves to Firestore). The Edit button opens a modal pre-filled with existing data (nama, tanggalMulai, checklist items as text). The Delete button calls hapusDoc. Each checklist item should be rendered as a checkbox that when clicked updates the done status in Firestore immediately. For renderOffboarding() (line 415): Add 'Checklist' and 'Aksi' columns. The View button shows details + checklist. The Edit button allows editing nama, tanggalKeluar, alasan, and checklist items. The Delete button removes the record. Add a default checklist to offboarding creation modal (items like: Serah terima tugas, Pengembalian aset, Deaktivasi akun, Exit interview, Surat referensi). Store checklist in Firestore as array of {task, done}.",
+    "ISSUE #4 - Hari Libur panel enhancements in modules-kehadiran.js. In renderHariLiburList() (list view) and renderHariLiburCalendar() (calendar view): Add an Edit button next to each holiday that opens a modal to edit the 'noted' (catatan/keterangan) field. Add a Reminder button that lets users set a reminder (stored in Firestore collection 'hrd_hari_libur_reminders' with fields: holidayId, userId, reminderDate, message). The reminder modal should allow picking how many days before the holiday to be reminded (1 day, 3 days, 1 week). On each page load, check if any reminders are due today and show a toast notification. In the calendar view, show a small bell icon on days that have a reminder set. In the list view, show a bell icon in the Aksi column if a reminder exists."
+  ],
+  "acceptance_criteria": [
+    "In the attendance recap grid, Cuti Sakit shows 'S' (distinct color), Izin Pribadi shows 'I', WFH shows 'W', Cuti Tahunan shows 'C', Cuti Melahirkan shows 'M' - all with appropriate distinct colors and legend entries",
+    "Each cuti/izin row in the recap table has a View button that opens a full detail modal and a Delete button available to the submitter or admin",
+    "Onboarding table has Aksi column with View/Edit/Delete buttons. View shows detail with interactive checkboxes. Edit pre-fills form. Delete removes record. Checking a checklist item immediately updates Firestore.",
+    "Offboarding table has Checklist column showing progress (done/total) and Aksi column with View/Edit/Delete. Creation modal includes default checklist items. Interactive checkboxes work same as onboarding.",
+    "Hari Libur list view shows Edit (for notes) and Reminder buttons per holiday. Calendar view shows bell icon on dates with reminders. Reminder modal allows selecting days-before notification. Due reminders show toast on page load.",
+    "No JavaScript syntax errors in the modified files (eslint parse check passes)"
+  ],
+  "verification": [
+    "Run: cd /projects/sandbox/hr-legal-app && node -c absensi-ijef.js && echo 'absensi-ijef.js syntax OK'",
+    "Run: cd /projects/sandbox/hr-legal-app && node -c modules-kehadiran.js && echo 'modules-kehadiran.js syntax OK'",
+    "Run: cd /projects/sandbox/hr-legal-app && node -c modules-karyawan.js && echo 'modules-karyawan.js syntax OK'",
+    "Verify the cutiStatus abbreviation mapping covers all 5 leave types by grepping for the mapping in absensi-ijef.js",
+    "Verify onboarding/offboarding tables now include Aksi column header with th>Aksi in modules-karyawan.js",
+    "Verify hari libur reminder functionality exists by grepping for 'hrd_hari_libur_reminders' in modules-kehadiran.js"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

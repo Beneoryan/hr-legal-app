@@ -408,14 +408,140 @@ async function renderStrukturOrg(){
 }
 
 // ── ONBOARDING ────────────────────────────────────────────────
-async function renderOnboarding(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>🚀 Onboarding</span><button class="btn btn-primary btn-sm" onclick="modalOnboarding()">+ Tambah</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Mulai</th><th>Checklist</th><th>Status</th></tr></thead><tbody id="tblOnboard"></tbody></table></div></div>`;const snap=await db.collection('hrd_onboarding').get();let h='';if(snap.empty)h='<tr><td colspan="4" class="text-center">Belum ada</td></tr>';else snap.forEach(d=>{const p=d.data();const done=(p.checklist||[]).filter(c=>c.done).length,total=(p.checklist||[]).length;h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggalMulai)}</td><td>${done}/${total}</td><td><span class="badge badge-${done===total?'success':'warning'}">${done===total?'Selesai':'Proses'}</span></td></tr>`;});document.getElementById('tblOnboard').innerHTML=h;}
+async function renderOnboarding(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>🚀 Onboarding</span><button class="btn btn-primary btn-sm" onclick="modalOnboarding()">+ Tambah</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Mulai</th><th>Checklist</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="tblOnboard"></tbody></table></div></div>`;const snap=await db.collection('hrd_onboarding').get();let h='';if(snap.empty)h='<tr><td colspan="5" class="text-center">Belum ada</td></tr>';else snap.forEach(d=>{const p=d.data();const done=(p.checklist||[]).filter(c=>c.done).length,total=(p.checklist||[]).length;h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggalMulai)}</td><td>${done}/${total}</td><td><span class="badge badge-${done===total?'success':'warning'}">${done===total?'Selesai':'Proses'}</span></td><td><button class="btn btn-xs btn-info" onclick="viewOnboarding('${d.id}')" title="Lihat">👁️</button> <button class="btn btn-xs btn-warning" onclick="editOnboarding('${d.id}')" title="Edit">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusOnboarding('${d.id}')" title="Hapus">🗑️</button></td></tr>`;});document.getElementById('tblOnboard').innerHTML=h;}
 function modalOnboarding(){openModal(`<div class="modal-title">Tambah Onboarding</div><div class="form-group"><label>Nama</label><input class="form-control" id="obNama"></div><div class="form-group"><label>Tanggal Mulai</label><input class="form-control" type="date" id="obTgl" value="${todayStr()}"></div><div class="form-group"><label>Checklist (per baris)</label><textarea class="form-control" id="obCheck">Orientasi perusahaan\nSetup email & akun\nTraining SOP\nPerkenalan tim\nSerah terima perlengkapan</textarea></div><button class="btn btn-primary" onclick="simpanOnboarding()">Simpan</button>`);}
 async function simpanOnboarding(){const nama=document.getElementById('obNama').value;if(!nama)return toast('Nama wajib','warning');const items=document.getElementById('obCheck').value.split('\n').filter(x=>x.trim()).map(x=>({task:x.trim(),done:false}));await db.collection('hrd_onboarding').add({nama,tanggalMulai:document.getElementById('obTgl').value,checklist:items,createdAt:new Date().toISOString()});closeModalDirect();toast('Ditambahkan','success');renderOnboarding();}
 
+async function viewOnboarding(id){
+  const doc=await db.collection('hrd_onboarding').doc(id).get();
+  if(!doc.exists)return toast('Data tidak ditemukan','warning');
+  const p=doc.data();
+  const done=(p.checklist||[]).filter(c=>c.done).length,total=(p.checklist||[]).length;
+  let checkHtml='';
+  (p.checklist||[]).forEach((c,i)=>{
+    checkHtml+=`<div style="padding:4px 0"><label style="cursor:pointer"><input type="checkbox" ${c.done?'checked':''} onchange="toggleOnboardingCheck('${id}',${i})"> ${escHtml(c.task)}</label></div>`;
+  });
+  openModal(`<div class="modal-title">Detail Onboarding</div>
+    <table style="width:100%;border-collapse:collapse">
+      <tr><td class="fw-700" style="padding:6px 8px;width:120px">Nama</td><td style="padding:6px 8px">${escHtml(p.nama||'-')}</td></tr>
+      <tr><td class="fw-700" style="padding:6px 8px">Tanggal Mulai</td><td style="padding:6px 8px">${formatDate(p.tanggalMulai)}</td></tr>
+      <tr><td class="fw-700" style="padding:6px 8px">Progress</td><td style="padding:6px 8px">${done}/${total}</td></tr>
+      <tr><td class="fw-700" style="padding:6px 8px">Status</td><td style="padding:6px 8px"><span class="badge badge-${done===total?'success':'warning'}">${done===total?'Selesai':'Proses'}</span></td></tr>
+    </table>
+    <div class="mt-16"><div class="fw-700 mb-8">Checklist:</div>${checkHtml}</div>
+    <div class="mt-16"><button class="btn btn-outline" onclick="closeModalDirect()">Tutup</button></div>`);
+}
+
+async function editOnboarding(id){
+  const doc=await db.collection('hrd_onboarding').doc(id).get();
+  if(!doc.exists)return toast('Data tidak ditemukan','warning');
+  const p=doc.data();
+  const checkText=(p.checklist||[]).map(c=>c.task).join('\n');
+  openModal(`<div class="modal-title">Edit Onboarding</div>
+    <div class="form-group"><label>Nama</label><input class="form-control" id="obEditNama" value="${escHtml(p.nama||'')}"></div>
+    <div class="form-group"><label>Tanggal Mulai</label><input class="form-control" type="date" id="obEditTgl" value="${p.tanggalMulai||''}"></div>
+    <div class="form-group"><label>Checklist (per baris)</label><textarea class="form-control" id="obEditCheck" style="min-height:100px">${escHtml(checkText)}</textarea></div>
+    <button class="btn btn-primary" onclick="updateOnboarding('${id}')">Simpan</button>`);
+}
+
+async function updateOnboarding(id){
+  const nama=document.getElementById('obEditNama').value;
+  if(!nama)return toast('Nama wajib','warning');
+  const oldDoc=await db.collection('hrd_onboarding').doc(id).get();
+  const oldChecklist=oldDoc.exists?(oldDoc.data().checklist||[]):[];
+  const newTasks=document.getElementById('obEditCheck').value.split('\n').filter(x=>x.trim());
+  const checklist=newTasks.map(t=>{
+    const existing=oldChecklist.find(c=>c.task===t.trim());
+    return {task:t.trim(),done:existing?existing.done:false};
+  });
+  await db.collection('hrd_onboarding').doc(id).update({nama,tanggalMulai:document.getElementById('obEditTgl').value,checklist});
+  closeModalDirect();toast('Diperbarui','success');renderOnboarding();
+}
+
+async function toggleOnboardingCheck(id,index){
+  const doc=await db.collection('hrd_onboarding').doc(id).get();
+  if(!doc.exists)return;
+  const p=doc.data();
+  const checklist=p.checklist||[];
+  if(checklist[index])checklist[index].done=!checklist[index].done;
+  await db.collection('hrd_onboarding').doc(id).update({checklist});
+  viewOnboarding(id);
+}
+
+async function hapusOnboarding(id){
+  if(!confirm('Hapus data onboarding ini?'))return;
+  await db.collection('hrd_onboarding').doc(id).delete();
+  toast('Dihapus','success');renderOnboarding();
+}
+
 // ── OFFBOARDING ───────────────────────────────────────────────
-async function renderOffboarding(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>📦 Offboarding</span><button class="btn btn-primary btn-sm" onclick="modalOffboarding()">+ Tambah</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Tgl Keluar</th><th>Alasan</th><th>Status</th></tr></thead><tbody id="tblOff"></tbody></table></div></div>`;const snap=await db.collection('hrd_offboarding').get();let h='';if(snap.empty)h='<tr><td colspan="4" class="text-center">Belum ada</td></tr>';else snap.forEach(d=>{const p=d.data();h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggalKeluar)}</td><td>${escHtml(p.alasan||'-')}</td><td><span class="badge badge-${p.status==='selesai'?'success':'warning'}">${p.status||'proses'}</span></td></tr>`;});document.getElementById('tblOff').innerHTML=h;}
-function modalOffboarding(){openModal(`<div class="modal-title">Tambah Offboarding</div><div class="form-group"><label>Nama</label><input class="form-control" id="offNama"></div><div class="form-group"><label>Tgl Keluar</label><input class="form-control" type="date" id="offTgl" value="${todayStr()}"></div><div class="form-group"><label>Alasan</label><select class="form-control" id="offAlasan"><option>Resign</option><option>PHK</option><option>Kontrak Habis</option><option>Pensiun</option></select></div><button class="btn btn-primary" onclick="simpanOffboarding()">Simpan</button>`);}
-async function simpanOffboarding(){const data={nama:document.getElementById('offNama').value,tanggalKeluar:document.getElementById('offTgl').value,alasan:document.getElementById('offAlasan').value,status:'proses',createdAt:new Date().toISOString()};if(!data.nama)return toast('Nama wajib','warning');await db.collection('hrd_offboarding').add(data);closeModalDirect();toast('Ditambahkan','success');renderOffboarding();}
+async function renderOffboarding(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>📦 Offboarding</span><button class="btn btn-primary btn-sm" onclick="modalOffboarding()">+ Tambah</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Tgl Keluar</th><th>Alasan</th><th>Status</th><th>Checklist</th><th>Aksi</th></tr></thead><tbody id="tblOff"></tbody></table></div></div>`;const snap=await db.collection('hrd_offboarding').get();let h='';if(snap.empty)h='<tr><td colspan="6" class="text-center">Belum ada</td></tr>';else snap.forEach(d=>{const p=d.data();const done=(p.checklist||[]).filter(c=>c.done).length,total=(p.checklist||[]).length;h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggalKeluar)}</td><td>${escHtml(p.alasan||'-')}</td><td><span class="badge badge-${p.status==='selesai'?'success':'warning'}">${p.status||'proses'}</span></td><td>${total?done+'/'+total:'-'}</td><td><button class="btn btn-xs btn-info" onclick="viewOffboarding('${d.id}')" title="Lihat">👁️</button> <button class="btn btn-xs btn-warning" onclick="editOffboarding('${d.id}')" title="Edit">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusOffboarding('${d.id}')" title="Hapus">🗑️</button></td></tr>`;});document.getElementById('tblOff').innerHTML=h;}
+function modalOffboarding(){openModal(`<div class="modal-title">Tambah Offboarding</div><div class="form-group"><label>Nama</label><input class="form-control" id="offNama"></div><div class="form-group"><label>Tgl Keluar</label><input class="form-control" type="date" id="offTgl" value="${todayStr()}"></div><div class="form-group"><label>Alasan</label><select class="form-control" id="offAlasan"><option>Resign</option><option>PHK</option><option>Kontrak Habis</option><option>Pensiun</option></select></div><div class="form-group"><label>Checklist (per baris)</label><textarea class="form-control" id="offCheck" style="min-height:100px">Serah terima tugas\nPengembalian aset\nDeaktivasi akun\nExit interview\nSurat referensi</textarea></div><button class="btn btn-primary" onclick="simpanOffboarding()">Simpan</button>`);}
+async function simpanOffboarding(){const checklist=document.getElementById('offCheck').value.split('\n').filter(x=>x.trim()).map(x=>({task:x.trim(),done:false}));const data={nama:document.getElementById('offNama').value,tanggalKeluar:document.getElementById('offTgl').value,alasan:document.getElementById('offAlasan').value,status:'proses',checklist,createdAt:new Date().toISOString()};if(!data.nama)return toast('Nama wajib','warning');await db.collection('hrd_offboarding').add(data);closeModalDirect();toast('Ditambahkan','success');renderOffboarding();}
+
+async function viewOffboarding(id){
+  const doc=await db.collection('hrd_offboarding').doc(id).get();
+  if(!doc.exists)return toast('Data tidak ditemukan','warning');
+  const p=doc.data();
+  const done=(p.checklist||[]).filter(c=>c.done).length,total=(p.checklist||[]).length;
+  let checkHtml='';
+  (p.checklist||[]).forEach((c,i)=>{
+    checkHtml+=`<div style="padding:4px 0"><label style="cursor:pointer"><input type="checkbox" ${c.done?'checked':''} onchange="toggleOffboardingCheck('${id}',${i})"> ${escHtml(c.task)}</label></div>`;
+  });
+  openModal(`<div class="modal-title">Detail Offboarding</div>
+    <table style="width:100%;border-collapse:collapse">
+      <tr><td class="fw-700" style="padding:6px 8px;width:120px">Nama</td><td style="padding:6px 8px">${escHtml(p.nama||'-')}</td></tr>
+      <tr><td class="fw-700" style="padding:6px 8px">Tgl Keluar</td><td style="padding:6px 8px">${formatDate(p.tanggalKeluar)}</td></tr>
+      <tr><td class="fw-700" style="padding:6px 8px">Alasan</td><td style="padding:6px 8px">${escHtml(p.alasan||'-')}</td></tr>
+      <tr><td class="fw-700" style="padding:6px 8px">Status</td><td style="padding:6px 8px"><span class="badge badge-${p.status==='selesai'?'success':'warning'}">${p.status||'proses'}</span></td></tr>
+      <tr><td class="fw-700" style="padding:6px 8px">Progress</td><td style="padding:6px 8px">${done}/${total}</td></tr>
+    </table>
+    <div class="mt-16"><div class="fw-700 mb-8">Checklist:</div>${checkHtml||'<p class="text-sm">Tidak ada checklist</p>'}</div>
+    <div class="mt-16"><button class="btn btn-outline" onclick="closeModalDirect()">Tutup</button></div>`);
+}
+
+async function editOffboarding(id){
+  const doc=await db.collection('hrd_offboarding').doc(id).get();
+  if(!doc.exists)return toast('Data tidak ditemukan','warning');
+  const p=doc.data();
+  const checkText=(p.checklist||[]).map(c=>c.task).join('\n');
+  openModal(`<div class="modal-title">Edit Offboarding</div>
+    <div class="form-group"><label>Nama</label><input class="form-control" id="offEditNama" value="${escHtml(p.nama||'')}"></div>
+    <div class="form-group"><label>Tgl Keluar</label><input class="form-control" type="date" id="offEditTgl" value="${p.tanggalKeluar||''}"></div>
+    <div class="form-group"><label>Alasan</label><select class="form-control" id="offEditAlasan"><option ${p.alasan==='Resign'?'selected':''}>Resign</option><option ${p.alasan==='PHK'?'selected':''}>PHK</option><option ${p.alasan==='Kontrak Habis'?'selected':''}>Kontrak Habis</option><option ${p.alasan==='Pensiun'?'selected':''}>Pensiun</option></select></div>
+    <div class="form-group"><label>Checklist (per baris)</label><textarea class="form-control" id="offEditCheck" style="min-height:100px">${escHtml(checkText)}</textarea></div>
+    <button class="btn btn-primary" onclick="updateOffboarding('${id}')">Simpan</button>`);
+}
+
+async function updateOffboarding(id){
+  const nama=document.getElementById('offEditNama').value;
+  if(!nama)return toast('Nama wajib','warning');
+  const oldDoc=await db.collection('hrd_offboarding').doc(id).get();
+  const oldChecklist=oldDoc.exists?(oldDoc.data().checklist||[]):[];
+  const newTasks=document.getElementById('offEditCheck').value.split('\n').filter(x=>x.trim());
+  const checklist=newTasks.map(t=>{
+    const existing=oldChecklist.find(c=>c.task===t.trim());
+    return {task:t.trim(),done:existing?existing.done:false};
+  });
+  await db.collection('hrd_offboarding').doc(id).update({nama,tanggalKeluar:document.getElementById('offEditTgl').value,alasan:document.getElementById('offEditAlasan').value,checklist});
+  closeModalDirect();toast('Diperbarui','success');renderOffboarding();
+}
+
+async function toggleOffboardingCheck(id,index){
+  const doc=await db.collection('hrd_offboarding').doc(id).get();
+  if(!doc.exists)return;
+  const p=doc.data();
+  const checklist=p.checklist||[];
+  if(checklist[index])checklist[index].done=!checklist[index].done;
+  await db.collection('hrd_offboarding').doc(id).update({checklist});
+  viewOffboarding(id);
+}
+
+async function hapusOffboarding(id){
+  if(!confirm('Hapus data offboarding ini?'))return;
+  await db.collection('hrd_offboarding').doc(id).delete();
+  toast('Dihapus','success');renderOffboarding();
+}
 
 // ── REKRUTMEN ─────────────────────────────────────────────────
 async function renderLowongan(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>📝 Lowongan</span><button class="btn btn-primary btn-sm" onclick="modalLowongan()">+ Tambah</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Posisi</th><th>Dept</th><th>Status</th><th>Deadline</th><th>Aksi</th></tr></thead><tbody id="tblLow"></tbody></table></div></div>`;const snap=await db.collection('hrd_lowongan').get();let h='';if(snap.empty)h='<tr><td colspan="5" class="text-center">Belum ada</td></tr>';else snap.forEach(d=>{const p=d.data();h+=`<tr><td class="fw-700">${escHtml(p.posisi)}</td><td>${escHtml(p.departemen||'-')}</td><td><span class="badge badge-${p.status==='open'?'success':'danger'}">${p.status}</span></td><td>${formatDate(p.deadline)}</td><td><button class="btn btn-xs btn-info" onclick="modalLowongan('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_lowongan','${d.id}','lowongan')">🗑️</button></td></tr>`;});document.getElementById('tblLow').innerHTML=h;}
