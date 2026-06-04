@@ -408,3 +408,131 @@ async function renderPenalty(){const main=document.getElementById('mainContent')
 function modalPenalty(){openModal(`<div class="modal-title">Tambah Penalty</div><div class="grid-2"><div class="form-group"><label>Karyawan</label><input class="form-control" id="penNama"></div><div class="form-group"><label>Tanggal</label><input class="form-control" type="date" id="penTgl" value="${todayStr()}"></div></div><div class="grid-2"><div class="form-group"><label>Jenis</label><select class="form-control" id="penJenis"><option>Terlambat</option><option>Mangkir</option><option>SP I</option><option>SP II</option><option>SP III</option></select></div><div class="form-group"><label>Poin</label><input class="form-control" type="number" id="penPoin" value="1"></div></div><button class="btn btn-primary" onclick="simpanPenalty()">Simpan</button>`);}
 async function simpanPenalty(){const data={nama:document.getElementById('penNama').value,tanggal:document.getElementById('penTgl').value,jenis:document.getElementById('penJenis').value,poin:parseInt(document.getElementById('penPoin').value)||1,createdAt:new Date().toISOString()};if(!data.nama)return toast('Nama wajib','warning');await db.collection('hrd_penalty').add(data);closeModalDirect();toast('Ditambahkan','success');renderPenalty();}
 
+
+// ── DAILY TASK & REMINDER ─────────────────────────────────────
+async function renderDailyTask(){
+  const main=document.getElementById('mainContent');
+  main.innerHTML=`
+    <div class="page-title"><span>📋 Daily Task & Reminder</span><button class="btn btn-primary btn-sm" onclick="modalAddTask()">+ Tambah Task</button></div>
+    <div class="stats-grid mb-16" id="taskStats"></div>
+    <div class="card">
+      <div class="tabs mb-16" id="taskTabs">
+        <div class="tab active" onclick="filterDailyTasks('all')">Semua</div>
+        <div class="tab" onclick="filterDailyTasks('today')">Hari Ini</div>
+        <div class="tab" onclick="filterDailyTasks('upcoming')">Mendatang</div>
+        <div class="tab" onclick="filterDailyTasks('done')">Selesai</div>
+        <div class="tab" onclick="filterDailyTasks('overdue')">Terlambat</div>
+      </div>
+      <div id="taskList">Loading...</div>
+    </div>`;
+  await loadDailyTasks('all');
+}
+
+let _dailyTaskFilter='all';
+let _dailyTaskData=[];
+
+async function loadDailyTasks(filter){
+  _dailyTaskFilter=filter||'all';
+  document.querySelectorAll('#taskTabs .tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('#taskTabs .tab').forEach(t=>{
+    const map={all:'Semua',today:'Hari Ini',upcoming:'Mendatang',done:'Selesai',overdue:'Terlambat'};
+    if(t.textContent.trim()===map[filter])t.classList.add('active');
+  });
+  try{
+    const snap=await db.collection('hrd_daily_tasks').get();
+    _dailyTaskData=[];
+    snap.forEach(d=>{const t=d.data();if(t.userId===currentUser.id)_dailyTaskData.push({id:d.id,...t});});
+  }catch(e){_dailyTaskData=[];}
+  const today=todayStr();
+  let filtered=_dailyTaskData;
+  if(filter==='today')filtered=_dailyTaskData.filter(t=>t.tanggal===today&&!t.done);
+  else if(filter==='upcoming')filtered=_dailyTaskData.filter(t=>t.tanggal>today&&!t.done);
+  else if(filter==='done')filtered=_dailyTaskData.filter(t=>t.done);
+  else if(filter==='overdue')filtered=_dailyTaskData.filter(t=>t.tanggal<today&&!t.done);
+  const priorityOrder={high:0,medium:1,low:2};
+  filtered.sort((a,b)=>{
+    if(!a.done&&!b.done){if(a.tanggal<today&&b.tanggal>=today)return -1;if(b.tanggal<today&&a.tanggal>=today)return 1;}
+    if(a.tanggal!==b.tanggal)return a.tanggal.localeCompare(b.tanggal);
+    return(priorityOrder[a.priority]||1)-(priorityOrder[b.priority]||1);
+  });
+  const totalTasks=_dailyTaskData.length;
+  const doneTasks=_dailyTaskData.filter(t=>t.done).length;
+  const todayTasks=_dailyTaskData.filter(t=>t.tanggal===today&&!t.done).length;
+  const overdueTasks=_dailyTaskData.filter(t=>t.tanggal<today&&!t.done).length;
+  const statsEl=document.getElementById('taskStats');
+  if(statsEl)statsEl.innerHTML=`<div class="stat-card" style="border-left-color:#1565c0"><div class="stat-value" style="color:#1565c0">${totalTasks}</div><div class="stat-label">Total Task</div></div><div class="stat-card" style="border-left-color:#f57f17"><div class="stat-value" style="color:#f57f17">${todayTasks}</div><div class="stat-label">Hari Ini</div></div><div class="stat-card" style="border-left-color:#c62828"><div class="stat-value" style="color:#c62828">${overdueTasks}</div><div class="stat-label">Terlambat</div></div><div class="stat-card" style="border-left-color:#2e7d32"><div class="stat-value" style="color:#2e7d32">${doneTasks}</div><div class="stat-label">Selesai</div></div>`;
+  const listEl=document.getElementById('taskList');
+  if(!listEl)return;
+  if(!filtered.length){listEl.innerHTML='<div style="text-align:center;padding:32px;color:var(--text-light)"><div style="font-size:2rem;margin-bottom:8px">✅</div><p>Tidak ada task</p></div>';return;}
+  let html='';
+  filtered.forEach(t=>{
+    const isOverdue=t.tanggal<today&&!t.done;
+    const isToday2=t.tanggal===today;
+    const priorityColor=t.priority==='high'?'#c62828':t.priority==='low'?'#666':'#f57f17';
+    const priorityLabel=t.priority==='high'?'Tinggi':t.priority==='low'?'Rendah':'Sedang';
+    const borderColor=t.done?'#2e7d32':isOverdue?'#c62828':isToday2?'#1565c0':'#e0e0e0';
+    html+=`<div style="display:flex;align-items:flex-start;gap:12px;padding:12px;border-left:4px solid ${borderColor};margin-bottom:8px;background:${t.done?'#f1f8e9':isOverdue?'#fff8f8':'#fff'};border-radius:0 8px 8px 0">`;
+    html+=`<input type="checkbox" ${t.done?'checked':''} onchange="toggleDailyTask('${t.id}')" style="margin-top:4px;width:18px;height:18px;accent-color:#2e7d32;cursor:pointer">`;
+    html+=`<div style="flex:1"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-weight:700;font-size:.9rem;${t.done?'text-decoration:line-through;color:#999':''}">${escHtml(t.title)}</span><span style="font-size:.65rem;padding:2px 6px;border-radius:4px;background:${priorityColor}20;color:${priorityColor};font-weight:600">${priorityLabel}</span>`;
+    if(isOverdue)html+=`<span class="badge badge-danger" style="font-size:.6rem">Terlambat</span>`;
+    if(isToday2&&!t.done)html+=`<span class="badge badge-info" style="font-size:.6rem">Hari Ini</span>`;
+    html+=`</div>`;
+    if(t.description)html+=`<div style="font-size:.8rem;color:var(--text-light);margin-top:4px;${t.done?'text-decoration:line-through':''}">${escHtml(t.description)}</div>`;
+    html+=`<div style="font-size:.7rem;color:#999;margin-top:4px">📅 ${formatDate(t.tanggal)}${t.waktu?' ⏰ '+t.waktu:''}${t.reminder?' 🔔 '+t.reminder:''}</div></div>`;
+    html+=`<div style="display:flex;gap:4px"><button class="btn btn-xs btn-warning" onclick="editDailyTask('${t.id}')">✏️</button><button class="btn btn-xs btn-danger" onclick="hapusDailyTask('${t.id}')">🗑️</button></div></div>`;
+  });
+  listEl.innerHTML=html;
+}
+
+function filterDailyTasks(f){loadDailyTasks(f);}
+
+function modalAddTask(){
+  openModal(`<div class="modal-title">+ Tambah Task</div>
+    <div class="form-group"><label>Judul Task *</label><input class="form-control" id="dtTitle" placeholder="Contoh: Meeting dengan klien"></div>
+    <div class="form-group"><label>Deskripsi</label><textarea class="form-control" id="dtDesc" rows="2" placeholder="Detail task..."></textarea></div>
+    <div class="grid-2"><div class="form-group"><label>Tanggal *</label><input class="form-control" type="date" id="dtDate" value="${todayStr()}"></div><div class="form-group"><label>Waktu</label><input class="form-control" type="time" id="dtTime"></div></div>
+    <div class="grid-2"><div class="form-group"><label>Prioritas</label><select class="form-control" id="dtPriority"><option value="medium">Sedang</option><option value="high">Tinggi</option><option value="low">Rendah</option></select></div><div class="form-group"><label>Pengingat</label><select class="form-control" id="dtReminder"><option value="">Tidak ada</option><option value="15 menit">15 menit</option><option value="30 menit">30 menit</option><option value="1 jam">1 jam</option><option value="1 hari">1 hari</option></select></div></div>
+    <div class="form-group"><label>Ulangi</label><select class="form-control" id="dtRepeat"><option value="">Tidak</option><option value="daily">Setiap Hari</option><option value="weekly">Setiap Minggu</option><option value="monthly">Setiap Bulan</option></select></div>
+    <button class="btn btn-primary" onclick="simpanDailyTask()">💾 Simpan</button>`);
+}
+
+async function simpanDailyTask(){
+  const title=document.getElementById('dtTitle').value.trim();
+  const tanggal=document.getElementById('dtDate').value;
+  if(!title||!tanggal)return toast('Judul dan tanggal wajib','warning');
+  try{
+    await db.collection('hrd_daily_tasks').add({title,description:document.getElementById('dtDesc').value.trim(),tanggal,waktu:document.getElementById('dtTime').value||'',priority:document.getElementById('dtPriority').value,reminder:document.getElementById('dtReminder').value,repeat:document.getElementById('dtRepeat').value||'',done:false,userId:currentUser.id,createdAt:new Date().toISOString()});
+    toast('Task ditambahkan','success');
+  }catch(e){toast('Gagal: '+e.message,'error');}
+  closeModalDirect();
+  await loadDailyTasks(_dailyTaskFilter);
+}
+
+async function toggleDailyTask(id){
+  try{const ref=db.collection('hrd_daily_tasks').doc(id);const doc=await ref.get();if(!doc.exists)return;const t=doc.data();await ref.update({done:!t.done,doneAt:!t.done?new Date().toISOString():null});}catch(e){toast('Gagal: '+e.message,'error');}
+  await loadDailyTasks(_dailyTaskFilter);
+}
+
+async function editDailyTask(id){
+  const task=_dailyTaskData.find(t=>t.id===id);if(!task)return;
+  openModal(`<div class="modal-title">✏️ Edit Task</div>
+    <div class="form-group"><label>Judul *</label><input class="form-control" id="dtEditTitle" value="${escHtml(task.title)}"></div>
+    <div class="form-group"><label>Deskripsi</label><textarea class="form-control" id="dtEditDesc" rows="2">${escHtml(task.description||'')}</textarea></div>
+    <div class="grid-2"><div class="form-group"><label>Tanggal *</label><input class="form-control" type="date" id="dtEditDate" value="${task.tanggal}"></div><div class="form-group"><label>Waktu</label><input class="form-control" type="time" id="dtEditTime" value="${task.waktu||''}"></div></div>
+    <div class="grid-2"><div class="form-group"><label>Prioritas</label><select class="form-control" id="dtEditPriority"><option value="medium" ${task.priority==='medium'?'selected':''}>Sedang</option><option value="high" ${task.priority==='high'?'selected':''}>Tinggi</option><option value="low" ${task.priority==='low'?'selected':''}>Rendah</option></select></div><div class="form-group"><label>Pengingat</label><select class="form-control" id="dtEditReminder"><option value="" ${!task.reminder?'selected':''}>Tidak ada</option><option value="15 menit" ${task.reminder==='15 menit'?'selected':''}>15 menit</option><option value="30 menit" ${task.reminder==='30 menit'?'selected':''}>30 menit</option><option value="1 jam" ${task.reminder==='1 jam'?'selected':''}>1 jam</option><option value="1 hari" ${task.reminder==='1 hari'?'selected':''}>1 hari</option></select></div></div>
+    <div class="form-group"><label>Ulangi</label><select class="form-control" id="dtEditRepeat"><option value="" ${!task.repeat?'selected':''}>Tidak</option><option value="daily" ${task.repeat==='daily'?'selected':''}>Setiap Hari</option><option value="weekly" ${task.repeat==='weekly'?'selected':''}>Setiap Minggu</option><option value="monthly" ${task.repeat==='monthly'?'selected':''}>Setiap Bulan</option></select></div>
+    <button class="btn btn-primary" onclick="updateDailyTask('${id}')">💾 Simpan</button>`);
+}
+
+async function updateDailyTask(id){
+  const title=document.getElementById('dtEditTitle').value.trim();const tanggal=document.getElementById('dtEditDate').value;
+  if(!title||!tanggal)return toast('Judul dan tanggal wajib','warning');
+  try{await db.collection('hrd_daily_tasks').doc(id).update({title,description:document.getElementById('dtEditDesc').value.trim(),tanggal,waktu:document.getElementById('dtEditTime').value||'',priority:document.getElementById('dtEditPriority').value,reminder:document.getElementById('dtEditReminder').value,repeat:document.getElementById('dtEditRepeat').value||'',updatedAt:new Date().toISOString()});toast('Diperbarui','success');}catch(e){toast('Gagal: '+e.message,'error');}
+  closeModalDirect();await loadDailyTasks(_dailyTaskFilter);
+}
+
+async function hapusDailyTask(id){
+  if(!confirm('Hapus task ini?'))return;
+  try{await db.collection('hrd_daily_tasks').doc(id).delete();toast('Dihapus','success');}catch(e){toast('Gagal: '+e.message,'error');}
+  await loadDailyTasks(_dailyTaskFilter);
+}
