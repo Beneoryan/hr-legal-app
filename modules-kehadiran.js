@@ -422,7 +422,7 @@ function setHariLiburReminder(id, tanggal, nama) {
   openModal(`<div class="modal-title">🔔 Set Reminder</div>
     <p class="text-sm mb-16">Hari libur: <b>${nama}</b> (${formatDate(tanggal)})</p>
     <div class="form-group"><label>Ingatkan</label>
-      <select class="form-control" id="hlReminderOpt">
+      <select class="form-control" id="hlReminderOpt" onchange="document.getElementById('hlReminderCustomWrap').style.display=this.value==='custom'?'block':'none'">
         <option value="1">1 hari sebelumnya</option>
         <option value="3">3 hari sebelumnya</option>
         <option value="7">1 minggu sebelumnya</option>
@@ -430,7 +430,6 @@ function setHariLiburReminder(id, tanggal, nama) {
       </select>
     </div>
     <div class="form-group" id="hlReminderCustomWrap" style="display:none"><label>Tanggal Reminder</label><input class="form-control" type="date" id="hlReminderCustomDate"></div>
-    <script>document.getElementById('hlReminderOpt').onchange=function(){document.getElementById('hlReminderCustomWrap').style.display=this.value==='custom'?'block':'none';}<\/script>
     ${existing?'<p class="text-xs mb-8" style="color:var(--warning)">Reminder sudah ada. Simpan akan mengganti yang lama.</p>':''}
     <div class="flex gap-8">
       <button class="btn btn-primary" onclick="simpanHariLiburReminder('${id}','${tanggal}','${nama.replace(/'/g,"\\'")}')">Simpan</button>
@@ -471,10 +470,11 @@ async function checkHariLiburReminders() {
   try {
     const today = todayStr();
     const snap = await db.collection('hrd_hari_libur_reminders').where('userId','==',currentUser.id).where('reminderDate','<=',today).get();
-    snap.forEach(d => {
+    for (const d of snap.docs) {
       const r = d.data();
       toast(`🔔 Reminder: ${r.holidayNama} segera tiba!`, 'info');
-    });
+      await db.collection('hrd_hari_libur_reminders').doc(d.id).delete();
+    }
   } catch(e) { /* ignore */ }
 }
 

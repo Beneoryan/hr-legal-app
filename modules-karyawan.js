@@ -450,8 +450,8 @@ async function updateOnboarding(id){
   const oldDoc=await db.collection('hrd_onboarding').doc(id).get();
   const oldChecklist=oldDoc.exists?(oldDoc.data().checklist||[]):[];
   const newTasks=document.getElementById('obEditCheck').value.split('\n').filter(x=>x.trim());
-  const checklist=newTasks.map(t=>{
-    const existing=oldChecklist.find(c=>c.task===t.trim());
+  const checklist=newTasks.map((t,i)=>{
+    const existing=oldChecklist[i];
     return {task:t.trim(),done:existing?existing.done:false};
   });
   await db.collection('hrd_onboarding').doc(id).update({nama,tanggalMulai:document.getElementById('obEditTgl').value,checklist});
@@ -459,12 +459,15 @@ async function updateOnboarding(id){
 }
 
 async function toggleOnboardingCheck(id,index){
-  const doc=await db.collection('hrd_onboarding').doc(id).get();
-  if(!doc.exists)return;
-  const p=doc.data();
-  const checklist=p.checklist||[];
-  if(checklist[index])checklist[index].done=!checklist[index].done;
-  await db.collection('hrd_onboarding').doc(id).update({checklist});
+  const ref=db.collection('hrd_onboarding').doc(id);
+  await db.runTransaction(async(t)=>{
+    const doc=await t.get(ref);
+    if(!doc.exists)return;
+    const p=doc.data();
+    const checklist=p.checklist||[];
+    if(checklist[index])checklist[index].done=!checklist[index].done;
+    t.update(ref,{checklist});
+  });
   viewOnboarding(id);
 }
 
@@ -519,8 +522,8 @@ async function updateOffboarding(id){
   const oldDoc=await db.collection('hrd_offboarding').doc(id).get();
   const oldChecklist=oldDoc.exists?(oldDoc.data().checklist||[]):[];
   const newTasks=document.getElementById('offEditCheck').value.split('\n').filter(x=>x.trim());
-  const checklist=newTasks.map(t=>{
-    const existing=oldChecklist.find(c=>c.task===t.trim());
+  const checklist=newTasks.map((t,i)=>{
+    const existing=oldChecklist[i];
     return {task:t.trim(),done:existing?existing.done:false};
   });
   await db.collection('hrd_offboarding').doc(id).update({nama,tanggalKeluar:document.getElementById('offEditTgl').value,alasan:document.getElementById('offEditAlasan').value,checklist});
@@ -528,12 +531,15 @@ async function updateOffboarding(id){
 }
 
 async function toggleOffboardingCheck(id,index){
-  const doc=await db.collection('hrd_offboarding').doc(id).get();
-  if(!doc.exists)return;
-  const p=doc.data();
-  const checklist=p.checklist||[];
-  if(checklist[index])checklist[index].done=!checklist[index].done;
-  await db.collection('hrd_offboarding').doc(id).update({checklist});
+  const ref=db.collection('hrd_offboarding').doc(id);
+  await db.runTransaction(async(t)=>{
+    const doc=await t.get(ref);
+    if(!doc.exists)return;
+    const p=doc.data();
+    const checklist=p.checklist||[];
+    if(checklist[index])checklist[index].done=!checklist[index].done;
+    t.update(ref,{checklist});
+  });
   viewOffboarding(id);
 }
 
