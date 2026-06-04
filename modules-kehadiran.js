@@ -586,7 +586,17 @@ async function saveDayNote(dateStr, existingDocId){
   console.log('[HariLibur] Note saved for',dateStr,'cache size:',cachedNotes.length);
   toast('Catatan disimpan','success');
   closeModalDirect();
-  await loadHariLiburView();
+  // Re-render calendar directly from in-memory data (don't re-fetch from Firestore)
+  const container=document.getElementById('hariLiburContent');
+  if(container && hariLiburCalendarMonth){
+    const y=hariLiburCalendarMonth.year,m=hariLiburCalendarMonth.month;
+    const startDate2=`${y}-${String(m+1).padStart(2,'0')}-01`;
+    const endDate2=`${y}-${String(m+1).padStart(2,'0')}-${String(new Date(y,m+1,0).getDate()).padStart(2,'0')}`;
+    const snap2=await db.collection('hrd_hari_libur').where('tanggal','>=',startDate2).where('tanggal','<=',endDate2).get();
+    const holidays2=[];snap2.forEach(d=>holidays2.push({id:d.id,...d.data()}));
+    if(hariLiburViewMode==='kalender')renderHariLiburCalendar(container,y,m,holidays2);
+    else renderHariLiburList(container,y,m,holidays2);
+  }
 }
 
 async function setDayReminder(dateStr, holidayId, daysBefore){
@@ -613,7 +623,16 @@ async function setDayReminder(dateStr, holidayId, daysBefore){
   console.log('[HariLibur] Reminder set for',dateStr);
   toast('Pengingat diset '+daysBefore+' hari sebelumnya','success');
   closeModalDirect();
-  await loadHariLiburView();
+  const container=document.getElementById('hariLiburContent');
+  if(container && hariLiburCalendarMonth){
+    const y=hariLiburCalendarMonth.year,m=hariLiburCalendarMonth.month;
+    const startDate2=`${y}-${String(m+1).padStart(2,'0')}-01`;
+    const endDate2=`${y}-${String(m+1).padStart(2,'0')}-${String(new Date(y,m+1,0).getDate()).padStart(2,'0')}`;
+    const snap2=await db.collection('hrd_hari_libur').where('tanggal','>=',startDate2).where('tanggal','<=',endDate2).get();
+    const holidays2=[];snap2.forEach(d=>holidays2.push({id:d.id,...d.data()}));
+    if(hariLiburViewMode==='kalender')renderHariLiburCalendar(container,y,m,holidays2);
+    else renderHariLiburList(container,y,m,holidays2);
+  }
 }
 
 async function removeDayReminder(reminderTanggal){
@@ -631,7 +650,16 @@ async function removeDayReminder(reminderTanggal){
   
   toast('Pengingat dihapus','success');
   closeModalDirect();
-  await loadHariLiburView();
+  const container=document.getElementById('hariLiburContent');
+  if(container && hariLiburCalendarMonth){
+    const y=hariLiburCalendarMonth.year,m=hariLiburCalendarMonth.month;
+    const startDate2=`${y}-${String(m+1).padStart(2,'0')}-01`;
+    const endDate2=`${y}-${String(m+1).padStart(2,'0')}-${String(new Date(y,m+1,0).getDate()).padStart(2,'0')}`;
+    const snap2=await db.collection('hrd_hari_libur').where('tanggal','>=',startDate2).where('tanggal','<=',endDate2).get();
+    const holidays2=[];snap2.forEach(d=>holidays2.push({id:d.id,...d.data()}));
+    if(hariLiburViewMode==='kalender')renderHariLiburCalendar(container,y,m,holidays2);
+    else renderHariLiburList(container,y,m,holidays2);
+  }
 }
 
 async function syncHariLiburNasional() {
