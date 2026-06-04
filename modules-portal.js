@@ -12,7 +12,12 @@ async function renderPortal(){const main=document.getElementById('mainContent');
     if(!avatarUrl)avatarUrl=currentUser.profilePic||'';
   }catch(e){}
   const avatarHtml=avatarUrl?`<img src="${avatarUrl}" style="width:60px;height:60px;border-radius:50%;object-fit:cover">`:`<div style="width:60px;height:60px;font-size:1.5rem;background:var(--primary);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center">${u.nama.charAt(0)}</div>`;
-  main.innerHTML=`<div class="page-title"><span>🏠 Portal Saya</span></div><div class="card" style="border-left:4px solid var(--accent)"><div class="flex gap-16" style="align-items:center">${avatarHtml}<div><div class="fw-700" style="font-size:1.1rem">${escHtml(u.nama)}</div><div class="text-sm" style="color:#999">${escHtml(u.departemen||'-')} • ${escHtml(u.posisi||u.role)}</div><div class="text-xs" style="color:#999">NIP: ${escHtml(u.nip||'-')}</div></div></div></div><div class="stats-grid"><div class="stat-card" style="cursor:pointer;-webkit-tap-highlight-color:rgba(198,40,40,.2);touch-action:manipulation" onclick="navigateTo('portal-absensi')"><div class="stat-icon">📍</div><div class="stat-value" id="pAbsen">-</div><div class="stat-label">Kehadiran Bulan Ini</div></div><div class="stat-card" style="cursor:pointer;-webkit-tap-highlight-color:rgba(198,40,40,.2);touch-action:manipulation" onclick="navigateTo('portal-cuti')"><div class="stat-icon">🏖️</div><div class="stat-value" id="pCuti">-</div><div class="stat-label">Sisa Cuti</div></div><div class="stat-card" style="cursor:pointer;-webkit-tap-highlight-color:rgba(198,40,40,.2);touch-action:manipulation" onclick="navigateTo('inbox')"><div class="stat-icon">📥</div><div class="stat-value" id="pInbox">-</div><div class="stat-label">Inbox Meeting</div></div></div>
+  main.innerHTML=`<div class="page-title"><span>🏠 Portal Saya</span></div><div class="card" style="border-left:4px solid var(--accent)"><div class="flex gap-16" style="align-items:center">${avatarHtml}<div><div class="fw-700" style="font-size:1.1rem">${escHtml(u.nama)}</div><div class="text-sm" style="color:#999">${escHtml(u.departemen||'-')} • ${escHtml(u.posisi||u.role)}</div><div class="text-xs" style="color:#999">NIP: ${escHtml(u.nip||'-')}</div></div></div></div><div class="stats-grid"><div class="stat-card" style="cursor:pointer;-webkit-tap-highlight-color:rgba(198,40,40,.2);touch-action:manipulation" onclick="navigateTo('portal-absensi')"><div class="stat-icon">📍</div><div class="stat-value" id="pAbsen">-</div><div class="stat-label">Kehadiran Bulan Ini</div></div><div class="stat-card" style="cursor:pointer;-webkit-tap-highlight-color:rgba(198,40,40,.2);touch-action:manipulation" onclick="navigateTo('portal-cuti')"><div class="stat-icon">🏖️</div><div class="stat-value" id="pCuti">-</div><div class="stat-label">Sisa Cuti</div></div><div class="stat-card" style="cursor:pointer;-webkit-tap-highlight-color:rgba(198,40,40,.2);touch-action:manipulation" onclick="navigateTo('daily-task')"><div class="stat-icon">📋</div><div class="stat-value" id="pTask">-</div><div class="stat-label">Task Hari Ini</div></div><div class="stat-card" style="cursor:pointer;-webkit-tap-highlight-color:rgba(198,40,40,.2);touch-action:manipulation" onclick="navigateTo('inbox')"><div class="stat-icon">📥</div><div class="stat-value" id="pInbox">-</div><div class="stat-label">Inbox Meeting</div></div></div>
+  <!-- DAILY TASK TODAY SECTION -->
+  <div class="card" id="portalDailyTaskSection">
+    <div class="card-title mb-12" style="display:flex;justify-content:space-between;align-items:center"><span>📋 Daily Task Hari Ini</span><button class="btn btn-xs btn-primary" onclick="navigateTo('daily-task')">Lihat Semua</button></div>
+    <div id="portalDailyTaskList"><p class="text-sm" style="color:#999">Memuat...</p></div>
+  </div>
   <!-- KOLOM PENGUMUMAN, BROADCAST, MEETING & INVITE -->
   <!-- AKSI CEPAT + KOMUNIKASI -->
   <div class="card">
@@ -43,10 +48,37 @@ async function renderPortal(){const main=document.getElementById('mainContent');
   </div>
   <div class="card"><div class="card-title">📲 Download / Install Aplikasi</div><p class="text-sm mb-8" style="color:#666">Install aplikasi ini di perangkat Anda untuk akses lebih cepat.</p>${renderDownloadAppSection()}</div>`;
   // Load data
-  const[absenSnap,cutiSnap,inboxSnap]=await Promise.all([db.collection('hrd_absensi').where('userId','==',u.id).where('tanggal','>=',monthStr()+'-01').get(),db.collection('hrd_cuti').where('userId','==',u.id).where('status','==','approved').get(),db.collection('hrd_meeting_invites').where('targetUser','==',u.id).where('read','==',false).get()]);
+  const[absenSnap,cutiSnap,inboxSnap,taskSnap]=await Promise.all([db.collection('hrd_absensi').where('userId','==',u.id).where('tanggal','>=',monthStr()+'-01').get(),db.collection('hrd_cuti').where('userId','==',u.id).where('status','==','approved').get(),db.collection('hrd_meeting_invites').where('targetUser','==',u.id).where('read','==',false).get(),db.collection('hrd_daily_tasks').get()]);
   document.getElementById('pAbsen').textContent=absenSnap.size+' hari';
   document.getElementById('pCuti').textContent=Math.max(0,12-cutiSnap.size)+' hari';
   document.getElementById('pInbox').textContent=inboxSnap.size;
+  // Daily task today
+  const today=todayStr();
+  const myTasks=[];taskSnap.forEach(d=>{const t=d.data();if(t.userId===u.id)myTasks.push({id:d.id,...t});});
+  const todayTasks=myTasks.filter(t=>t.tanggal===today&&!t.done);
+  const overdueTasks=myTasks.filter(t=>t.tanggal<today&&!t.done);
+  const taskEl=document.getElementById('pTask');
+  if(taskEl)taskEl.textContent=(todayTasks.length+overdueTasks.length);
+  // Render daily task list on portal
+  const taskListEl=document.getElementById('portalDailyTaskList');
+  if(taskListEl){
+    const displayTasks=[...overdueTasks,...todayTasks].slice(0,5);
+    if(!displayTasks.length){taskListEl.innerHTML='<p class="text-sm" style="color:#999">Tidak ada task hari ini. 🎉</p>';}
+    else{
+      let th='';
+      displayTasks.forEach(t=>{
+        const isOverdue=t.tanggal<today;
+        const priorityColor=t.priority==='high'?'#c62828':t.priority==='low'?'#666':'#f57f17';
+        const priorityLabel=t.priority==='high'?'Tinggi':t.priority==='low'?'Rendah':'Sedang';
+        th+=`<div style="display:flex;align-items:center;gap:8px;padding:8px;border-left:3px solid ${isOverdue?'#c62828':'#1565c0'};margin-bottom:6px;background:${isOverdue?'#fff8f8':'#f8fafe'};border-radius:0 6px 6px 0;cursor:pointer" onclick="navigateTo('daily-task')">`;
+        th+=`<div style="flex:1"><span style="font-weight:600;font-size:.85rem">${escHtml(t.title)}</span> <span style="font-size:.6rem;padding:1px 5px;border-radius:3px;background:${priorityColor}20;color:${priorityColor}">${priorityLabel}</span>`;
+        if(isOverdue)th+=' <span style="font-size:.6rem;color:#c62828;font-weight:600">Terlambat</span>';
+        if(t.assignedByName)th+=`<div style="font-size:.65rem;color:#999;margin-top:2px">Ditugaskan oleh: ${escHtml(t.assignedByName)}</div>`;
+        th+=`</div><span style="font-size:.7rem;color:#999">${t.waktu||''}</span></div>`;
+      });
+      taskListEl.innerHTML=th;
+    }
+  }
 }
 
 async function loadPortalPengumuman(){try{const snap=await db.collection('hrd_pengumuman').get();const el=document.getElementById('portalPengumumanBody');const ct=document.getElementById('portalPengumumanCount');if(ct)ct.textContent=snap.size;if(!el)return;if(snap.empty){el.innerHTML='<p class="text-sm" style="color:#999">Belum ada</p>';return;}let h='';const items=[];snap.forEach(d=>items.push({id:d.id,...d.data()}));items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));items.slice(0,5).forEach(p=>{h+=`<div style="padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="viewPengumuman('${p.id}')"><div class="fw-700 text-sm">${escHtml(p.judul||'')}</div><div class="text-xs" style="color:#999">${formatDate(p.createdAt)}</div></div>`;});el.innerHTML=h;}catch(e){console.error('loadPortalPengumuman:',e);}}
