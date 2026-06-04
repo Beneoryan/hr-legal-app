@@ -413,38 +413,43 @@ async function renderOnboarding(){
   const snap=await db.collection('hrd_onboarding').get();
   const items=[];snap.forEach(d=>items.push({id:d.id,...d.data()}));
 
-  // Collect all unique checklist task names (ordered by first appearance)
-  const allTasks=[];
-  items.forEach(p=>{
-    (p.checklist||[]).forEach(c=>{
-      if(!allTasks.includes(c.task))allTasks.push(c.task);
-    });
-  });
-
-  let h=`<div class="page-title"><span>🚀 Onboarding</span><button class="btn btn-primary btn-sm" onclick="modalOnboarding()">+ Tambah</button></div><div class="card"><div class="table-wrap" style="overflow-x:auto"><table><thead><tr><th style="min-width:120px">Karyawan</th><th>Mulai</th>`;
-  allTasks.forEach(t=>{h+=`<th style="text-align:center;font-size:.65rem;min-width:40px;writing-mode:vertical-rl;transform:rotate(180deg);padding:8px 4px">${escHtml(t)}</th>`;});
-  h+=`<th>Status</th><th>Aksi</th></tr></thead><tbody>`;
-
+  let h=`<div class="page-title"><span>🚀 Onboarding</span><button class="btn btn-primary btn-sm" onclick="modalOnboarding()">+ Tambah</button></div>`;
+  
   if(!items.length){
-    h+=`<tr><td colspan="${allTasks.length+4}" class="text-center">Belum ada</td></tr>`;
+    h+=`<div class="card"><p class="text-center">Belum ada data onboarding</p></div>`;
   } else {
+    h+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px">`;
     items.forEach(p=>{
-      const done=(p.checklist||[]).filter(c=>c.done).length,total=(p.checklist||[]).length;
-      h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggalMulai)}</td>`;
-      allTasks.forEach(task=>{
-        const checkItem=(p.checklist||[]).find(c=>c.task===task);
-        const idx=(p.checklist||[]).findIndex(c=>c.task===task);
-        if(checkItem){
-          h+=`<td style="text-align:center"><input type="checkbox" ${checkItem.done?'checked':''} onchange="toggleOnboardingCheck('${p.id}',${idx})"></td>`;
-        } else {
-          h+=`<td style="text-align:center;color:#ccc">-</td>`;
-        }
+      const done=(p.checklist||[]).filter(c=>c.done).length;
+      const total=(p.checklist||[]).length;
+      const pct=total?Math.round(done/total*100):0;
+      const statusColor=pct===100?'#2e7d32':pct>=50?'#f57f17':'#c62828';
+      
+      h+=`<div class="card" style="padding:16px;border-left:4px solid ${statusColor}">`;
+      h+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">`;
+      h+=`<div><div class="fw-700" style="font-size:.95rem">${escHtml(p.nama)}</div><div class="text-xs" style="color:var(--text-light)">Mulai: ${formatDate(p.tanggalMulai)}</div></div>`;
+      h+=`<div style="display:flex;gap:4px"><button class="btn btn-xs btn-info" onclick="viewOnboarding('${p.id}')" title="Detail">👁️</button><button class="btn btn-xs btn-warning" onclick="editOnboarding('${p.id}')" title="Edit">✏️</button><button class="btn btn-xs btn-danger" onclick="hapusOnboarding('${p.id}')" title="Hapus">🗑️</button></div>`;
+      h+=`</div>`;
+      
+      // Progress bar
+      h+=`<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span class="text-xs fw-700">Progress</span><span class="text-xs fw-700" style="color:${statusColor}">${done}/${total} (${pct}%)</span></div>`;
+      h+=`<div style="background:#eee;border-radius:4px;height:6px;overflow:hidden"><div style="background:${statusColor};height:100%;width:${pct}%;border-radius:4px;transition:width .3s"></div></div></div>`;
+      
+      // Checklist items
+      h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">`;
+      (p.checklist||[]).forEach((c,i)=>{
+        h+=`<label style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:${c.done?'#e8f5e9':'#f5f5f5'};border-radius:6px;cursor:pointer;font-size:.78rem;transition:background .2s">`;
+        h+=`<input type="checkbox" ${c.done?'checked':''} onchange="toggleOnboardingCheck('${p.id}',${i})" style="accent-color:${statusColor}">`;
+        h+=`<span style="${c.done?'text-decoration:line-through;color:#999':''}">${escHtml(c.task)}</span></label>`;
       });
-      h+=`<td><span class="badge badge-${done===total&&total>0?'success':'warning'}">${done===total&&total>0?'Selesai':'Proses'}</span></td>`;
-      h+=`<td><button class="btn btn-xs btn-info" onclick="viewOnboarding('${p.id}')" title="Lihat">👁️</button> <button class="btn btn-xs btn-warning" onclick="editOnboarding('${p.id}')" title="Edit">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusOnboarding('${p.id}')" title="Hapus">🗑️</button></td></tr>`;
+      h+=`</div>`;
+      
+      // Status badge
+      h+=`<div style="margin-top:12px;text-align:right"><span class="badge badge-${pct===100?'success':'warning'}">${pct===100?'Selesai':'Proses'}</span></div>`;
+      h+=`</div>`;
     });
+    h+=`</div>`;
   }
-  h+='</tbody></table></div></div>';
   main.innerHTML=h;
 }
 function modalOnboarding(){openModal(`<div class="modal-title">Tambah Onboarding</div><div class="form-group"><label>Nama</label><input class="form-control" id="obNama"></div><div class="form-group"><label>Tanggal Mulai</label><input class="form-control" type="date" id="obTgl" value="${todayStr()}"></div><div class="form-group"><label>Checklist (per baris)</label><textarea class="form-control" id="obCheck">Orientasi perusahaan\nSetup email & akun\nTraining SOP\nPerkenalan tim\nSerah terima perlengkapan</textarea></div><button class="btn btn-primary" onclick="simpanOnboarding()">Simpan</button>`);}
@@ -521,38 +526,43 @@ async function renderOffboarding(){
   const snap=await db.collection('hrd_offboarding').get();
   const items=[];snap.forEach(d=>items.push({id:d.id,...d.data()}));
 
-  // Collect all unique checklist task names (ordered by first appearance)
-  const allTasks=[];
-  items.forEach(p=>{
-    (p.checklist||[]).forEach(c=>{
-      if(!allTasks.includes(c.task))allTasks.push(c.task);
-    });
-  });
-
-  let h=`<div class="page-title"><span>📦 Offboarding</span><button class="btn btn-primary btn-sm" onclick="modalOffboarding()">+ Tambah</button></div><div class="card"><div class="table-wrap" style="overflow-x:auto"><table><thead><tr><th style="min-width:120px">Karyawan</th><th>Tgl Keluar</th><th>Alasan</th>`;
-  allTasks.forEach(t=>{h+=`<th style="text-align:center;font-size:.65rem;min-width:40px;writing-mode:vertical-rl;transform:rotate(180deg);padding:8px 4px">${escHtml(t)}</th>`;});
-  h+=`<th>Status</th><th>Aksi</th></tr></thead><tbody>`;
-
+  let h=`<div class="page-title"><span>📦 Offboarding</span><button class="btn btn-primary btn-sm" onclick="modalOffboarding()">+ Tambah</button></div>`;
+  
   if(!items.length){
-    h+=`<tr><td colspan="${allTasks.length+5}" class="text-center">Belum ada</td></tr>`;
+    h+=`<div class="card"><p class="text-center">Belum ada data offboarding</p></div>`;
   } else {
+    h+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px">`;
     items.forEach(p=>{
-      const done=(p.checklist||[]).filter(c=>c.done).length,total=(p.checklist||[]).length;
-      h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggalKeluar)}</td><td>${escHtml(p.alasan||'-')}</td>`;
-      allTasks.forEach(task=>{
-        const checkItem=(p.checklist||[]).find(c=>c.task===task);
-        const idx=(p.checklist||[]).findIndex(c=>c.task===task);
-        if(checkItem){
-          h+=`<td style="text-align:center"><input type="checkbox" ${checkItem.done?'checked':''} onchange="toggleOffboardingCheck('${p.id}',${idx})"></td>`;
-        } else {
-          h+=`<td style="text-align:center;color:#ccc">-</td>`;
-        }
+      const done=(p.checklist||[]).filter(c=>c.done).length;
+      const total=(p.checklist||[]).length;
+      const pct=total?Math.round(done/total*100):0;
+      const statusColor=pct===100?'#2e7d32':pct>=50?'#f57f17':'#c62828';
+      
+      h+=`<div class="card" style="padding:16px;border-left:4px solid ${statusColor}">`;
+      h+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">`;
+      h+=`<div><div class="fw-700" style="font-size:.95rem">${escHtml(p.nama)}</div><div class="text-xs" style="color:var(--text-light)">Keluar: ${formatDate(p.tanggalKeluar)} | ${escHtml(p.alasan||'-')}</div></div>`;
+      h+=`<div style="display:flex;gap:4px"><button class="btn btn-xs btn-info" onclick="viewOffboarding('${p.id}')" title="Detail">👁️</button><button class="btn btn-xs btn-warning" onclick="editOffboarding('${p.id}')" title="Edit">✏️</button><button class="btn btn-xs btn-danger" onclick="hapusOffboarding('${p.id}')" title="Hapus">🗑️</button></div>`;
+      h+=`</div>`;
+      
+      // Progress bar
+      h+=`<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span class="text-xs fw-700">Progress</span><span class="text-xs fw-700" style="color:${statusColor}">${done}/${total} (${pct}%)</span></div>`;
+      h+=`<div style="background:#eee;border-radius:4px;height:6px;overflow:hidden"><div style="background:${statusColor};height:100%;width:${pct}%;border-radius:4px;transition:width .3s"></div></div></div>`;
+      
+      // Checklist items
+      h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">`;
+      (p.checklist||[]).forEach((c,i)=>{
+        h+=`<label style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:${c.done?'#e8f5e9':'#f5f5f5'};border-radius:6px;cursor:pointer;font-size:.78rem;transition:background .2s">`;
+        h+=`<input type="checkbox" ${c.done?'checked':''} onchange="toggleOffboardingCheck('${p.id}',${i})" style="accent-color:${statusColor}">`;
+        h+=`<span style="${c.done?'text-decoration:line-through;color:#999':''}">${escHtml(c.task)}</span></label>`;
       });
-      h+=`<td><span class="badge badge-${p.status==='selesai'||done===total&&total>0?'success':'warning'}">${p.status==='selesai'||done===total&&total>0?'Selesai':'Proses'}</span></td>`;
-      h+=`<td><button class="btn btn-xs btn-info" onclick="viewOffboarding('${p.id}')" title="Lihat">👁️</button> <button class="btn btn-xs btn-warning" onclick="editOffboarding('${p.id}')" title="Edit">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusOffboarding('${p.id}')" title="Hapus">🗑️</button></td></tr>`;
+      h+=`</div>`;
+      
+      // Status badge
+      h+=`<div style="margin-top:12px;text-align:right"><span class="badge badge-${pct===100?'success':'warning'}">${pct===100?'Selesai':'Proses'}</span></div>`;
+      h+=`</div>`;
     });
+    h+=`</div>`;
   }
-  h+='</tbody></table></div></div>';
   main.innerHTML=h;
 }
 function modalOffboarding(){openModal(`<div class="modal-title">Tambah Offboarding</div><div class="form-group"><label>Nama</label><input class="form-control" id="offNama"></div><div class="form-group"><label>Tgl Keluar</label><input class="form-control" type="date" id="offTgl" value="${todayStr()}"></div><div class="form-group"><label>Alasan</label><select class="form-control" id="offAlasan"><option>Resign</option><option>PHK</option><option>Kontrak Habis</option><option>Pensiun</option></select></div><div class="form-group"><label>Checklist (per baris)</label><textarea class="form-control" id="offCheck" style="min-height:100px">Serah terima tugas\nPengembalian aset\nDeaktivasi akun\nExit interview\nSurat referensi</textarea></div><button class="btn btn-primary" onclick="simpanOffboarding()">Simpan</button>`);}
