@@ -47,11 +47,16 @@ async function renderPortal(){const main=document.getElementById('mainContent');
     </div>
   </div>
   <div class="card"><div class="card-title">📲 Download / Install Aplikasi</div><p class="text-sm mb-8" style="color:#666">Install aplikasi ini di perangkat Anda untuk akses lebih cepat.</p>${renderDownloadAppSection()}</div>`;
-  // Load data
-  const[absenSnap,cutiSnap,inboxSnap,taskSnap]=await Promise.all([db.collection('hrd_absensi').where('userId','==',u.id).where('tanggal','>=',monthStr()+'-01').get(),db.collection('hrd_cuti').where('userId','==',u.id).where('status','==','approved').get(),db.collection('hrd_meeting_invites').where('targetUser','==',u.id).where('read','==',false).get(),db.collection('hrd_daily_tasks').get()]);
-  document.getElementById('pAbsen').textContent=absenSnap.size+' hari';
-  document.getElementById('pCuti').textContent=Math.max(0,12-cutiSnap.size)+' hari';
-  document.getElementById('pInbox').textContent=inboxSnap.size;
+  // Load data (using simple .get() + client-side filter to avoid composite index requirements)
+  let absenCount=0,cutiCount=0,inboxCount=0;
+  const monthStart=monthStr()+'-01';
+  const[absenSnap,cutiSnap,inboxSnap,taskSnap]=await Promise.all([db.collection('hrd_absensi').get(),db.collection('hrd_cuti').get(),db.collection('hrd_meeting_invites').get(),db.collection('hrd_daily_tasks').get()]);
+  absenSnap.forEach(d=>{const data=d.data();if(data.userId===u.id&&data.tanggal>=monthStart)absenCount++;});
+  cutiSnap.forEach(d=>{const data=d.data();if(data.userId===u.id&&data.status==='approved')cutiCount++;});
+  inboxSnap.forEach(d=>{const data=d.data();if(data.targetUser===u.id&&data.read===false)inboxCount++;});
+  document.getElementById('pAbsen').textContent=absenCount+' hari';
+  document.getElementById('pCuti').textContent=Math.max(0,12-cutiCount)+' hari';
+  document.getElementById('pInbox').textContent=inboxCount;
   // Daily task today
   const today=todayStr();
   const myTasks=[];taskSnap.forEach(d=>{const t=d.data();if(t.userId===u.id)myTasks.push({id:d.id,...t});});

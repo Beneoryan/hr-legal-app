@@ -814,13 +814,15 @@ async function modalGroupChat(){
 async function sendGroupChat(){
   const dept=document.getElementById('grpDept').value;const msg=document.getElementById('grpMsg').value.trim();
   const label=dept==='admin'?'Admin':dept;
-  // Find existing group room
-  const existingSnap=await db.collection('hrd_chat_threads').where('isGroup','==',true).where('groupName','==',label).get();
+  // Find existing group room (single-field query + client-side filter to avoid composite index)
+  const existingSnap=await db.collection('hrd_chat_threads').where('isGroup','==',true).get();
   let threadId=null;
-  if(!existingSnap.empty){
-    threadId=existingSnap.docs[0].id;
+  let matchDoc=null;
+  existingSnap.forEach(d=>{if(d.data().groupName===label)matchDoc=d;});
+  if(matchDoc){
+    threadId=matchDoc.id;
     // Add current user to participants if not already
-    const threadData=existingSnap.docs[0].data();
+    const threadData=matchDoc.data();
     if(!threadData.participants?.includes(currentUser.id)){
       const updatedMembers=[...threadData.participants,currentUser.id];
       await db.collection('hrd_chat_threads').doc(threadId).update({participants:updatedMembers});
@@ -1022,12 +1024,12 @@ function detectNotifLink(title){
 }
 async function markAllRead(){
   const[s1,s2]=await Promise.all([
-    db.collection('hrd_notifikasi').where('targetUser','==',currentUser.id).where('read','==',false).get(),
-    db.collection('hrd_notifikasi').where('targetUser','==',currentUser.role).where('read','==',false).get()
+    db.collection('hrd_notifikasi').where('targetUser','==',currentUser.id).get(),
+    db.collection('hrd_notifikasi').where('targetUser','==',currentUser.role).get()
   ]);
   const batch=db.batch();
-  s1.forEach(d=>batch.update(d.ref,{read:true}));
-  s2.forEach(d=>batch.update(d.ref,{read:true}));
+  s1.forEach(d=>{if(d.data().read===false)batch.update(d.ref,{read:true});});
+  s2.forEach(d=>{if(d.data().read===false)batch.update(d.ref,{read:true});});
   await batch.commit();
   toast('Semua dibaca','success');renderNotifikasi();
 }

@@ -229,8 +229,8 @@ async function loadHariLiburView() {
     const endDate = `${y}-${String(m+1).padStart(2,'0')}-${String(new Date(y, m+1, 0).getDate()).padStart(2,'0')}`;
     let holidays = [];
     try {
-      const snap = await db.collection('hrd_hari_libur').where('tanggal','>=',startDate).where('tanggal','<=',endDate).get();
-      snap.forEach(d => holidays.push({ id: d.id, ...d.data() }));
+      const snap = await db.collection('hrd_hari_libur').get();
+      snap.forEach(d => { const data = d.data(); if(data.tanggal>=startDate && data.tanggal<=endDate) holidays.push({ id: d.id, ...data }); });
     } catch(e) { console.warn('Failed to load holidays:', e); }
     let navHtml = `<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:16px">
       <div style="display:flex;align-items:center;gap:8px">
@@ -321,10 +321,10 @@ async function renderMyCalendarView(container) {
 
   try {
     const [holSnap, taskSnap] = await Promise.all([
-      db.collection('hrd_hari_libur').where('tanggal','>=',startDate).where('tanggal','<=',endDate).get(),
+      db.collection('hrd_hari_libur').get(),
       db.collection('hrd_daily_tasks').get()
     ]);
-    holSnap.forEach(d => holidays.push({ id: d.id, ...d.data() }));
+    holSnap.forEach(d => { const data = d.data(); if(data.tanggal>=startDate && data.tanggal<=endDate) holidays.push({ id: d.id, ...data }); });
     taskSnap.forEach(d => {
       const t = d.data();
       if (t.userId === currentUser.id && t.tanggal >= startDate && t.tanggal <= endDate) {
@@ -507,8 +507,10 @@ async function autoLoadHariLiburNasional() {
   else if (year === 2026) dataToSync = HARI_LIBUR_NASIONAL_2026;
   else return;
 
-  const existingSnap = await db.collection('hrd_hari_libur').where('tahun','==',year).where('tipe','in',['nasional','cuti_bersama']).limit(1).get();
-  if (!existingSnap.empty) return; // Already populated
+  const existingSnap = await db.collection('hrd_hari_libur').where('tahun','==',year).get();
+  let alreadyPopulated=false;
+  existingSnap.forEach(d=>{const t=d.data().tipe;if(t==='nasional'||t==='cuti_bersama')alreadyPopulated=true;});
+  if (alreadyPopulated) return; // Already populated
 
   const batch = [];
   dataToSync.forEach(h => {

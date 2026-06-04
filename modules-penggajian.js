@@ -64,33 +64,33 @@ async function doGenerateAllGaji(){
   // Delete existing slips for this period
   const existSnap=await db.collection('hrd_penggajian').where('periode','==',bulan).get();
   if(!existSnap.empty){const delBatch=db.batch();existSnap.forEach(d=>delBatch.delete(d.ref));await delBatch.commit();}
-  // Load all related data
+  // Load all related data (using simple queries + client-side filtering to avoid composite index requirements)
   const[absenSnap,reimbSnap,kasbonSnap,tunjSnap,kpiSnap,insentifSnap,cutiSnap,overtimeSnap,dinasLuarSnap]=await Promise.all([
-    db.collection('hrd_absensi').where('tanggal','>=',periodeStart).where('tanggal','<=',periodeEnd).get(),
-    db.collection('hrd_reimbursement').where('status','==','approved').get(),
+    db.collection('hrd_absensi').get(),
+    db.collection('hrd_reimbursement').get(),
     db.collection('hrd_kasbon').get(),
     db.collection('hrd_tunjangan').get(),
     db.collection('hrd_kpi').get(),
     db.collection('hrd_insentif').get(),
-    db.collection('hrd_cuti').where('status','==','approved').get(),
-    db.collection('hrd_overtime').where('status','==','approved').get(),
-    db.collection('hrd_dinas_luar').where('status','==','approved').get().catch(()=>({forEach:()=>{}}))
+    db.collection('hrd_cuti').get(),
+    db.collection('hrd_overtime').get(),
+    db.collection('hrd_dinas_luar').get().catch(()=>({forEach:()=>{}}))
   ]);
   // Build attendance map: userId -> {hadir, izin, cuti, lembur_jam}
   const absenMap={};
-  absenSnap.forEach(d=>{const p=d.data();const uid=p.userId;if(!absenMap[uid])absenMap[uid]={hadir:0,lembur:0};if(p.tipe==='masuk')absenMap[uid].hadir++;if(p.tipe==='pulang'&&p.lembur&&p.lemburJam)absenMap[uid].lembur+=p.lemburJam;});
+  absenSnap.forEach(d=>{const p=d.data();if(p.tanggal<periodeStart||p.tanggal>periodeEnd)return;const uid=p.userId;if(!absenMap[uid])absenMap[uid]={hadir:0,lembur:0};if(p.tipe==='masuk')absenMap[uid].hadir++;if(p.tipe==='pulang'&&p.lembur&&p.lemburJam)absenMap[uid].lembur+=p.lemburJam;});
   // Cuti map: userId -> jumlah hari cuti dalam periode
   const cutiMap={};
-  cutiSnap.forEach(d=>{const c=d.data();const uid=c.userId;if(!uid)return;const start=new Date(c.mulai);const end=new Date(c.selesai);let days=0;for(let dt=new Date(start);dt<=end;dt.setDate(dt.getDate()+1)){const ds=dt.toISOString().split('T')[0];if(ds>=periodeStart&&ds<=periodeEnd)days++;}if(!cutiMap[uid])cutiMap[uid]=0;cutiMap[uid]+=days;});
+  cutiSnap.forEach(d=>{const c=d.data();if(c.status!=='approved')return;const uid=c.userId;if(!uid)return;const start=new Date(c.mulai);const end=new Date(c.selesai);let days=0;for(let dt=new Date(start);dt<=end;dt.setDate(dt.getDate()+1)){const ds=dt.toISOString().split('T')[0];if(ds>=periodeStart&&ds<=periodeEnd)days++;}if(!cutiMap[uid])cutiMap[uid]=0;cutiMap[uid]+=days;});
   // Overtime map
   const otMap={};
-  overtimeSnap.forEach(d=>{const o=d.data();if(o.tanggal>=periodeStart&&o.tanggal<=periodeEnd){const uid=o.userId||o.nama;if(!otMap[uid])otMap[uid]=0;otMap[uid]+=(o.durasi||0);}});
+  overtimeSnap.forEach(d=>{const o=d.data();if(o.status!=='approved')return;if(o.tanggal>=periodeStart&&o.tanggal<=periodeEnd){const uid=o.userId||o.nama;if(!otMap[uid])otMap[uid]=0;otMap[uid]+=(o.durasi||0);}});
   // Dinas luar map: userId -> jumlah hari dinas dalam periode
   const dinasMap={};
-  dinasLuarSnap.forEach(d=>{const dl=d.data();const uid=dl.userId||dl.nama;const startD=dl.tanggalMulai||dl.tanggal;const endD=dl.tanggalSelesai||dl.tanggal;if(!startD)return;let days=0;const endTime=new Date(endD||startD).getTime();let maxIter=366;for(let dt=new Date(startD);dt.getTime()<=endTime;dt.setDate(dt.getDate()+1)){if(--maxIter<0)break;const ds=dt.toISOString().split('T')[0];if(ds>=periodeStart&&ds<=periodeEnd)days++;}if(!dinasMap[uid])dinasMap[uid]=0;dinasMap[uid]+=days;});
+  dinasLuarSnap.forEach(d=>{const dl=d.data();if(dl.status!=='approved')return;const uid=dl.userId||dl.nama;const startD=dl.tanggalMulai||dl.tanggal;const endD=dl.tanggalSelesai||dl.tanggal;if(!startD)return;let days=0;const endTime=new Date(endD||startD).getTime();let maxIter=366;for(let dt=new Date(startD);dt.getTime()<=endTime;dt.setDate(dt.getDate()+1)){if(--maxIter<0)break;const ds=dt.toISOString().split('T')[0];if(ds>=periodeStart&&ds<=periodeEnd)days++;}if(!dinasMap[uid])dinasMap[uid]=0;dinasMap[uid]+=days;});
   // Build other maps
   const reimbMap={},kasbonMap={},kpiMap={},insentifMap={};
-  reimbSnap.forEach(d=>{const r=d.data();const n=(r.nama||'').toLowerCase();reimbMap[n]=(reimbMap[n]||0)+(r.jumlah||0);});
+  reimbSnap.forEach(d=>{const r=d.data();if(r.status!=='approved')return;const n=(r.nama||'').toLowerCase();reimbMap[n]=(reimbMap[n]||0)+(r.jumlah||0);});
   kasbonSnap.forEach(d=>{const r=d.data();if(r.status==='aktif'){const n=(r.nama||'').toLowerCase();const angsuran=Math.ceil((r.jumlah||0)/(r.cicilan||1));kasbonMap[n]=(kasbonMap[n]||0)+angsuran;}});
   kpiSnap.forEach(d=>{const r=d.data();const n=(r.nama||'').toLowerCase();if(!kpiMap[n]||r.skor>kpiMap[n])kpiMap[n]=r.skor||0;});
   insentifSnap.forEach(d=>{const r=d.data();const n=(r.nama||'').toLowerCase();insentifMap[n]=(insentifMap[n]||0)+(r.nominal||0);});
@@ -251,8 +251,10 @@ async function processImportPenggajianFromText(text){
     let totalBersih=Number(String(map.totalBersih!==undefined?row[map.totalBersih]:'').replace(/[^0-9.-]/g,''))||0;
     if(!totalBersih)totalBersih=gajiPokok+tunjangan+lembur+bonus-potongan-pph21;
     const payload={nama,periode,gajiPokok,tunjangan:tunjangan+lembur+bonus,potongan,pph21,totalBersih,updatedAt:new Date().toISOString()};
-    const snap=await db.collection('hrd_penggajian').where('nama','==',nama).where('periode','==',periode).limit(1).get();
-    if(!snap.empty){await db.collection('hrd_penggajian').doc(snap.docs[0].id).update(payload);updated++;}
+    const snap=await db.collection('hrd_penggajian').where('nama','==',nama).get();
+    let existDoc=null;
+    snap.forEach(d=>{if(d.data().periode===periode)existDoc=d;});
+    if(existDoc){await db.collection('hrd_penggajian').doc(existDoc.id).update(payload);updated++;}
     else{await db.collection('hrd_penggajian').add({...payload,createdAt:new Date().toISOString()});added++;}
   }
   closeModalDirect();toast(`✅ Import selesai: ${added} baru, ${updated} terupdate`,'success');renderPenggajian();

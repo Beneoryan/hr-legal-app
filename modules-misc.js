@@ -381,8 +381,8 @@ async function _buildCutiDetail(p,karyawan){
   if(karyawan&&(p.jenis||'').toLowerCase().includes('cuti tahunan')){
     try{
       const jatah=hitungJatahCuti(karyawan);
-      const cutiSnap=await db.collection('hrd_cuti').where('nama','==',p.nama).where('jenis','==','Cuti Tahunan').where('status','==','approved').get();
-      let terpakai=0;cutiSnap.forEach(d=>{terpakai+=(d.data().durasi||0);});
+      const cutiSnap=await db.collection('hrd_cuti').where('nama','==',p.nama).get();
+      let terpakai=0;cutiSnap.forEach(d=>{const cd=d.data();if(cd.jenis==='Cuti Tahunan'&&cd.status==='approved')terpakai+=(cd.durasi||0);});
       const sisa=Math.max(0,jatah-terpakai);
       h+='<div style="margin-top:12px;padding:10px;background:#f0f7ff;border-radius:6px;font-size:.83rem">';
       h+=`<div class="fw-700 mb-4">📊 Sisa Jatah Cuti Tahunan</div>`;
@@ -425,8 +425,8 @@ async function _buildOvertimeDetail(p,karyawan){
     const tgl=p.tanggal||'';
     const monthPrefix=tgl.substring(0,7);// YYYY-MM
     if(monthPrefix&&p.nama){
-      const otSnap=await db.collection('hrd_overtime').where('nama','==',p.nama).where('status','==','approved').get();
-      let totalJam=0;otSnap.forEach(d=>{const od=d.data();if((od.tanggal||'').startsWith(monthPrefix))totalJam+=(parseFloat(od.durasi)||0);});
+      const otSnap=await db.collection('hrd_overtime').where('nama','==',p.nama).get();
+      let totalJam=0;otSnap.forEach(d=>{const od=d.data();if(od.status==='approved'&&(od.tanggal||'').startsWith(monthPrefix))totalJam+=(parseFloat(od.durasi)||0);});
       h+='<div style="margin-top:12px;padding:10px;background:#f0f7ff;border-radius:6px;font-size:.83rem">';
       h+=`<div class="fw-700 mb-4">📊 Total Lembur Bulan Ini (Approved)</div>`;
       h+=`<div>Total: <b>${totalJam}</b> jam</div>`;
@@ -520,10 +520,10 @@ async function _buildReimbDetail(p){
   // Claim history
   try{
     if(p.nama){
-      const rSnap=await db.collection('hrd_reimbursement').where('nama','==',p.nama).where('status','==','approved').get();
+      const rSnap=await db.collection('hrd_reimbursement').where('nama','==',p.nama).get();
       let totalBulan=0,totalTahun=0;const now=new Date();const bulanIni=now.toISOString().substring(0,7);const tahunIni=now.getFullYear().toString();
       const byCategory={};
-      rSnap.forEach(d=>{const rd=d.data();const amt=parseFloat(rd.jumlah)||0;const cr=rd.createdAt||'';if(cr.startsWith(bulanIni))totalBulan+=amt;if(cr.startsWith(tahunIni))totalTahun+=amt;const cat=rd.kategori||'Lainnya';byCategory[cat]=(byCategory[cat]||0)+amt;});
+      rSnap.forEach(d=>{const rd=d.data();if(rd.status!=='approved')return;const amt=parseFloat(rd.jumlah)||0;const cr=rd.createdAt||'';if(cr.startsWith(bulanIni))totalBulan+=amt;if(cr.startsWith(tahunIni))totalTahun+=amt;const cat=rd.kategori||'Lainnya';byCategory[cat]=(byCategory[cat]||0)+amt;});
       h+='<div style="margin-top:12px;padding:10px;background:#f0f7ff;border-radius:6px;font-size:.83rem">';
       h+=`<div class="fw-700 mb-4">📊 Riwayat Klaim (Approved)</div>`;
       h+=`<div>Bulan ini: <b>${formatCurrency(totalBulan)}</b> | Tahun ini: <b>${formatCurrency(totalTahun)}</b></div>`;
@@ -551,9 +551,9 @@ async function _buildKasbonDetail(p,karyawan){
   // Existing active loans
   try{
     if(p.nama){
-      const kSnap=await db.collection('hrd_kasbon').where('nama','==',p.nama).where('status','==','approved').get();
+      const kSnap=await db.collection('hrd_kasbon').where('nama','==',p.nama).get();
       let totalOutstanding=0;let activeCount=0;
-      kSnap.forEach(d=>{const kd=d.data();const jumlah=parseFloat(kd.jumlah)||0;const sudahBayar=parseFloat(kd.sudahBayar)||0;const sisa=jumlah-sudahBayar;if(sisa>0){totalOutstanding+=sisa;activeCount++;}});
+      kSnap.forEach(d=>{const kd=d.data();if(kd.status!=='approved')return;const jumlah=parseFloat(kd.jumlah)||0;const sudahBayar=parseFloat(kd.sudahBayar)||0;const sisa=jumlah-sudahBayar;if(sisa>0){totalOutstanding+=sisa;activeCount++;}});
       h+='<div style="margin-top:12px;padding:10px;background:#f0f7ff;border-radius:6px;font-size:.83rem">';
       h+=`<div class="fw-700 mb-4">📊 Pinjaman Aktif</div>`;
       h+=`<div>Jumlah pinjaman aktif: <b>${activeCount}</b> | Total sisa: <b>${formatCurrency(totalOutstanding)}</b></div>`;
