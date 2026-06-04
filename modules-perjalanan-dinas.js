@@ -284,6 +284,7 @@ function getGradePeraturanSync(grade) {
 // ══════════════════════════════════════════════════════════════
 
 function renderPerjalananDinas(){
+  window._portalDinasMode=false;
   const main=document.getElementById('mainContent');
   main.innerHTML=`<div class="page-title"><span>✈️ Prosedur Perjalanan Dinas</span><button class="btn btn-primary btn-sm" onclick="modalAjukanSPPD()">+ Ajukan SPPD</button></div>
     <div class="tabs" id="sppdTabs">
@@ -358,7 +359,7 @@ async function showSPPDTab(tab){
 
 
 async function loadSPPDDaftar(el){
-  const isPortal=window._portalDinasMode&&!hasAccess(3);
+  const isPortal=window._portalDinasMode||!hasAccess(3);
   const snap=await db.collection('hrd_perjalanan_dinas').orderBy('createdAt','desc').get().catch(()=>db.collection('hrd_perjalanan_dinas').get());
   let h=`<div class="card"><div class="card-header"><div class="card-title">📋 Daftar Surat Perintah Perjalanan Dinas (SPPD)</div></div>
     <div class="table-wrap"><table><thead><tr><th>No. SPPD</th><th>Nama</th><th>Tujuan</th><th>Tanggal</th><th>Durasi</th><th>Status</th><th>Aksi</th></tr></thead><tbody>`;
@@ -830,7 +831,7 @@ function cetakSPPD(id){
 // ── UANG MUKA PERJALANAN DINAS ────────────────────────────────
 
 async function loadSPPDUangMuka(el){
-  const isPortal=window._portalDinasMode&&!hasAccess(3);
+  const isPortal=window._portalDinasMode||!hasAccess(3);
   const snap=await db.collection('hrd_uang_muka_dinas').get();
   let h=`<div class="card"><div class="card-header"><div class="card-title">💰 Uang Muka Perjalanan Dinas</div><button class="btn btn-primary btn-sm" onclick="modalUangMukaDinasNew()">+ Ajukan Uang Muka</button></div>
     <div class="table-wrap"><table><thead><tr><th>No. SPPD</th><th>Nama</th><th>Jumlah</th><th>Status</th><th>Aksi</th></tr></thead><tbody>`;
@@ -928,7 +929,7 @@ function viewUangMukaDinas(id){
 // ── LAPORAN PERJALANAN DINAS ──────────────────────────────────
 
 async function loadSPPDLaporan(el){
-  const isPortal=window._portalDinasMode&&!hasAccess(3);
+  const isPortal=window._portalDinasMode||!hasAccess(3);
   const snap=await db.collection('hrd_laporan_dinas').get();
   let h=`<div class="card"><div class="card-header"><div class="card-title">📝 Laporan Perjalanan Dinas</div><button class="btn btn-primary btn-sm" onclick="modalLaporanDinasNew()">+ Buat Laporan</button></div>
     <div class="table-wrap"><table><thead><tr><th>No. SPPD</th><th>Nama</th><th>Tujuan</th><th>Hasil</th><th>Tanggal Laporan</th><th>Aksi</th></tr></thead><tbody>`;
@@ -1012,7 +1013,7 @@ function viewLaporanDinas(id){
 // ── REIMBURSEMENT PERJALANAN DINAS ────────────────────────────
 
 async function loadSPPDReimbursement(el){
-  const isPortal=window._portalDinasMode&&!hasAccess(3);
+  const isPortal=window._portalDinasMode||!hasAccess(3);
   const snap=await db.collection('hrd_reimburse_dinas').get();
   let h=`<div class="card"><div class="card-header"><div class="card-title">🧾 Reimbursement Perjalanan Dinas</div><button class="btn btn-primary btn-sm" onclick="modalReimburseDinasNew()">+ Ajukan Reimburse</button></div>
     <p class="text-sm mb-16" style="color:#666">Pertanggungjawaban biaya perjalanan dinas. Selisih uang muka vs pengeluaran aktual akan dikembalikan/dibayarkan.</p>

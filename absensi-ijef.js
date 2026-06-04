@@ -706,7 +706,7 @@ async function doClockOut() {
 
 async function checkTodayStatus(){const snap=await db.collection('hrd_absensi').where('userId','==',currentUser.id).where('tanggal','==',todayStr()).get();let masuk=false,pulang=false;snap.forEach(d=>{if(d.data().tipe==='masuk')masuk=true;if(d.data().tipe==='pulang')pulang=true;});const el=document.getElementById('clockStatus');if(el){if(masuk&&pulang)el.innerHTML='<div class="badge badge-success" style="font-size:.9rem;padding:8px 16px">✅ Sudah In & Out</div>';else if(masuk)el.innerHTML='<div class="badge badge-info" style="font-size:.9rem;padding:8px 16px">⏰ Sudah In, belum Out</div>';else el.innerHTML='<div class="badge badge-warning" style="font-size:.9rem;padding:8px 16px">⚠️ Belum absen</div>';}}
 
-async function loadTodayHistory(){const snap=await db.collection('hrd_absensi').where('tanggal','==',todayStr()).get();let h='';if(snap.empty)h='<p class="text-sm" style="color:#999">Belum ada absensi hari ini</p>';else snap.forEach(d=>{const p=d.data();const tipeLabel=p.tipe==='masuk'?'Clock In':p.tipe==='pulang'?'Clock Out':p.tipe==='dinas_luar'?'Dinas Luar':p.tipe==='istirahat_mulai'?'Mulai Istirahat':p.tipe==='istirahat_selesai'?'Selesai Istirahat':p.tipe;const badgeColor=p.tipe==='masuk'?'success':p.tipe==='pulang'?'info':p.tipe==='istirahat_mulai'?'warning':p.tipe==='istirahat_selesai'?'info':'warning';let lemburBadge='';if(p.lembur&&p.lemburJam)lemburBadge=` <span class="badge" style="background:#f3e5f5;color:#7b1fa2">Lembur ${p.lemburJam} jam</span>`;let coreViolBadge='';if(p.coreHoursViolation)coreViolBadge=' <span class="badge badge-warning">⚠️ Core Hours</span>';h+=`<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">${p.foto?`<img src="${p.foto}" style="width:36px;height:36px;border-radius:50%;object-fit:cover">`:'<div style="width:36px;height:36px;border-radius:50%;background:#eee;display:flex;align-items:center;justify-content:center">👤</div>'}<div style="flex:1"><div class="fw-700 text-sm">${escHtml(p.nama)} ${p.tipe==='dinas_luar'?'<span class="badge badge-info">Dinas Luar</span>':''}${lemburBadge}${coreViolBadge}</div><div class="text-xs" style="color:#999">${tipeLabel} — ${p.waktu}</div></div><span class="badge badge-${badgeColor}">${p.status||p.tipe}</span></div>`;});const el=document.getElementById('todayHistory');if(el)el.innerHTML=h;}
+async function loadTodayHistory(){const snap=await (window._portalAbsensiMode||!hasAccess(3)?db.collection('hrd_absensi').where('tanggal','==',todayStr()).where('userId','==',currentUser.id).get():db.collection('hrd_absensi').where('tanggal','==',todayStr()).get());let h='';if(snap.empty)h='<p class="text-sm" style="color:#999">Belum ada absensi hari ini</p>';else snap.forEach(d=>{const p=d.data();const tipeLabel=p.tipe==='masuk'?'Clock In':p.tipe==='pulang'?'Clock Out':p.tipe==='dinas_luar'?'Dinas Luar':p.tipe==='istirahat_mulai'?'Mulai Istirahat':p.tipe==='istirahat_selesai'?'Selesai Istirahat':p.tipe;const badgeColor=p.tipe==='masuk'?'success':p.tipe==='pulang'?'info':p.tipe==='istirahat_mulai'?'warning':p.tipe==='istirahat_selesai'?'info':'warning';let lemburBadge='';if(p.lembur&&p.lemburJam)lemburBadge=` <span class="badge" style="background:#f3e5f5;color:#7b1fa2">Lembur ${p.lemburJam} jam</span>`;let coreViolBadge='';if(p.coreHoursViolation)coreViolBadge=' <span class="badge badge-warning">⚠️ Core Hours</span>';h+=`<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">${p.foto?`<img src="${p.foto}" style="width:36px;height:36px;border-radius:50%;object-fit:cover">`:'<div style="width:36px;height:36px;border-radius:50%;background:#eee;display:flex;align-items:center;justify-content:center">👤</div>'}<div style="flex:1"><div class="fw-700 text-sm">${escHtml(p.nama)} ${p.tipe==='dinas_luar'?'<span class="badge badge-info">Dinas Luar</span>':''}${lemburBadge}${coreViolBadge}</div><div class="text-xs" style="color:#999">${tipeLabel} — ${p.waktu}</div></div><span class="badge badge-${badgeColor}">${p.status||p.tipe}</span></div>`;});const el=document.getElementById('todayHistory');if(el)el.innerHTML=h;}
 
 // ── BREAK TRACKING ────────────────────────────────────────────
 
@@ -1249,7 +1249,7 @@ async function loadRekapGrid(){
   const bulan=document.getElementById('rekapBulan')?.value||monthStr();
   const days=getMonthDays(bulan);
   const startDate=bulan+'-01',endDate=bulan+'-'+String(days).padStart(2,'0');
-  const[usersSnap,absenSnap,settDoc,cutiSnap,overtimeSnap,hariLiburSnap]=await Promise.all([db.collection('hrd_karyawan').where('status','==','aktif').get(),db.collection('hrd_absensi').get(),db.collection('hrd_settings').doc('absensi').get(),db.collection('hrd_cuti').where('status','==','approved').get(),db.collection('hrd_overtime').get(),db.collection('hrd_hari_libur').get()]);
+  const[usersSnap,absenSnap,settDoc,cutiSnap,overtimeSnap,hariLiburSnap,dinasLuarSnap,sppdSnap]=await Promise.all([db.collection('hrd_karyawan').where('status','==','aktif').get(),db.collection('hrd_absensi').get(),db.collection('hrd_settings').doc('absensi').get(),db.collection('hrd_cuti').where('status','==','approved').get(),db.collection('hrd_overtime').get(),db.collection('hrd_hari_libur').get(),db.collection('hrd_dinas_luar').where('status','==','approved').get().catch(()=>({forEach:()=>{}})),db.collection('hrd_perjalanan_dinas').where('status','==','approved').get().catch(()=>({forEach:()=>{}}))]);
   const sett = settDoc.exists ? settDoc.data() : {};
   const flex = sett.flexTime || { enabled: true, durasiKerja: 8, durasiIstirahat: 1 };
   // Build cuti map: userId -> {day: jenis}
@@ -1258,11 +1258,15 @@ async function loadRekapGrid(){
   // Build overtime map: userId -> {day: true}
   const otMap={};
   overtimeSnap.forEach(d=>{const o=d.data();if(o.tanggal&&o.tanggal>=startDate&&o.tanggal<=endDate&&o.status==='approved'){const uid=o.userId||o.nama;const day=parseInt(o.tanggal.split('-')[2]);if(!otMap[uid])otMap[uid]={};otMap[uid][day]=true;}});
+  // Build dinas luar map: userId -> {day: true}
+  const dinasLuarMap={};
+  dinasLuarSnap.forEach(d=>{const dl=d.data();const uid=dl.userId||dl.nama;const startD=dl.tanggalMulai||dl.tanggal;const endD=dl.tanggalSelesai||dl.tanggal;if(!startD)return;const endTime=new Date(endD||startD).getTime();let maxIter=366;for(let dt=new Date(startD);dt.getTime()<=endTime;dt.setDate(dt.getDate()+1)){if(--maxIter<0)break;const ds=dt.toISOString().split('T')[0];if(ds>=startDate&&ds<=endDate){const day=dt.getDate();if(!dinasLuarMap[uid])dinasLuarMap[uid]={};dinasLuarMap[uid][day]=true;}}});
+  sppdSnap.forEach(d=>{const sp=d.data();const uid=sp.userId||sp.nama;if(!sp.tanggalMulai)return;const endTime=new Date(sp.tanggalSelesai||sp.tanggalMulai).getTime();let maxIter=366;for(let dt=new Date(sp.tanggalMulai);dt.getTime()<=endTime;dt.setDate(dt.getDate()+1)){if(--maxIter<0)break;const ds=dt.toISOString().split('T')[0];if(ds>=startDate&&ds<=endDate){const day=dt.getDate();if(!dinasLuarMap[uid])dinasLuarMap[uid]={};dinasLuarMap[uid][day]=true;}}});
   // Build hari libur set
   const liburSet=new Set();hariLiburSnap.forEach(d=>{const h=d.data();if(h.tanggal&&h.tanggal>=startDate&&h.tanggal<=endDate)liburSet.add(parseInt(h.tanggal.split('-')[2]));});
   const users=[];usersSnap.forEach(d=>users.push({id:d.id,...d.data()}));
   // Portal mode: only show current user (unless GM/admin)
-  const isPortalMode=window._portalAbsensiMode&&!hasAccess(2);
+  const isPortalMode=window._portalAbsensiMode||!hasAccess(3);
   const filteredUsers=isPortalMode?users.filter(u=>u.nama?.toLowerCase()===currentUser.nama?.toLowerCase()||u.id===currentUser.id):users;
   const absenMap={};
   const jamKerjaMap={};
@@ -1298,7 +1302,11 @@ async function loadRekapGrid(){
       const isLibur=liburSet.has(i);
       let color='#eee',text='-',title='';
       if(isLibur&&!st){color='#9e9e9e';text='H';title=' title="Hari Libur"';}
-      else if(cutiStatus&&!st){color='#00bcd4';text='C';title=` title="${cutiStatus}"`;ut++;}
+      else if(cutiStatus&&!st){
+        if(cutiStatus==='WFH'){color='#009688';text='W';title=' title="WFH"';ut++;}
+        else{color='#00bcd4';text='C';title=` title="${cutiStatus}"`;ut++;}
+      }
+      else if(dinasLuarMap[u.id]?.[i]&&!st||dinasLuarMap[u.nama]?.[i]&&!st||dinasLuarMap[namaLow]?.[i]&&!st){color='#2196f3';text='D';title=' title="Dinas Luar (SPPD)"';ut++;totalD++;}
       else if(st==='lembur'||isOT){color='#7b1fa2';text='L';ut++;totalLembur++;if(lemburJam){userLemburJam+=lemburJam;totalLemburJam+=lemburJam;}}
       else if(st==='tepat_waktu'||st==='hadir'){color='#4caf50';text='✓';ut++;totalH++;}
       else if(st==='terlambat'){color='#ff9800';text='T';ut++;totalT++;}
@@ -1310,7 +1318,7 @@ async function loadRekapGrid(){
     }
     h+=`<td class="fw-700 text-center">${ut}</td>`;
     h+=`<td class="fw-700 text-center" style="color:#7b1fa2">${userLemburJam>0?userLemburJam.toFixed(1)+'j':'-'}</td>`;
-    h+=`<td><button class="btn btn-xs btn-info" onclick="editAbsenKaryawan('${u.id}','${(u.nama||'').replace(/'/g,"\\'")}','${bulan}')">✏️</button></td></tr>`;
+    h+=`<td>${hasAccess(6)?`<button class="btn btn-xs btn-info" onclick="editAbsenKaryawan('${u.id}','${(u.nama||'').replace(/'/g,"\\'")}','${bulan}')">✏️</button>`:''}</td></tr>`;
   });
   h+='</tbody></table></div>';
   document.getElementById('rekapGrid').innerHTML=h;
@@ -1329,6 +1337,7 @@ async function loadRekapGrid(){
   summaryHtml += `<span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#7b1fa2;border-radius:2px"></span> Lembur</span>
       <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#2196f3;border-radius:2px"></span> Dinas Luar</span>
       <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#00bcd4;border-radius:2px"></span> Cuti/Izin</span>
+      <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#009688;border-radius:2px"></span> WFH</span>
       <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#9e9e9e;border-radius:2px"></span> Hari Libur</span>
       <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#eee;border-radius:2px"></span> Tidak Hadir</span>
     </div>`;

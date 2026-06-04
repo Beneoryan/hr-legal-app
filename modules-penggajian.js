@@ -65,7 +65,7 @@ async function doGenerateAllGaji(){
   const existSnap=await db.collection('hrd_penggajian').where('periode','==',bulan).get();
   if(!existSnap.empty){const delBatch=db.batch();existSnap.forEach(d=>delBatch.delete(d.ref));await delBatch.commit();}
   // Load all related data
-  const[absenSnap,reimbSnap,kasbonSnap,tunjSnap,kpiSnap,insentifSnap,cutiSnap,overtimeSnap]=await Promise.all([
+  const[absenSnap,reimbSnap,kasbonSnap,tunjSnap,kpiSnap,insentifSnap,cutiSnap,overtimeSnap,dinasLuarSnap]=await Promise.all([
     db.collection('hrd_absensi').where('tanggal','>=',periodeStart).where('tanggal','<=',periodeEnd).get(),
     db.collection('hrd_reimbursement').where('status','==','approved').get(),
     db.collection('hrd_kasbon').get(),
@@ -73,7 +73,8 @@ async function doGenerateAllGaji(){
     db.collection('hrd_kpi').get(),
     db.collection('hrd_insentif').get(),
     db.collection('hrd_cuti').where('status','==','approved').get(),
-    db.collection('hrd_overtime').where('status','==','approved').get()
+    db.collection('hrd_overtime').where('status','==','approved').get(),
+    db.collection('hrd_dinas_luar').where('status','==','approved').get().catch(()=>({forEach:()=>{}}))
   ]);
   // Build attendance map: userId -> {hadir, izin, cuti, lembur_jam}
   const absenMap={};
@@ -84,6 +85,9 @@ async function doGenerateAllGaji(){
   // Overtime map
   const otMap={};
   overtimeSnap.forEach(d=>{const o=d.data();if(o.tanggal>=periodeStart&&o.tanggal<=periodeEnd){const uid=o.userId||o.nama;if(!otMap[uid])otMap[uid]=0;otMap[uid]+=(o.durasi||0);}});
+  // Dinas luar map: userId -> jumlah hari dinas dalam periode
+  const dinasMap={};
+  dinasLuarSnap.forEach(d=>{const dl=d.data();const uid=dl.userId||dl.nama;const startD=dl.tanggalMulai||dl.tanggal;const endD=dl.tanggalSelesai||dl.tanggal;if(!startD)return;let days=0;const endTime=new Date(endD||startD).getTime();let maxIter=366;for(let dt=new Date(startD);dt.getTime()<=endTime;dt.setDate(dt.getDate()+1)){if(--maxIter<0)break;const ds=dt.toISOString().split('T')[0];if(ds>=periodeStart&&ds<=periodeEnd)days++;}if(!dinasMap[uid])dinasMap[uid]=0;dinasMap[uid]+=days;});
   // Build other maps
   const reimbMap={},kasbonMap={},kpiMap={},insentifMap={};
   reimbSnap.forEach(d=>{const r=d.data();const n=(r.nama||'').toLowerCase();reimbMap[n]=(reimbMap[n]||0)+(r.jumlah||0);});
@@ -107,12 +111,15 @@ async function doGenerateAllGaji(){
     // Kehadiran
     const kehadiran=absenMap[uid]?.hadir||0;
     const cutiHari=cutiMap[uid]||0;
-    const hariEfektif=Math.min(kehadiran+cutiHari,hariKerja); // Cuti dihitung hadir
+    const dinasHari=dinasMap[uid]||dinasMap[namaLow]||0;
+    const hariEfektif=Math.min(kehadiran+cutiHari+dinasHari,hariKerja); // Cuti & dinas dihitung hadir
     const tidakHadir=Math.max(0,hariKerja-hariEfektif);
     const potonganAbsen=tidakHadir*gajiPerHari;
 
     // Lembur: 1.5x gaji per jam untuk 1 jam pertama, 2x setelahnya (UU Cipta Kerja)
-    const lemburJam=(absenMap[uid]?.lembur||0)+(otMap[uid]||0);
+    const autoLembur=absenMap[uid]?.lembur||0;
+    const manualLembur=otMap[uid]||otMap[namaLow]||0;
+    const lemburJam=autoLembur+manualLembur;
     const gajiPerJam=Math.round(gaji/(hariKerja*8)); // 8 jam per hari
     let lemburNominal=0;
     if(lemburJam>0){
@@ -153,10 +160,11 @@ async function doGenerateAllGaji(){
       nama:k.nama,karyawanId:uid,periode:bulan,periodeStart,periodeEnd,
       gajiPokok:gaji,tunjangan:tunj,tunjCuti,insentif,bonus:0,
       reimbursement:reimb,lembur:lemburNominal,lemburJam,
+      lemburDetail:{auto:autoLembur,manual:manualLembur,total:lemburJam},
       bpjsKesehatan:bpjsKes,bpjsTK,potongan:potonganAbsen,kasbon:loan,pph21,
       totalBersih:thp,
       // Detail kehadiran
-      hariKerja,kehadiran,cutiHari,tidakHadir,
+      hariKerja,kehadiran,cutiHari,dinasHari,tidakHadir,
       kpiScore:kpiMap[namaLow]||0,
       createdAt:new Date().toISOString()
     });
