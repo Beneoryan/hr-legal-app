@@ -1,0 +1,26 @@
+{
+  "id": "FEAT-007",
+  "type": "feat",
+  "description": "Auto-fill Data Umum (Section A) in the health test form from hrd_karyawan employee data so users don't need to type Nama, Usia, Jenis Kelamin, and Golongan Darah manually.",
+  "status": "in_progress",
+  "steps": [
+    "In modalFormTestKesehatan(), after const du = data.dataUmum || {}, add code to fetch employee data from hrd_karyawan when dataUmum fields are empty",
+    "Calculate age (usia) from karyawan's tanggalLahir field",
+    "Create autoNama, autoUsia, autoGender, autoGolDarah variables with priority: dataUmum > karyawan > currentUser",
+    "Update HTML template to use the auto-filled values instead of direct du.xxx references"
+  ],
+  "acceptance_criteria": [
+    "When opening the form, Nama/Usia/Jenis Kelamin/Golongan Darah are pre-filled from hrd_karyawan data",
+    "Previously saved dataUmum values take priority over karyawan data",
+    "Age is calculated from tanggalLahir field",
+    "Nama field remains readonly for scheduled tests (when id is provided)",
+    "File passes node --check syntax validation"
+  ],
+  "verification": [
+    "Run node --check modules-test-kesehatan.js",
+    "Grep for karyawanData in the file",
+    "Grep for autoNama, autoUsia, autoGender, autoGolDarah variables"
+  ],
+  "blocked_reason": null,
+  "findings": null
+}

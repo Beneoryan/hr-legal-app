@@ -225,6 +225,35 @@ async function modalFormTestKesehatan(id) {
     if (doc.exists) data = doc.data();
   }
   const du = data.dataUmum || {};
+
+  // Auto-fill from karyawan data if dataUmum is empty
+  let karyawanData = null;
+  if (!du.nama || !du.jenisKelamin || !du.golonganDarah) {
+    const namaToSearch = (data.nama || (typeof currentUser !== 'undefined' ? currentUser.nama : '') || '').trim().toLowerCase();
+    if (namaToSearch) {
+      const kSnap = await db.collection('hrd_karyawan').get();
+      kSnap.forEach(d => {
+        const k = d.data();
+        if ((k.nama || '').trim().toLowerCase() === namaToSearch) {
+          karyawanData = k;
+        }
+      });
+    }
+  }
+
+  // Calculate age from tanggalLahir
+  let autoUsia = du.usia || '';
+  if (!autoUsia && karyawanData && karyawanData.tanggalLahir) {
+    const birthDate = new Date(karyawanData.tanggalLahir);
+    const today = new Date();
+    autoUsia = String(today.getFullYear() - birthDate.getFullYear());
+  }
+
+  // Pre-fill values from karyawan data
+  const autoNama = du.nama || data.nama || (karyawanData ? karyawanData.nama : '') || (typeof currentUser !== 'undefined' ? currentUser.nama : '') || '';
+  const autoGender = du.jenisKelamin || (karyawanData ? karyawanData.jenisKelamin : '') || '';
+  const autoGolDarah = du.golonganDarah || (karyawanData ? karyawanData.golonganDarah : '') || '';
+
   const rk = data.riwayatKesehatan || {};
   const pf = data.pemeriksaanFisik || {};
   const pl = data.pemeriksaanLab || {};
@@ -262,22 +291,22 @@ async function modalFormTestKesehatan(id) {
     <h4 style="margin:16px 0 8px;color:var(--primary)">A. Data Umum</h4>
     <p style="margin:0 0 10px;font-size:.8rem;color:#666;font-style:italic">Isi data diri dasar. Tinggi badan dalam satuan cm, berat badan dalam kg. BMI akan terhitung otomatis.</p>
     <div class="grid-2">
-      <div class="form-group"><label>Nama</label><input class="form-control" id="tkfNama" value="${escHtml(du.nama || data.nama || (typeof currentUser !== 'undefined' ? currentUser.nama : '') || '')}" ${id ? 'readonly style="background:#f0f0f0"' : ''}></div>
-      <div class="form-group"><label>Usia</label><input type="number" class="form-control" id="tkfUsia" value="${du.usia || ""}"></div>
+      <div class="form-group"><label>Nama</label><input class="form-control" id="tkfNama" value="${escHtml(autoNama)}" ${id ? 'readonly style="background:#f0f0f0"' : ''}></div>
+      <div class="form-group"><label>Usia</label><input type="number" class="form-control" id="tkfUsia" value="${autoUsia}"></div>
       <div class="form-group"><label>Jenis Kelamin</label>
         <select class="form-control" id="tkfGender">
           <option value="">-- Pilih --</option>
-          <option value="Laki-laki" ${du.jenisKelamin === "Laki-laki" ? "selected" : ""}>Laki-laki</option>
-          <option value="Perempuan" ${du.jenisKelamin === "Perempuan" ? "selected" : ""}>Perempuan</option>
+          <option value="Laki-laki" ${autoGender === "Laki-laki" ? "selected" : ""}>Laki-laki</option>
+          <option value="Perempuan" ${autoGender === "Perempuan" ? "selected" : ""}>Perempuan</option>
         </select>
       </div>
       <div class="form-group"><label>Golongan Darah</label>
         <select class="form-control" id="tkfGolDarah">
           <option value="">-- Pilih --</option>
-          <option value="A" ${du.golonganDarah === "A" ? "selected" : ""}>A</option>
-          <option value="B" ${du.golonganDarah === "B" ? "selected" : ""}>B</option>
-          <option value="AB" ${du.golonganDarah === "AB" ? "selected" : ""}>AB</option>
-          <option value="O" ${du.golonganDarah === "O" ? "selected" : ""}>O</option>
+          <option value="A" ${autoGolDarah === "A" ? "selected" : ""}>A</option>
+          <option value="B" ${autoGolDarah === "B" ? "selected" : ""}>B</option>
+          <option value="AB" ${autoGolDarah === "AB" ? "selected" : ""}>AB</option>
+          <option value="O" ${autoGolDarah === "O" ? "selected" : ""}>O</option>
         </select>
       </div>
       <div class="form-group"><label>Tinggi Badan (cm)</label><input type="number" class="form-control" id="tkfTinggi" value="${du.tinggi || ""}" oninput="hitungBMI()"></div>
