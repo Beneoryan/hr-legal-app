@@ -47,19 +47,19 @@ async function renderPortal(){const main=document.getElementById('mainContent');
     </div>
   </div>
   <div class="card"><div class="card-title">📲 Download / Install Aplikasi</div><p class="text-sm mb-8" style="color:#666">Install aplikasi ini di perangkat Anda untuk akses lebih cepat.</p>${renderDownloadAppSection()}</div>`;
-  // Load data (using simple .get() + client-side filter to avoid composite index requirements)
+  // Load data (using .where() queries to only fetch current user's data for privacy)
   let absenCount=0,cutiCount=0,inboxCount=0;
   const monthStart=monthStr()+'-01';
-  const[absenSnap,cutiSnap,inboxSnap,taskSnap]=await Promise.all([db.collection('hrd_absensi').get(),db.collection('hrd_cuti').get(),db.collection('hrd_meeting_invites').get(),db.collection('hrd_daily_tasks').get()]);
-  absenSnap.forEach(d=>{const data=d.data();if(data.userId===u.id&&data.tanggal>=monthStart)absenCount++;});
-  cutiSnap.forEach(d=>{const data=d.data();if(data.userId===u.id&&data.status==='approved')cutiCount++;});
-  inboxSnap.forEach(d=>{const data=d.data();if(data.targetUser===u.id&&data.read===false)inboxCount++;});
+  const[absenSnap,cutiSnap,inboxSnap,taskSnap]=await Promise.all([db.collection('hrd_absensi').where('userId','==',u.id).get(),db.collection('hrd_cuti').where('userId','==',u.id).get(),db.collection('hrd_meeting_invites').where('targetUser','==',u.id).get(),db.collection('hrd_daily_tasks').where('userId','==',u.id).get()]);
+  absenSnap.forEach(d=>{const data=d.data();if(data.tanggal>=monthStart)absenCount++;});
+  cutiSnap.forEach(d=>{const data=d.data();if(data.status==='approved')cutiCount++;});
+  inboxSnap.forEach(d=>{const data=d.data();if(data.read===false)inboxCount++;});
   document.getElementById('pAbsen').textContent=absenCount+' hari';
   document.getElementById('pCuti').textContent=Math.max(0,12-cutiCount)+' hari';
   document.getElementById('pInbox').textContent=inboxCount;
   // Daily task today
   const today=todayStr();
-  const myTasks=[];taskSnap.forEach(d=>{const t=d.data();if(t.userId===u.id)myTasks.push({id:d.id,...t});});
+  const myTasks=[];taskSnap.forEach(d=>{const t=d.data();myTasks.push({id:d.id,...t});});
   const todayTasks=myTasks.filter(t=>t.tanggal===today&&!t.done);
   const overdueTasks=myTasks.filter(t=>t.tanggal<today&&!t.done);
   const taskEl=document.getElementById('pTask');
@@ -106,13 +106,13 @@ async function loadPortalInfoSections(){
     const pgSnap=await db.collection('hrd_pengumuman').get();
     const bcSnap=await db.collection('hrd_broadcast').get();
     const mtSnap=await db.collection('hrd_meeting').get();
-    const invSnap=await db.collection('hrd_meeting_invites').get();
-    const notifSnap=await db.collection('hrd_notifikasi').get();
+    const invSnap=await db.collection('hrd_meeting_invites').where('targetUser','==',currentUser.id).get();
+    const notifSnap=await db.collection('hrd_notifikasi').where('targetUser','==',currentUser.id).get();
     
-    // Filter invites for current user
-    const myInvites=[];invSnap.forEach(d=>{const p=d.data();if(p.targetUser===currentUser.id)myInvites.push({id:d.id,...p});});
-    // Filter notifs for current user (unread)
-    const myNotifs=[];notifSnap.forEach(d=>{const p=d.data();if((p.targetUser===currentUser.id||p.targetUser===currentUser.role)&&!p.read)myNotifs.push({id:d.id,...p});});
+    // Filter invites for current user (already filtered by .where())
+    const myInvites=[];invSnap.forEach(d=>{const p=d.data();myInvites.push({id:d.id,...p});});
+    // Filter notifs for current user (unread, already filtered by .where())
+    const myNotifs=[];notifSnap.forEach(d=>{const p=d.data();if(!p.read)myNotifs.push({id:d.id,...p});});
 
     // Pengumuman
     const pgCount=document.getElementById('portalPengumumanCount');
@@ -725,12 +725,10 @@ function startPortalDiscTest(){
 
 async function loadMyDiscHistory(){
   try{
-    // Flexible name matching - case insensitive
-    const snap=await db.collection('hrd_disc_results').get();
-    const myName=currentUser.nama.toLowerCase().trim();
-    const myNip=(currentUser.nip||'').toLowerCase().trim();
+    // Query only current user's DISC results by nama for privacy
+    const snap=await db.collection('hrd_disc_results').where('nama','==',currentUser.nama).get();
     let allResults=[];
-    snap.forEach(d=>{const r=d.data();const rName=(r.nama||'').toLowerCase().trim();const rNip=(r.nip||'').toLowerCase().trim();if(rName===myName||(myNip&&rNip===myNip))allResults.push({id:d.id,...r});});
+    snap.forEach(d=>{allResults.push({id:d.id,...d.data()});});
     allResults.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
     let h='';
     if(!allResults.length)h='<tr><td colspan="5" class="text-center" style="color:var(--text-light)">Belum pernah tes</td></tr>';
@@ -746,13 +744,13 @@ async function viewMyDiscDetail(id){
 
 
 // ── PORTAL: REIMBURSE ─────────────────────────────────────────
-async function renderPortalReimburse(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>🧾 Reimbursement Saya</span><button class="btn btn-primary btn-sm" onclick="modalReimburse()">+ Ajukan</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Kategori</th><th>Jumlah</th><th>Status</th><th>Tanggal</th></tr></thead><tbody id="tblMyReimb"></tbody></table></div></div>`;const snap=await db.collection('hrd_reimbursement').get();const items=[];snap.forEach(d=>{const r=d.data();if((r.nama||'').toLowerCase()===currentUser.nama.toLowerCase())items.push(r);});let h='';if(!items.length)h='<tr><td colspan="4" class="text-center">Belum ada</td></tr>';else items.forEach(p=>{h+=`<tr><td>${escHtml(p.kategori||'-')}</td><td>${formatCurrency(p.jumlah)}</td><td><span class="badge badge-${p.status==='approved'?'success':p.status==='rejected'?'danger':'warning'}">${p.status}</span></td><td>${formatDate(p.createdAt)}</td></tr>`;});document.getElementById('tblMyReimb').innerHTML=h;}
+async function renderPortalReimburse(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>🧾 Reimbursement Saya</span><button class="btn btn-primary btn-sm" onclick="modalReimburse()">+ Ajukan</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Kategori</th><th>Jumlah</th><th>Status</th><th>Tanggal</th></tr></thead><tbody id="tblMyReimb"></tbody></table></div></div>`;const snap=await db.collection('hrd_reimbursement').where('nama','==',currentUser.nama).get();const items=[];snap.forEach(d=>{items.push(d.data());});let h='';if(!items.length)h='<tr><td colspan="4" class="text-center">Belum ada</td></tr>';else items.forEach(p=>{h+=`<tr><td>${escHtml(p.kategori||'-')}</td><td>${formatCurrency(p.jumlah)}</td><td><span class="badge badge-${p.status==='approved'?'success':p.status==='rejected'?'danger':'warning'}">${p.status}</span></td><td>${formatDate(p.createdAt)}</td></tr>`;});document.getElementById('tblMyReimb').innerHTML=h;}
 
 // ── PORTAL: KASBON ────────────────────────────────────────────
-async function renderPortalKasbon(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>💳 Kasbon & Loan Saya</span><button class="btn btn-primary btn-sm" onclick="modalKasbon()">+ Ajukan</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Jenis</th><th>Total</th><th>Angsuran/Bln</th><th>Sudah Bayar</th><th>Sisa</th><th>Status</th></tr></thead><tbody id="tblMyKasbon"></tbody></table></div></div>`;const snap=await db.collection('hrd_kasbon').get();const items=[];snap.forEach(d=>{const r=d.data();if((r.nama||'').toLowerCase()===currentUser.nama.toLowerCase())items.push(r);});let h='';if(!items.length)h='<tr><td colspan="6" class="text-center">Belum ada</td></tr>';else items.forEach(p=>{const angsuran=Math.ceil((p.jumlah||0)/(p.cicilan||1));const sisa=Math.max(0,(p.jumlah||0)-(p.sudahBayar||0));h+=`<tr><td>${escHtml(p.jenis||'-')}</td><td>${formatCurrency(p.jumlah)}</td><td>${formatCurrency(angsuran)}</td><td>${formatCurrency(p.sudahBayar||0)}</td><td class="fw-700" style="color:${sisa>0?'var(--danger)':'var(--success)'}">${formatCurrency(sisa)}</td><td><span class="badge badge-${p.status==='aktif'?'success':p.status==='lunas'?'primary':'warning'}">${p.status}</span></td></tr>`;});document.getElementById('tblMyKasbon').innerHTML=h;}
+async function renderPortalKasbon(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>💳 Kasbon & Loan Saya</span><button class="btn btn-primary btn-sm" onclick="modalKasbon()">+ Ajukan</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Jenis</th><th>Total</th><th>Angsuran/Bln</th><th>Sudah Bayar</th><th>Sisa</th><th>Status</th></tr></thead><tbody id="tblMyKasbon"></tbody></table></div></div>`;const snap=await db.collection('hrd_kasbon').where('nama','==',currentUser.nama).get();const items=[];snap.forEach(d=>{items.push(d.data());});let h='';if(!items.length)h='<tr><td colspan="6" class="text-center">Belum ada</td></tr>';else items.forEach(p=>{const angsuran=Math.ceil((p.jumlah||0)/(p.cicilan||1));const sisa=Math.max(0,(p.jumlah||0)-(p.sudahBayar||0));h+=`<tr><td>${escHtml(p.jenis||'-')}</td><td>${formatCurrency(p.jumlah)}</td><td>${formatCurrency(angsuran)}</td><td>${formatCurrency(p.sudahBayar||0)}</td><td class="fw-700" style="color:${sisa>0?'var(--danger)':'var(--success)'}">${formatCurrency(sisa)}</td><td><span class="badge badge-${p.status==='aktif'?'success':p.status==='lunas'?'primary':'warning'}">${p.status}</span></td></tr>`;});document.getElementById('tblMyKasbon').innerHTML=h;}
 
 // ── PORTAL: KPI ───────────────────────────────────────────────
-async function renderPortalKPI(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>📈 KPI Saya</span></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Periode</th><th>Skor</th><th>Grade</th><th>Penilai</th><th>Catatan</th></tr></thead><tbody id="tblMyKPI"></tbody></table></div></div>`;const snap=await db.collection('hrd_kpi').get();const items=[];snap.forEach(d=>{const r=d.data();if((r.nama||'').toLowerCase()===currentUser.nama.toLowerCase())items.push(r);});items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));let h='';if(!items.length)h='<tr><td colspan="5" class="text-center">Belum ada penilaian</td></tr>';else items.forEach(p=>{const grade=p.skor>=90?'A':p.skor>=80?'B':p.skor>=70?'C':p.skor>=60?'D':'E';h+=`<tr><td>${escHtml(p.periode||'-')}</td><td><span class="badge badge-${p.skor>=80?'success':p.skor>=60?'warning':'danger'}">${p.skor}/100</span></td><td class="fw-700">${grade}</td><td>${escHtml(p.penilai||'-')}</td><td style="font-size:.78rem">${escHtml(p.catatan||'-')}</td></tr>`;});document.getElementById('tblMyKPI').innerHTML=h;}
+async function renderPortalKPI(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>📈 KPI Saya</span></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Periode</th><th>Skor</th><th>Grade</th><th>Penilai</th><th>Catatan</th></tr></thead><tbody id="tblMyKPI"></tbody></table></div></div>`;const snap=await db.collection('hrd_kpi').where('nama','==',currentUser.nama).get();const items=[];snap.forEach(d=>{items.push(d.data());});items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));let h='';if(!items.length)h='<tr><td colspan="5" class="text-center">Belum ada penilaian</td></tr>';else items.forEach(p=>{const grade=p.skor>=90?'A':p.skor>=80?'B':p.skor>=70?'C':p.skor>=60?'D':'E';h+=`<tr><td>${escHtml(p.periode||'-')}</td><td><span class="badge badge-${p.skor>=80?'success':p.skor>=60?'warning':'danger'}">${p.skor}/100</span></td><td class="fw-700">${grade}</td><td>${escHtml(p.penilai||'-')}</td><td style="font-size:.78rem">${escHtml(p.catatan||'-')}</td></tr>`;});document.getElementById('tblMyKPI').innerHTML=h;}
 
 // ── PORTAL: SETTING AKUN ──────────────────────────────────────
 function renderPortalSetting(){const u=currentUser;const main=document.getElementById('mainContent');const avatar=u.profilePic||'';main.innerHTML=`<div class="page-title"><span>⚙️ Setting Akun</span></div><div class="card"><h4 class="color-primary mb-16">👤 Data Pribadi</h4>

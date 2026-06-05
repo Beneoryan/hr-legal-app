@@ -1023,23 +1023,24 @@ async function renderPortalTestKesehatan() {
 
 async function loadPortalTestKesehatan() {
   const u = currentUser;
-  const uNama = (u.nama || "").toLowerCase().trim();
 
-  // Fetch all test records and filter client-side to avoid Firestore index issues
-  const allSnap = await db.collection("hrd_test_kesehatan").get();
+  // Query only current user's test records by userId for privacy
+  const snap = await db.collection("hrd_test_kesehatan").where("userId", "==", u.id).get();
   const myTests = [];
-  allSnap.forEach((d) => {
-    const r = d.data();
-    // Match by userId (hrd_users id), linkedKaryawan, or nama
-    const matches =
-      r.userId === u.id ||
-      (u.linkedKaryawan && r.userId === u.linkedKaryawan) ||
-      (r.nama || "").toLowerCase().trim() === uNama ||
-      (r.dataUmum &&
-        (r.dataUmum.nama || "").toLowerCase().trim() === uNama);
-    if (matches) {
-      myTests.push({ id: d.id, ...r });
-    }
+  snap.forEach((d) => {
+    myTests.push({ id: d.id, ...d.data() });
+  });
+  // Also check by nama if linkedKaryawan might have different userId
+  if (u.linkedKaryawan && u.linkedKaryawan !== u.id) {
+    const snap2 = await db.collection("hrd_test_kesehatan").where("userId", "==", u.linkedKaryawan).get();
+    snap2.forEach((d) => {
+      if (!myTests.find(t => t.id === d.id)) myTests.push({ id: d.id, ...d.data() });
+    });
+  }
+  // Fallback: also query by nama field for records that may not have userId set
+  const namaSnap = await db.collection("hrd_test_kesehatan").where("nama", "==", u.nama).get();
+  namaSnap.forEach((d) => {
+    if (!myTests.find(t => t.id === d.id)) myTests.push({ id: d.id, ...d.data() });
   });
 
   const pending = myTests.filter((t) => t.status === "pending");

@@ -1,0 +1,30 @@
+{
+  "id": "FEAT-002",
+  "type": "fix",
+  "description": "Fix portal data privacy: Change portal functions that fetch ALL records from Firestore to use server-side .where() queries so only the current user's data is downloaded. This prevents other employees' data from being accessible in the browser.",
+  "status": "in_progress",
+  "steps": [
+    "In modules-portal.js, update renderPortalOvertime() to use .get() + client-side filter by userId instead of .where() to avoid potential index issues (currently it uses .where which is fine for single-field)",
+    "In modules-portal.js, update renderPortalReimburse() to filter by userId or use .where('nama','==',currentUser.nama) instead of fetching all records",
+    "In modules-portal.js, update renderPortalKasbon() to filter by userId or use .where('nama','==',currentUser.nama) instead of fetching all records",
+    "In modules-portal.js, update renderPortalKPI() to filter by userId or use .where('nama','==',currentUser.nama) instead of fetching all records",
+    "In modules-portal.js, update the renderPortal() dashboard stats to use .where() queries for absensi and daily_tasks (userId), cuti (userId), meeting_invites (targetUser)",
+    "In modules-test-kesehatan.js, update loadPortalTestKesehatan() to use .where() query instead of fetching all test records",
+    "Run node --check on all modified files to confirm no syntax errors"
+  ],
+  "acceptance_criteria": [
+    "renderPortalReimburse() only fetches current user's reimbursements from Firestore",
+    "renderPortalKasbon() only fetches current user's kasbon data from Firestore",
+    "renderPortalKPI() only fetches current user's KPI data from Firestore",
+    "renderPortal() dashboard stats use filtered queries where possible",
+    "loadPortalTestKesehatan() uses filtered queries instead of fetching all records",
+    "node --check passes on all modified JS files",
+    "Existing functionality is preserved (same data shown to user)"
+  ],
+  "verification": [
+    "Run: node --check /projects/sandbox/hr-legal-app/modules-portal.js",
+    "Run: node --check /projects/sandbox/hr-legal-app/modules-test-kesehatan.js"
+  ],
+  "blocked_reason": null,
+  "findings": null
+}
