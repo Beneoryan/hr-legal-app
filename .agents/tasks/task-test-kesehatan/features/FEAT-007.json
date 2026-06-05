@@ -2,7 +2,7 @@
   "id": "FEAT-007",
   "type": "feat",
   "description": "Auto-fill Data Umum (Section A) in the health test form from hrd_karyawan employee data so users don't need to type Nama, Usia, Jenis Kelamin, and Golongan Darah manually.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "In modalFormTestKesehatan(), after const du = data.dataUmum || {}, add code to fetch employee data from hrd_karyawan when dataUmum fields are empty",
     "Calculate age (usia) from karyawan's tanggalLahir field",
@@ -22,5 +22,5 @@
     "Grep for autoNama, autoUsia, autoGender, autoGolDarah variables"
   ],
   "blocked_reason": null,
-  "findings": null
+  "findings": "Implemented auto-fill for Data Umum (Section A) from hrd_karyawan. Uses full-collection .get() to avoid Firestore index issues. Calculates age from tanggalLahir. File size is 50KB, under 100KB limit. node --check passes cleanly."
 }
