@@ -82,9 +82,15 @@ async function doGenerateAllGaji(){
   // Cuti map: userId -> jumlah hari cuti dalam periode
   const cutiMap={};
   cutiSnap.forEach(d=>{const c=d.data();if(c.status!=='approved')return;const uid=c.userId;if(!uid)return;const start=new Date(c.mulai);const end=new Date(c.selesai);let days=0;for(let dt=new Date(start);dt<=end;dt.setDate(dt.getDate()+1)){const ds=dt.toISOString().split('T')[0];if(ds>=periodeStart&&ds<=periodeEnd)days++;}if(!cutiMap[uid])cutiMap[uid]=0;cutiMap[uid]+=days;});
-  // Overtime map
+  // Overtime map: index by both userId AND lowercase nama for reliable lookup
   const otMap={};
-  overtimeSnap.forEach(d=>{const o=d.data();if(o.status!=='approved')return;if(o.tanggal>=periodeStart&&o.tanggal<=periodeEnd){const uid=o.userId||o.nama;if(!otMap[uid])otMap[uid]=0;otMap[uid]+=(o.durasi||0);}});
+  overtimeSnap.forEach(d=>{const o=d.data();if(o.status!=='approved')return;if(o.tanggal>=periodeStart&&o.tanggal<=periodeEnd){
+    const uid=o.userId||'';
+    const nama=(o.nama||'').toLowerCase();
+    const dur=parseFloat(o.durasi)||0;
+    if(uid){if(!otMap[uid])otMap[uid]=0;otMap[uid]+=dur;}
+    if(nama){if(!otMap[nama])otMap[nama]=0;otMap[nama]+=dur;}
+  }});
   // Dinas luar map: userId -> jumlah hari dinas dalam periode
   const dinasMap={};
   dinasLuarSnap.forEach(d=>{const dl=d.data();if(dl.status!=='approved')return;const uid=dl.userId||dl.nama;const startD=dl.tanggalMulai||dl.tanggal;const endD=dl.tanggalSelesai||dl.tanggal;if(!startD)return;let days=0;const endTime=new Date(endD||startD).getTime();let maxIter=366;for(let dt=new Date(startD);dt.getTime()<=endTime;dt.setDate(dt.getDate()+1)){if(--maxIter<0)break;const ds=dt.toISOString().split('T')[0];if(ds>=periodeStart&&ds<=periodeEnd)days++;}if(!dinasMap[uid])dinasMap[uid]=0;dinasMap[uid]+=days;});
@@ -222,7 +228,25 @@ async function autoFillGajiFromKaryawan(){const nama=(document.getElementById('g
     let insentifPct=0;if(kpiScore>=90)insentifPct=0.15;else if(kpiScore>=80)insentifPct=0.10;else if(kpiScore>=70)insentifPct=0.05;
     document.getElementById('gjInsentif').value=Math.round(gaji*insentifPct);
   }
-  hitungGaji();toast(`Data dimuat: Gaji ${formatCurrency(gaji)}, Tunj ${formatCurrency(tunjTotal)}, Reimb ${formatCurrency(totalReimb)}, Loan ${formatCurrency(totalLoan)}`,'success');}
+  // Auto-load overtime (approved) for current period
+  const periode=document.getElementById('gjPeriode').value||monthStr();
+  const[pYear,pMonth]=periode.split('-').map(Number);
+  const prevMo=pMonth===1?12:pMonth-1;
+  const prevYr=pMonth===1?pYear-1:pYear;
+  const pStart=`${prevYr}-${String(prevMo).padStart(2,'0')}-20`;
+  const pEnd=`${pYear}-${String(pMonth).padStart(2,'0')}-20`;
+  const otSnap=await db.collection('hrd_overtime').get();
+  let totalOTJam=0;
+  otSnap.forEach(d=>{const o=d.data();if(o.status!=='approved')return;if(!o.tanggal||o.tanggal<pStart||o.tanggal>pEnd)return;if((o.nama||'').toLowerCase()===nama.toLowerCase())totalOTJam+=parseFloat(o.durasi)||0;});
+  if(totalOTJam>0){
+    const gajiPerJam=Math.round(gaji/(22*8));
+    let lemburNominal=0;
+    const jam1=Math.min(totalOTJam,1);
+    const jamSisa=Math.max(0,totalOTJam-1);
+    lemburNominal=Math.round(jam1*gajiPerJam*1.5+jamSisa*gajiPerJam*2);
+    document.getElementById('gjLembur').value=lemburNominal;
+  }
+  hitungGaji();toast(`Data dimuat: Gaji ${formatCurrency(gaji)}, Tunj ${formatCurrency(tunjTotal)}, Reimb ${formatCurrency(totalReimb)}, Loan ${formatCurrency(totalLoan)}${totalOTJam>0?`, Lembur ${totalOTJam} jam`:''}`,'success');}
 async function simpanGaji(){const tJab=Number(document.getElementById('gjTunjJabatan').value)||0;const tTrans=Number(document.getElementById('gjTunjTransport').value)||0;const tMakan=Number(document.getElementById('gjTunjMakan').value)||0;const tKom=Number(document.getElementById('gjTunjKom').value)||0;const lembur=Number(document.getElementById('gjLembur').value)||0;const insentif=Number(document.getElementById('gjInsentif').value)||0;const bonus=Number(document.getElementById('gjBonus').value)||0;const tLain=Number(document.getElementById('gjTunjLain').value)||0;const reimburse=Number(document.getElementById('gjReimburse').value)||0;const nama=document.getElementById('gjNama').value;const data={nama,periode:document.getElementById('gjPeriode').value,gajiPokok:Number(document.getElementById('gjPokok').value)||0,tunjangan:tJab+tTrans+tMakan+tKom+lembur+tLain,tunjJabatan:tJab,tunjTransport:tTrans,tunjMakan:tMakan,tunjKomunikasi:tKom,lembur,insentif,bonus,tunjLain:tLain,reimbursement:reimburse,bpjsKesehatan:Number(document.getElementById('gjBPJSKes').value)||0,bpjsTK:Number(document.getElementById('gjBPJSTK').value)||0,potongan:Number(document.getElementById('gjPotongan').value)||0,kasbon:Number(document.getElementById('gjKasbon').value)||0,pph21:window._gajiCalc?.pph21||0,totalBersih:window._gajiCalc?.total||0,createdAt:new Date().toISOString()};if(!nama)return toast('Pilih karyawan dulu','warning');await db.collection('hrd_penggajian').add(data);closeModalDirect();toast('Slip disimpan','success');renderPenggajian();}
 function modalImportPenggajian(){openModal(`<div class="modal-title">📥 Import Data Penggajian</div>
     <div class="tabs mb-16"><div class="tab active" onclick="switchImportTab('gaji','file')">📄 Upload CSV</div><div class="tab" onclick="switchImportTab('gaji','api')">🔗 API Google Sheets</div></div>
