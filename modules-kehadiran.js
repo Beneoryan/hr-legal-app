@@ -539,6 +539,30 @@ async function simpanPenalty(){const data={nama:document.getElementById('penNama
 
 
 // ── DAILY TASK & REMINDER ─────────────────────────────────────
+function buildGCalUrl(t){
+  const title=encodeURIComponent(t.title);
+  let dates;
+  if(t.waktu){
+    const startDT=t.tanggal.replace(/-/g,'')+'T'+t.waktu.replace(':','')+'00';
+    const startDate=new Date(t.tanggal+'T'+t.waktu+':00');
+    const endDate=new Date(startDate.getTime()+60*60*1000);
+    const endDT=endDate.toISOString().replace(/[-:]/g,'').replace('.000Z','').split('T')[0].substring(0,8)+'T'+String(endDate.getHours()).padStart(2,'0')+String(endDate.getMinutes()).padStart(2,'0')+'00';
+    dates=startDT+'/'+endDT;
+  }else{
+    const d=t.tanggal.replace(/-/g,'');
+    const nextDay=new Date(t.tanggal);
+    nextDay.setDate(nextDay.getDate()+1);
+    const endD=nextDay.toISOString().split('T')[0].replace(/-/g,'');
+    dates=d+'/'+endD;
+  }
+  let details='';
+  if(t.description)details+=t.description+'\n\n';
+  details+='Prioritas: '+(t.priority==='high'?'Tinggi':t.priority==='low'?'Rendah':'Sedang');
+  if(t.assignedByName)details+='\nDitugaskan oleh: '+t.assignedByName;
+  details+='\n\n[IMS Daily Task]';
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dates}&details=${encodeURIComponent(details)}&trp=false`;
+}
+
 async function renderDailyTask(){
   const main=document.getElementById('mainContent');
   const assignedTab=hasAccess(3)?'<div class="tab" onclick="filterDailyTasks(\'assigned\')">Ditugaskan</div>':'';
@@ -619,9 +643,9 @@ async function loadDailyTasks(filter){
     // Determine action buttons: admin always gets edit+delete, assigned tasks from others get view only
     const isAssignedByOther=t.assignedBy&&t.assignedBy!==currentUser.id&&t.userId===currentUser.id;
     if(isAdmin||!isAssignedByOther){
-      html+=`<div style="display:flex;gap:4px"><button class="btn btn-xs btn-info" onclick="viewDailyTask('${t.id}')" title="Lihat">👁️</button><button class="btn btn-xs btn-warning" onclick="editDailyTask('${t.id}')">✏️</button><button class="btn btn-xs btn-danger" onclick="hapusDailyTask('${t.id}')">🗑️</button></div></div>`;
+      html+=`<div style="display:flex;gap:4px;flex-wrap:wrap"><a href="${buildGCalUrl(t)}" target="_blank" class="btn btn-xs btn-info" title="Tambah ke Google Calendar" style="text-decoration:none">📅</a><button class="btn btn-xs btn-info" onclick="viewDailyTask('${t.id}')" title="Lihat">👁️</button><button class="btn btn-xs btn-warning" onclick="editDailyTask('${t.id}')">✏️</button><button class="btn btn-xs btn-danger" onclick="hapusDailyTask('${t.id}')">🗑️</button></div></div>`;
     }else{
-      html+=`<div style="display:flex;gap:4px"><button class="btn btn-xs btn-info" onclick="viewDailyTask('${t.id}')" title="Lihat">👁️</button></div></div>`;
+      html+=`<div style="display:flex;gap:4px;flex-wrap:wrap"><a href="${buildGCalUrl(t)}" target="_blank" class="btn btn-xs btn-info" title="Tambah ke Google Calendar" style="text-decoration:none">📅</a><button class="btn btn-xs btn-info" onclick="viewDailyTask('${t.id}')" title="Lihat">👁️</button></div></div>`;
     }
   });
   listEl.innerHTML=html;
@@ -647,7 +671,7 @@ function viewDailyTask(id){
       ${task.targetUserName?`<tr><td style="padding:8px;font-weight:700">Untuk</td><td style="padding:8px">${escHtml(task.targetUserName)}</td></tr>`:''}
       ${task.doneAt?`<tr><td style="padding:8px;font-weight:700">Selesai pada</td><td style="padding:8px">${formatDate(task.doneAt.split('T')[0])} ${task.doneAt.split('T')[1]?task.doneAt.split('T')[1].substring(0,5):''}</td></tr>`:''}
     </table>
-    <div style="margin-top:16px;text-align:right"><button class="btn btn-sm btn-outline" onclick="closeModalDirect()">Tutup</button></div>`);
+    <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end"><a href="${buildGCalUrl(task)}" target="_blank" class="btn btn-sm btn-info" style="text-decoration:none">📅 Tambah ke Google Calendar</a><button class="btn btn-sm btn-outline" onclick="closeModalDirect()">Tutup</button></div>`);
 }
 
 async function modalAddTask(){
