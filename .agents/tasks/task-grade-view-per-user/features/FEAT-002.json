@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "fix",
   "description": "Fix portal data privacy: Change portal functions that fetch ALL records from Firestore to use server-side .where() queries so only the current user's data is downloaded. This prevents other employees' data from being accessible in the browser.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "In modules-portal.js, update renderPortalOvertime() to use .get() + client-side filter by userId instead of .where() to avoid potential index issues (currently it uses .where which is fine for single-field)",
     "In modules-portal.js, update renderPortalReimburse() to filter by userId or use .where('nama','==',currentUser.nama) instead of fetching all records",
@@ -26,5 +26,5 @@
     "Run: node --check /projects/sandbox/hr-legal-app/modules-test-kesehatan.js"
   ],
   "blocked_reason": null,
-  "findings": null
+  "findings": "Changed all portal functions from .get() (fetch all) + client-side filter to .where() (server-side filter) queries. This ensures only the current user's data is downloaded from Firestore. For test kesehatan, used multiple targeted queries (by userId, linkedKaryawan, and nama) as fallbacks instead of fetching all records. Single-field .where() queries do not require composite indexes in Firestore."
 }
