@@ -23,22 +23,22 @@ async function renderTestKesehatan() {
   <div class="page-title">
     <span>🏥 Test Kesehatan</span>
     <div class="flex gap-8">
-      <button class="btn btn-primary btn-sm" onclick="modalJadwalTestKesehatan('calon')">+ Jadwalkan Calon</button>
-      <button class="btn btn-info btn-sm" onclick="modalJadwalTestKesehatan('existing')">+ Jadwalkan Karyawan</button>
+      ${hasAccess(3) ? `<button class="btn btn-primary btn-sm" onclick="modalJadwalTestKesehatan('calon')">+ Jadwalkan Calon</button>
+      <button class="btn btn-info btn-sm" onclick="modalJadwalTestKesehatan('existing')">+ Jadwalkan Karyawan</button>` : ''}
     </div>
   </div>
   <div class="card">
     <div class="tabs" id="testKesehatanTabs">
-      <div class="tab active" onclick="showTestKesehatanTab('calon')">👤 Calon Karyawan</div>
+      ${hasAccess(3) ? `<div class="tab active" onclick="showTestKesehatanTab('calon')">👤 Calon Karyawan</div>
       <div class="tab" onclick="showTestKesehatanTab('existing')">👥 Karyawan Existing</div>
-      <div class="tab" onclick="showTestKesehatanTab('riwayat')">📋 Riwayat Test</div>
+      <div class="tab" onclick="showTestKesehatanTab('riwayat')">📋 Riwayat Test</div>` : `<div class="tab active" onclick="showTestKesehatanTab('riwayat')">📋 Riwayat Test</div>`}
     </div>
     <div style="margin:12px 0">
-      <input class="form-control" id="searchTestKesehatan" placeholder="🔍 Cari nama..." oninput="showTestKesehatanTab(window._tkTab||'calon')">
+      <input class="form-control" id="searchTestKesehatan" placeholder="🔍 Cari nama..." oninput="showTestKesehatanTab(window._tkTab||'riwayat')">
     </div>
     <div id="testKesehatanContent"></div>
   </div>`;
-  showTestKesehatanTab("calon");
+  showTestKesehatanTab(hasAccess(3) ? "calon" : "riwayat");
 }
 
 // ── TAB SWITCHING ─────────────────────────────────────────────
@@ -62,6 +62,20 @@ async function showTestKesehatanTab(tab) {
   const snap = await db.collection("hrd_test_kesehatan").get();
   const docs = [];
   snap.forEach((d) => docs.push({ id: d.id, ...d.data() }));
+
+  // Non-admin users can only see their own records
+  if (!hasAccess(3)) {
+    const myId = currentUser.id || '';
+    const myLinked = currentUser.linkedKaryawan || '';
+    const myNama = (currentUser.nama || '').toLowerCase().trim();
+    const allDocs = docs.slice();
+    docs.length = 0;
+    allDocs.forEach(d => {
+      if (d.userId === myId || d.userId === myLinked || (d.nama || '').toLowerCase().trim() === myNama) {
+        docs.push(d);
+      }
+    });
+  }
 
   let filtered = [];
   if (tab === "calon") {
