@@ -173,7 +173,7 @@ const HARI_LIBUR_NASIONAL_2026 = [
 ];
 
 let hariLiburCalendarMonth = null;
-let hariLiburViewMode = 'kalender'; // 'kalender', 'myCalendar', or 'daftar'
+let hariLiburViewMode = 'myCalendar'; // 'myCalendar' or 'daftar'
 
 async function renderHariLibur() {
   const main = document.getElementById('mainContent');
@@ -185,8 +185,7 @@ async function renderHariLibur() {
     <div class="page-title"><span>📅 Hari Libur</span></div>
     <div class="card">
       <div class="tabs mb-16" id="hariLiburTabs">
-        <div class="tab ${hariLiburViewMode==='kalender'?'active':''}" onclick="switchHariLiburView('kalender')">📅 Google Calendar</div>
-        <div class="tab ${hariLiburViewMode==='myCalendar'?'active':''}" onclick="switchHariLiburView('myCalendar')">📋 Kalender Saya</div>
+        <div class="tab ${hariLiburViewMode==='myCalendar'?'active':''}" onclick="switchHariLiburView('myCalendar')">📅 Kalender</div>
         <div class="tab ${hariLiburViewMode==='daftar'?'active':''}" onclick="switchHariLiburView('daftar')">📋 Daftar Libur</div>
       </div>
       <div id="hariLiburContent"></div>
@@ -219,9 +218,7 @@ async function loadHariLiburView() {
   window._hariLiburUserReminders = [];
   window._hariLiburUserNotes = [];
 
-  if (hariLiburViewMode === 'kalender') {
-    renderGoogleCalendarEmbed(container);
-  } else if (hariLiburViewMode === 'myCalendar') {
+  if (hariLiburViewMode === 'myCalendar') {
     renderMyCalendarView(container);
   } else {
     const monthNames = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
@@ -248,25 +245,6 @@ async function loadHariLiburView() {
     container.appendChild(listDiv);
     renderHariLiburList(listDiv, y, m, holidays);
   }
-}
-
-function renderGoogleCalendarEmbed(container) {
-  const calendarId = 'id.indonesian%23holiday%40group.v.calendar.google.com';
-  const embedUrl = 'https://calendar.google.com/calendar/embed?src='+calendarId+'&ctz=Asia/Jakarta&mode=MONTH&showTitle=0&showNav=1&showDate=1&showPrint=0&showTabs=0&showCalendars=0&showTz=0&wkst=2';
-  let html = '<div style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">';
-  html += '<p class="text-sm" style="color:var(--text-light)">Kalender Indonesia terintegrasi dengan Google Calendar. Klik event untuk detail, atau tambahkan ke kalender pribadi.</p>';
-  html += '<div style="display:flex;gap:8px">';
-  html += hasAccess(6)?'<button class="btn btn-info btn-sm" onclick="syncHariLiburNasional()">🔄 Sinkron</button>':'';
-  html += hasAccess(6)?'<button class="btn btn-primary btn-sm" onclick="modalHariLibur()">+ Tambah</button>':'';
-  html += '</div></div>';
-  html += '<div style="border-radius:8px;overflow:hidden;border:1px solid var(--border);background:#fff">';
-  html += '<iframe src="'+embedUrl+'" style="border:0;width:100%;height:600px" frameborder="0" scrolling="no"></iframe>';
-  html += '</div>';
-  html += '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">';
-  html += '<a href="https://calendar.google.com/calendar/r?cid='+calendarId+'" target="_blank" class="btn btn-sm btn-primary" style="text-decoration:none">+ Tambahkan ke Google Calendar Saya</a>';
-  html += '<a href="https://calendar.google.com/calendar/r" target="_blank" class="btn btn-sm btn-outline" style="text-decoration:none">Buka Google Calendar</a>';
-  html += '</div>';
-  container.innerHTML = html;
 }
 
 function renderHariLiburList(container, year, month, holidays) {
@@ -307,11 +285,13 @@ async function renderMyCalendarView(container) {
       <button class="btn btn-sm btn-outline" onclick="hariLiburNextMonth()">&gt;</button>
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <span style="font-size:.75rem;color:var(--text-light)">🔴 Libur &nbsp; 🔵 Pending &nbsp; 🟢 Selesai &nbsp; 🔴 Terlambat &nbsp; 🟣 Ditugaskan</span>
+      ${hasAccess(6)?'<button class="btn btn-info btn-sm" onclick="syncHariLiburNasional()">🔄 Sinkron</button>':''}
+      ${hasAccess(6)?'<button class="btn btn-primary btn-sm" onclick="modalHariLibur()">+ Hari Libur</button>':''}
     </div>
   </div>`;
 
-  container.innerHTML = navHtml + '<div style="text-align:center;padding:24px;color:var(--text-light)">Memuat kalender...</div>';
+  let legendHtml = '<div style="margin-bottom:12px"><span style="font-size:.75rem;color:var(--text-light)">🔴 Libur &nbsp; 🔵 Pending &nbsp; 🟢 Selesai &nbsp; 🟠 Terlambat &nbsp; 🟣 Ditugaskan</span></div>';
+  container.innerHTML = navHtml + legendHtml + '<div style="text-align:center;padding:24px;color:var(--text-light)">Memuat kalender...</div>';
 
   // Load holidays and tasks for this month
   const startDate = `${y}-${String(m+1).padStart(2,'0')}-01`;
@@ -413,7 +393,7 @@ async function renderMyCalendarView(container) {
 
   calHtml += '</div>';
 
-  container.innerHTML = navHtml + calHtml;
+  container.innerHTML = navHtml + legendHtml + calHtml;
 }
 
 async function hapusHariLibur(id) {
