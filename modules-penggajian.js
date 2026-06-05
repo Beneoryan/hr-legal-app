@@ -1,7 +1,7 @@
 'use strict';
 // ── PENGGAJIAN ────────────────────────────────────────────────
 async function renderPenggajian(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>💰 Penggajian</span><div class="flex gap-8"><button class="btn btn-primary btn-sm" onclick="modalGaji()">+ Generate Slip</button><button class="btn btn-success btn-sm" onclick="generateAllGaji()">⚡ Generate Semua</button><button class="btn btn-secondary btn-sm" onclick="modalImportPenggajian()">⬇️ Import</button></div></div><div class="card"><div class="flex gap-8 mb-16 flex-wrap"><input class="form-control" type="month" id="filterBulanGaji" value="${monthStr()}" onchange="loadGaji()" style="max-width:160px"><input class="form-control" placeholder="🔍 Cari nama..." id="filterNamaGaji" oninput="filterGajiTable()" style="max-width:180px"><select class="form-control" id="filterDeptGaji" onchange="filterGajiTable()" style="max-width:160px"><option value="">Semua Dept</option></select><select class="form-control" id="filterGajiRange" onchange="filterGajiTable()" style="max-width:160px"><option value="">Semua Gaji</option><option value="0-3000000">&lt; 3 Juta</option><option value="3000000-5000000">3-5 Juta</option><option value="5000000-10000000">5-10 Juta</option><option value="10000000-99999999">&gt; 10 Juta</option></select><button class="btn btn-sm btn-info" onclick="loadGaji()">🔍</button></div><div id="gajiSummary" class="stats-grid mb-16"></div><div class="flex gap-8 mb-8"><label style="font-size:.78rem;display:flex;align-items:center;gap:4px"><input type="checkbox" id="selectAllGaji" onchange="toggleSelectAllGaji()"> Pilih Semua</label><button class="btn btn-xs btn-danger" onclick="hapusSelectedGaji()">🗑️ Hapus Terpilih</button><button class="btn btn-xs btn-danger" onclick="hapusSemuaGaji()">🗑️ Hapus Semua</button></div><div class="table-wrap"><table><thead><tr><th style="width:30px"><input type="checkbox" id="selectAllGajiHead" onchange="toggleSelectAllGaji()"></th><th>Karyawan</th><th>Gaji Pokok</th><th>Tunjangan</th><th>Insentif</th><th>Reimburse</th><th>Lembur</th><th>Potongan</th><th>Loan</th><th>PPH21</th><th>THP</th><th>Aksi</th></tr></thead><tbody id="tblGaji"></tbody></table></div></div>`;loadGaji();}
-async function loadGaji(){const bulan=document.getElementById('filterBulanGaji')?.value||monthStr();const snap=await db.collection('hrd_penggajian').where('periode','==',bulan).get();window._gajiData=[];snap.forEach(d=>window._gajiData.push({id:d.id,...d.data()}));
+async function loadGaji(){const bulan=document.getElementById('filterBulanGaji')?.value||monthStr();const allSnap=await db.collection('hrd_penggajian').get();window._gajiData=[];allSnap.forEach(d=>{const data=d.data();if(data.periode===bulan)window._gajiData.push({id:d.id,...data});});
   // Populate dept filter from karyawan data
   const kSnap=await db.collection('hrd_karyawan').get();const depts=new Set();const karyDeptMap={};kSnap.forEach(d=>{const k=d.data();depts.add(k.departemen||'');karyDeptMap[(k.nama||'').toLowerCase()]=k.departemen||'';});
   window._gajiData.forEach(g=>{g._dept=karyDeptMap[(g.nama||'').toLowerCase()]||'';});
@@ -65,7 +65,7 @@ async function doGenerateAllGaji(){
   const existSnap=await db.collection('hrd_penggajian').where('periode','==',bulan).get();
   if(!existSnap.empty){const delBatch=db.batch();existSnap.forEach(d=>delBatch.delete(d.ref));await delBatch.commit();}
   // Load all related data (using simple queries + client-side filtering to avoid composite index requirements)
-  const[absenSnap,reimbSnap,kasbonSnap,tunjSnap,kpiSnap,insentifSnap,cutiSnap,overtimeSnap,dinasLuarSnap]=await Promise.all([
+  const[absenSnap,reimbSnap,kasbonSnap,tunjSnap,kpiSnap,insentifSnap,cutiSnap,overtimeSnap,dinasLuarSnap,usersSnap]=await Promise.all([
     db.collection('hrd_absensi').get(),
     db.collection('hrd_reimbursement').get(),
     db.collection('hrd_kasbon').get(),
@@ -74,22 +74,28 @@ async function doGenerateAllGaji(){
     db.collection('hrd_insentif').get(),
     db.collection('hrd_cuti').get(),
     db.collection('hrd_overtime').get(),
-    db.collection('hrd_dinas_luar').get().catch(()=>({forEach:()=>{}}))
+    db.collection('hrd_dinas_luar').get().catch(()=>({forEach:()=>{}})),
+    db.collection('hrd_users').get()
   ]);
+  // Build userId -> nama map from hrd_users for cross-referencing overtime
+  const userNamaMap={};
+  usersSnap.forEach(d=>{const u=d.data();userNamaMap[d.id]=(u.nama||'').trim().toLowerCase();});
   // Build attendance map: userId -> {hadir, izin, cuti, lembur_jam}
   const absenMap={};
   absenSnap.forEach(d=>{const p=d.data();if(p.tanggal<periodeStart||p.tanggal>periodeEnd)return;const uid=p.userId;if(!absenMap[uid])absenMap[uid]={hadir:0,lembur:0};if(p.tipe==='masuk')absenMap[uid].hadir++;if(p.tipe==='pulang'&&p.lembur&&p.lemburJam)absenMap[uid].lembur+=p.lemburJam;});
   // Cuti map: userId -> jumlah hari cuti dalam periode
   const cutiMap={};
   cutiSnap.forEach(d=>{const c=d.data();if(c.status!=='approved')return;const uid=c.userId;if(!uid)return;const start=new Date(c.mulai);const end=new Date(c.selesai);let days=0;for(let dt=new Date(start);dt<=end;dt.setDate(dt.getDate()+1)){const ds=dt.toISOString().split('T')[0];if(ds>=periodeStart&&ds<=periodeEnd)days++;}if(!cutiMap[uid])cutiMap[uid]=0;cutiMap[uid]+=days;});
-  // Overtime map: index by both userId AND lowercase nama for reliable lookup
+  // Overtime map: index by userId, overtime nama, AND hrd_users nama for reliable lookup
   const otMap={};
   overtimeSnap.forEach(d=>{const o=d.data();if(o.status!=='approved')return;if(o.tanggal>=periodeStart&&o.tanggal<=periodeEnd){
     const uid=o.userId||'';
     const nama=(o.nama||'').trim().toLowerCase();
+    const userNama=uid?userNamaMap[uid]||'':'';
     const dur=parseFloat(o.durasi)||0;
     if(uid){if(!otMap[uid])otMap[uid]=0;otMap[uid]+=dur;}
     if(nama){if(!otMap[nama])otMap[nama]=0;otMap[nama]+=dur;}
+    if(userNama&&userNama!==nama){if(!otMap[userNama])otMap[userNama]=0;otMap[userNama]+=dur;}
   }});
   // Dinas luar map: userId -> jumlah hari dinas dalam periode
   const dinasMap={};
