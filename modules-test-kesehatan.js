@@ -123,13 +123,12 @@ async function modalJadwalTestKesehatan(tipe) {
       optionsHtml += `<option value="${d.id}" data-nama="${escHtml(k.nama || "")}">${escHtml(k.nama || "-")} - ${escHtml(k.posisiDilamar || k.posisi || "-")}</option>`;
     });
   } else {
-    const snap = await db
-      .collection("hrd_karyawan")
-      .where("status", "==", "aktif")
-      .get();
+    const snap = await db.collection("hrd_karyawan").get();
     snap.forEach((d) => {
       const k = d.data();
-      optionsHtml += `<option value="${d.id}" data-nama="${escHtml(k.nama || "")}">${escHtml(k.nama || "-")} - ${escHtml(k.posisi || "-")}</option>`;
+      if (k.status === "aktif") {
+        optionsHtml += `<option value="${d.id}" data-nama="${escHtml(k.nama || "")}">${escHtml(k.nama || "-")} - ${escHtml(k.posisi || "-")}</option>`;
+      }
     });
   }
   openModal(`
@@ -263,7 +262,7 @@ async function modalFormTestKesehatan(id) {
     <h4 style="margin:16px 0 8px;color:var(--primary)">A. Data Umum</h4>
     <p style="margin:0 0 10px;font-size:.8rem;color:#666;font-style:italic">Isi data diri dasar. Tinggi badan dalam satuan cm, berat badan dalam kg. BMI akan terhitung otomatis.</p>
     <div class="grid-2">
-      <div class="form-group"><label>Nama</label><input class="form-control" id="tkfNama" value="${escHtml(du.nama || data.nama || "")}"></div>
+      <div class="form-group"><label>Nama</label><input class="form-control" id="tkfNama" value="${escHtml(du.nama || data.nama || (typeof currentUser !== 'undefined' ? currentUser.nama : '') || '')}" ${id ? 'readonly style="background:#f0f0f0"' : ''}></div>
       <div class="form-group"><label>Usia</label><input type="number" class="form-control" id="tkfUsia" value="${du.usia || ""}"></div>
       <div class="form-group"><label>Jenis Kelamin</label>
         <select class="form-control" id="tkfGender">
@@ -755,10 +754,11 @@ function updateStatusPreview() {
 
 // ── SIMPAN TEST KESEHATAN ─────────────────────────────────────
 async function simpanTestKesehatan(id) {
-  const penyakitArr = [];
-  document
-    .querySelectorAll(".tkDisease:checked")
-    .forEach((c) => penyakitArr.push(c.value));
+  try {
+    const penyakitArr = [];
+    document
+      .querySelectorAll(".tkDisease:checked")
+      .forEach((c) => penyakitArr.push(c.value));
 
   const dataUmum = {
     nama: document.getElementById("tkfNama").value,
@@ -851,6 +851,10 @@ async function simpanTestKesehatan(id) {
   closeModalDirect();
   toast("Data test kesehatan disimpan", "success");
   if (typeof renderTestKesehatan === "function") renderTestKesehatan();
+  } catch (e) {
+    console.error("[TEST KESEHATAN] Gagal menyimpan:", e);
+    toast("Gagal menyimpan: " + e.message, "error");
+  }
 }
 
 // ── DETAIL TEST KESEHATAN (READ-ONLY) ─────────────────────────
@@ -979,60 +983,21 @@ async function renderPortalTestKesehatan() {
 
 async function loadPortalTestKesehatan() {
   const u = currentUser;
-  const myTests = [];
-  const seen = {};
   const uNama = (u.nama || "").toLowerCase().trim();
 
-  // Query 1: records linked by userId matching current user's hrd_users doc ID
-  const snapById = await db
-    .collection("hrd_test_kesehatan")
-    .where("userId", "==", u.id)
-    .get();
-  snapById.forEach((d) => {
-    seen[d.id] = true;
-    myTests.push({ id: d.id, ...d.data() });
-  });
-
-  // Query 2: records where userId matches the linked karyawan ID.
-  // Admin schedules set userId from hrd_karyawan dropdown, which is stored as
-  // currentUser.linkedKaryawan on the user account.
-  if (u.linkedKaryawan) {
-    const snapByKary = await db
-      .collection("hrd_test_kesehatan")
-      .where("userId", "==", u.linkedKaryawan)
-      .get();
-    snapByKary.forEach((d) => {
-      if (seen[d.id]) return;
-      seen[d.id] = true;
-      myTests.push({ id: d.id, ...d.data() });
-    });
-  }
-
-  // Query 3: records where userId is empty but name matches (legacy/manual records)
-  const snapEmpty = await db
-    .collection("hrd_test_kesehatan")
-    .where("userId", "==", "")
-    .get();
-  snapEmpty.forEach((d) => {
-    if (seen[d.id]) return;
+  // Fetch all test records and filter client-side to avoid Firestore index issues
+  const allSnap = await db.collection("hrd_test_kesehatan").get();
+  const myTests = [];
+  allSnap.forEach((d) => {
     const r = d.data();
-    if ((r.nama || "").toLowerCase().trim() === uNama) {
-      seen[d.id] = true;
-      myTests.push({ id: d.id, ...r });
-    }
-  });
-
-  // Query 4: records for tipe 'existing' matched by name as a last resort.
-  // Catches edge cases where neither userId matches (e.g. linkedKaryawan not set).
-  const snapExisting = await db
-    .collection("hrd_test_kesehatan")
-    .where("tipe", "==", "existing")
-    .get();
-  snapExisting.forEach((d) => {
-    if (seen[d.id]) return;
-    const r = d.data();
-    if ((r.nama || "").toLowerCase().trim() === uNama) {
-      seen[d.id] = true;
+    // Match by userId (hrd_users id), linkedKaryawan, or nama
+    const matches =
+      r.userId === u.id ||
+      (u.linkedKaryawan && r.userId === u.linkedKaryawan) ||
+      (r.nama || "").toLowerCase().trim() === uNama ||
+      (r.dataUmum &&
+        (r.dataUmum.nama || "").toLowerCase().trim() === uNama);
+    if (matches) {
       myTests.push({ id: d.id, ...r });
     }
   });
