@@ -102,9 +102,9 @@ async function showTestKesehatanTab(tab) {
         <td>${kesimpulanStatus}</td>
         <td>
           <button class="btn btn-xs btn-info" onclick="detailTestKesehatan('${p.id}')">&#x1F441;&#xFE0F;</button>
-          <button class="btn btn-xs btn-primary" onclick="modalFormTestKesehatan('${p.id}')">&#x1F4DD;</button>
+          ${tab !== 'riwayat' ? `<button class="btn btn-xs btn-primary" onclick="modalFormTestKesehatan('${p.id}')">&#x1F4DD;</button>
           ${p.tipe === "calon" && p.status !== "selesai" ? `<button class="btn btn-xs btn-success" onclick="(function(){var url=window.location.origin+'/test-kesehatan?id=${p.id}';if(navigator.clipboard){navigator.clipboard.writeText(url).then(function(){toast('Link disalin ke clipboard','success')}).catch(function(){prompt('Salin link berikut:',url)})}else{prompt('Salin link berikut:',url)}})()">&#x1F4CB; Copy Link</button>` : ""}
-          <button class="btn btn-xs btn-danger" onclick="hapusTestKesehatan('${p.id}')">&#x1F5D1;&#xFE0F;</button>
+          <button class="btn btn-xs btn-danger" onclick="hapusTestKesehatan('${p.id}')">&#x1F5D1;&#xFE0F;</button>` : ''}
         </td>
       </tr>`;
     });
@@ -836,8 +836,7 @@ async function simpanTestKesehatan(id) {
     status: hitungStatusKesehatan(),
     catatan: generateCatatanOtomatis(),
     rekomendasi: generateRekomendasiOtomatis(),
-    pemeriksaOleh:
-      typeof currentUser !== "undefined" ? currentUser.nama || "" : "",
+    pemeriksaOleh: "TENAGA MEDIS IJEF",
   };
 
   const updateData = {

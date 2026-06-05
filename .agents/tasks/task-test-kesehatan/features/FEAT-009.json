@@ -1,0 +1,23 @@
+{
+  "id": "FEAT-009",
+  "type": "fix",
+  "description": "Remove edit/delete buttons from riwayat tab (view only) and change pemeriksaOleh to always be 'TENAGA MEDIS IJEF'.",
+  "status": "completed",
+  "steps": [
+    "In showTestKesehatanTab(), for tab === 'riwayat', only render the view button (detailTestKesehatan) - remove edit and delete buttons",
+    "In simpanTestKesehatan(), change kesimpulan.pemeriksaOleh from currentUser.nama to the hardcoded string 'TENAGA MEDIS IJEF'"
+  ],
+  "acceptance_criteria": [
+    "In the riwayat tab, only the view (eye icon) button is shown - no edit or delete buttons",
+    "In the calon and existing tabs, all buttons remain as before",
+    "kesimpulan.pemeriksaOleh is always set to 'TENAGA MEDIS IJEF'",
+    "File passes node --check syntax validation"
+  ],
+  "verification": [
+    "Run node --check modules-test-kesehatan.js",
+    "Grep for 'TENAGA MEDIS IJEF' in the file",
+    "Verify riwayat tab conditional logic in showTestKesehatanTab"
+  ],
+  "blocked_reason": null,
+  "findings": "Both changes applied cleanly. Riwayat tab now only shows view button via conditional rendering (tab !== 'riwayat'). pemeriksaOleh hardcoded to 'TENAGA MEDIS IJEF'. node --check passes."
+}
