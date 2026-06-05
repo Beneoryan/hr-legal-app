@@ -1,0 +1,24 @@
+{
+  "id": "FEAT-008",
+  "type": "fix",
+  "description": "Fix 'Gagal menyimpan: No document to update' error in simpanTestKesehatan by adding id validation and fallback to set with merge when update fails.",
+  "status": "in_progress",
+  "steps": [
+    "In simpanTestKesehatan(id), add validation that id is a non-empty trimmed string before attempting update",
+    "Wrap the update call in a try-catch that falls back to db.collection().doc(id).set(updateData, { merge: true }) when update fails with 'No document to update' error",
+    "Ensure the else branch (add new doc) is reached when id is empty or whitespace-only"
+  ],
+  "acceptance_criteria": [
+    "When id is empty or whitespace-only, the function creates a new document instead of failing",
+    "When id is valid but document does not exist in Firestore, the function falls back to set with merge instead of throwing an error",
+    "Existing behavior for valid update (id exists and document exists) is preserved",
+    "File passes node --check syntax validation"
+  ],
+  "verification": [
+    "Run node --check modules-test-kesehatan.js",
+    "Grep for 'set(updateData' or 'set(' with merge in the file",
+    "Grep for 'id.trim()' or 'id && id.trim()' validation"
+  ],
+  "blocked_reason": null,
+  "findings": null
+}

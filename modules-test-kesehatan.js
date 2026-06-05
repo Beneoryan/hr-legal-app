@@ -855,8 +855,19 @@ async function simpanTestKesehatan(id) {
     updateData.status = "selesai";
   }
 
-  if (id) {
-    await db.collection("hrd_test_kesehatan").doc(id).update(updateData);
+  if (id && id.trim()) {
+    try {
+      await db.collection("hrd_test_kesehatan").doc(id).update(updateData);
+    } catch (updateErr) {
+      console.warn(
+        "[TEST KESEHATAN] Update failed, trying set with merge:",
+        updateErr.message,
+      );
+      await db
+        .collection("hrd_test_kesehatan")
+        .doc(id)
+        .set(updateData, { merge: true });
+    }
   } else {
     updateData.id = generateId();
     updateData.nama = dataUmum.nama;
