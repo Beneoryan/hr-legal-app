@@ -1279,9 +1279,9 @@ async function loadRekapGrid(){
   // Build cuti map: userId -> {day: jenis}
   const cutiMap={};
   cutiSnap.forEach(d=>{const c=d.data();if(c.status!=='approved'&&!c.approvedAt)return;if(!c.mulai||!c.selesai)return;const uid=c.userId||'';const namaRaw=(c.nama||'').trim();const nama=namaRaw.toLowerCase();const start=new Date(c.mulai+'T00:00:00');const end=new Date(c.selesai+'T00:00:00');for(let dt=new Date(start);dt<=end;dt.setDate(dt.getDate()+1)){const day=dt.getDate();const m=dt.getMonth()+1;const y=dt.getFullYear();const ds=y+'-'+String(m).padStart(2,'0')+'-'+String(day).padStart(2,'0');if(ds>=startDate&&ds<=endDate){if(uid){if(!cutiMap[uid])cutiMap[uid]={};cutiMap[uid][day]=c.jenis||'Cuti';}if(nama){if(!cutiMap[nama])cutiMap[nama]={};cutiMap[nama][day]=c.jenis||'Cuti';}if(namaRaw){if(!cutiMap[namaRaw])cutiMap[namaRaw]={};cutiMap[namaRaw][day]=c.jenis||'Cuti';}}}});
-  // Build overtime map: userId -> {day: true}
+  // Build overtime map: userId -> {day: durasi}
   const otMap={};
-  overtimeSnap.forEach(d=>{const o=d.data();if(!o.tanggal||o.tanggal<startDate||o.tanggal>endDate||(o.status!=='approved'&&!o.approvedAt))return;const uid=o.userId||'';const namaRaw=(o.nama||'').trim();const nama=namaRaw.toLowerCase();const day=parseInt(o.tanggal.split('-')[2]);if(uid){if(!otMap[uid])otMap[uid]={};otMap[uid][day]=true;}if(nama){if(!otMap[nama])otMap[nama]={};otMap[nama][day]=true;}if(namaRaw){if(!otMap[namaRaw])otMap[namaRaw]={};otMap[namaRaw][day]=true;}});
+  overtimeSnap.forEach(d=>{const o=d.data();if(!o.tanggal||o.tanggal<startDate||o.tanggal>endDate||(o.status!=='approved'&&!o.approvedAt))return;const uid=o.userId||'';const namaRaw=(o.nama||'').trim();const nama=namaRaw.toLowerCase();const day=parseInt(o.tanggal.split('-')[2]);const dur=parseFloat(o.durasi)||0;if(uid){if(!otMap[uid])otMap[uid]={};otMap[uid][day]=dur;}if(nama){if(!otMap[nama])otMap[nama]={};otMap[nama][day]=dur;}if(namaRaw){if(!otMap[namaRaw])otMap[namaRaw]={};otMap[namaRaw][day]=dur;}});
   // Build dinas luar map: userId -> {day: true}
   const dinasLuarMap={};
   dinasLuarSnap.forEach(d=>{const dl=d.data();if(dl.status!=='approved'&&!dl.approvedAt)return;const uid=dl.userId||'';const dlNamaRaw=(dl.nama||'').trim();const dlNama=dlNamaRaw.toLowerCase();const startD=dl.tanggalMulai||dl.tanggal;const endD=dl.tanggalSelesai||dl.tanggal;if(!startD)return;const endDt=new Date((endD||startD)+'T00:00:00');let maxIter=366;for(let dt=new Date(startD+'T00:00:00');dt<=endDt;dt.setDate(dt.getDate()+1)){if(--maxIter<0)break;const day=dt.getDate();const m=dt.getMonth()+1;const y=dt.getFullYear();const ds=y+'-'+String(m).padStart(2,'0')+'-'+String(day).padStart(2,'0');if(ds>=startDate&&ds<=endDate){if(uid){if(!dinasLuarMap[uid])dinasLuarMap[uid]={};dinasLuarMap[uid][day]=true;}if(dlNama){if(!dinasLuarMap[dlNama])dinasLuarMap[dlNama]={};dinasLuarMap[dlNama][day]=true;}if(dlNamaRaw){if(!dinasLuarMap[dlNamaRaw])dinasLuarMap[dlNamaRaw]={};dinasLuarMap[dlNamaRaw][day]=true;}}}});
@@ -1322,7 +1322,8 @@ async function loadRekapGrid(){
       const lemburJam=userLemburMap2[i];
       // Check cuti/izin first (by userId or nama)
       const cutiStatus=cutiMap[u.id]?.[i]||cutiMap[u.nama]?.[i]||cutiMap[(u.nama||'').trim()]?.[i]||cutiMap[(u.nama||'').trim().toLowerCase()]?.[i];
-      const isOT=otMap[u.id]?.[i]||otMap[u.nama]?.[i]||otMap[(u.nama||'').trim().toLowerCase()]?.[i];
+      const isOT=otMap[u.id]?.[i]!==undefined||otMap[u.nama]?.[i]!==undefined||otMap[(u.nama||'').trim().toLowerCase()]?.[i]!==undefined;
+      const otDurasi=otMap[u.id]?.[i]??otMap[u.nama]?.[i]??otMap[(u.nama||'').trim().toLowerCase()]?.[i]??0;
       const isLibur=liburSet.has(i);
       let color='#eee',text='-',title='';
       if(isLibur&&!st){color='#9e9e9e';text='H';title=' title="Hari Libur"';}
@@ -1334,7 +1335,7 @@ async function loadRekapGrid(){
         else{color='#00bcd4';text='C';title=` title="${cutiStatus}"`;ut++;}
       }
       else if(dinasLuarMap[u.id]?.[i]||dinasLuarMap[u.nama]?.[i]||dinasLuarMap[namaLow]?.[i]){color='#2196f3';text='D';title=' title="Dinas Luar (SPPD)"';ut++;totalD++;}
-      else if(st==='lembur'||isOT){color='#7b1fa2';text='L';ut++;totalLembur++;if(lemburJam){userLemburJam+=lemburJam;totalLemburJam+=lemburJam;}}
+      else if(st==='lembur'||isOT){color='#7b1fa2';text='L';ut++;totalLembur++;const effectiveLemburJam=Math.max(otDurasi||0,lemburJam||0);if(effectiveLemburJam>0){userLemburJam+=effectiveLemburJam;totalLemburJam+=effectiveLemburJam;}}
       else if(st==='tepat_waktu'||st==='hadir'){color='#4caf50';text='✓';ut++;totalH++;}
       else if(st==='terlambat'){color='#ff9800';text='T';ut++;totalT++;}
       else if(st==='lengkap'){color='#4caf50';text='✓';ut++;totalL++;}

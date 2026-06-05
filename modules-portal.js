@@ -329,7 +329,8 @@ async function renderPortalOvertime(){
   if(!items.length)h='<tr><td colspan="5" class="text-center">Belum ada pengajuan overtime</td></tr>';
   else items.forEach(p=>{
     const badge=p.status==='approved'?'badge-success':p.status==='rejected'?'badge-danger':'badge-warning';
-    h+=`<tr><td>${formatDate(p.tanggal)}</td><td>${p.jamMulai||'-'} - ${p.jamSelesai||'-'}</td><td class="fw-700">${p.durasi||0} jam</td><td class="text-sm">${escHtml((p.alasan||'').substring(0,50))}</td><td><span class="badge ${badge}">${p.status}</span></td><td><button class="btn btn-xs btn-info" onclick="viewOvertimeDetail('${p.id}')">👁️</button> <button class="btn btn-xs btn-primary" onclick="editOvertimePortal('${p.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_overtime','${p.id}','portal-overtime')">🗑️</button></td></tr>`;
+    const canEdit=p.status!=='approved'&&p.status!=='rejected';
+    h+=`<tr><td>${formatDate(p.tanggal)}</td><td>${p.jamMulai||'-'} - ${p.jamSelesai||'-'}</td><td class="fw-700">${p.durasi||0} jam</td><td class="text-sm">${escHtml((p.alasan||'').substring(0,50))}</td><td><span class="badge ${badge}">${p.status}</span></td><td><button class="btn btn-xs btn-info" onclick="viewOvertimeDetail('${p.id}')">👁️</button>${canEdit?' <button class="btn btn-xs btn-primary" onclick="editOvertimePortal(\''+p.id+'\')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc(\'hrd_overtime\',\''+p.id+'\',\'portal-overtime\')">🗑️</button>':''}</td></tr>`;
   });
   document.getElementById('tblPortalOT').innerHTML=h;
 }
@@ -343,12 +344,15 @@ function viewOvertimeDetail(id){
 }
 async function editOvertimePortal(id){
   const d=await db.collection('hrd_overtime').doc(id).get();const p=d.data();
+  if(p.status==='approved'||p.status==='rejected'){toast('Overtime yang sudah diproses tidak dapat diedit','warning');return;}
   openModal(`<div class="modal-title">✏️ Edit Overtime</div>
     <div class="grid-2"><div class="form-group"><label>Tanggal</label><input class="form-control" type="date" id="eotTgl" value="${p.tanggal||''}"></div><div class="form-group"><label>Alasan</label><input class="form-control" id="eotAlasan" value="${escHtml(p.alasan||'')}"></div></div>
     <div class="grid-2"><div class="form-group"><label>Jam Mulai</label><input class="form-control" type="time" id="eotStart" value="${p.jamMulai||''}"></div><div class="form-group"><label>Jam Selesai</label><input class="form-control" type="time" id="eotEnd" value="${p.jamSelesai||''}"></div></div>
     <button class="btn btn-primary" onclick="simpanEditOvertime('${id}')">💾 Simpan</button>`);
 }
 async function simpanEditOvertime(id){
+  const docRef=await db.collection('hrd_overtime').doc(id).get();
+  if(docRef.exists&&(docRef.data().status==='approved'||docRef.data().status==='rejected')){toast('Tidak dapat mengedit overtime yang sudah diproses','warning');closeModalDirect();return;}
   const s=document.getElementById('eotStart').value,e=document.getElementById('eotEnd').value;
   const durasi=s&&e?Math.max(0,((new Date('2000-01-01T'+e)-new Date('2000-01-01T'+s))/3600000)).toFixed(1):0;
   await db.collection('hrd_overtime').doc(id).update({tanggal:document.getElementById('eotTgl').value,alasan:document.getElementById('eotAlasan').value,jamMulai:s,jamSelesai:e,durasi:parseFloat(durasi),updatedAt:new Date().toISOString()});
