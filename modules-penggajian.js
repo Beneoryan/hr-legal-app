@@ -51,6 +51,7 @@ async function doGenerateAllGaji(){
   closeModalDirect();
   if(!confirm('Konfirmasi: Generate slip gaji untuk semua karyawan aktif?'))return;
   try{
+  console.log('[PAYROLL] Starting generate for period:', document.getElementById('filterBulanGaji')?.value||monthStr());
   const bulan=document.getElementById('filterBulanGaji')?.value||monthStr();
   const[year,month]=bulan.split('-').map(Number);
   // Periode gaji: tgl 20 bulan lalu s/d tgl 20 bulan ini
@@ -59,11 +60,14 @@ async function doGenerateAllGaji(){
   const periodeStart=`${prevYear}-${String(prevMonth).padStart(2,'0')}-20`;
   const periodeEnd=`${year}-${String(month).padStart(2,'0')}-20`;
 
-  const kSnap=await db.collection('hrd_karyawan').where('status','==','aktif').get();
+  const kSnapAll=await db.collection('hrd_karyawan').get();
+  const kDocs=[];kSnapAll.forEach(d=>{const data=d.data();if(data.status==='aktif')kDocs.push({id:d.id,data:()=>data,ref:d.ref});});
+  const kSnap={empty:kDocs.length===0,docs:kDocs,size:kDocs.length};
   if(kSnap.empty){toast('Tidak ada karyawan aktif','warning');return;}
   // Delete existing slips for this period
-  const existSnap=await db.collection('hrd_penggajian').where('periode','==',bulan).get();
-  if(!existSnap.empty){const delBatch=db.batch();existSnap.forEach(d=>delBatch.delete(d.ref));await delBatch.commit();}
+  const existSnapAll=await db.collection('hrd_penggajian').get();
+  const toDelete=[];existSnapAll.forEach(d=>{if(d.data().periode===bulan)toDelete.push(d.ref);});
+  if(toDelete.length>0){for(const ref of toDelete){await ref.delete();}}
   // Load all related data (using simple queries + client-side filtering to avoid composite index requirements)
   const[absenSnap,reimbSnap,kasbonSnap,tunjSnap,kpiSnap,insentifSnap,cutiSnap,overtimeSnap,dinasLuarSnap,usersSnap]=await Promise.all([
     db.collection('hrd_absensi').get(),
@@ -92,11 +96,13 @@ async function doGenerateAllGaji(){
     const uid=o.userId||'';
     const nama=(o.nama||'').trim().toLowerCase();
     const userNama=uid?userNamaMap[uid]||'':'';
-    const dur=parseFloat(o.durasi)||0;
+    const dur=typeof o.durasi==='number'?o.durasi:(typeof o.durasi==='string'?parseFloat(o.durasi.replace(/[^0-9.]/g,''))||0:parseFloat(o.durasi)||0);
     if(uid){if(!otMap[uid])otMap[uid]=0;otMap[uid]+=dur;}
     if(nama){if(!otMap[nama])otMap[nama]=0;otMap[nama]+=dur;}
     if(userNama&&userNama!==nama){if(!otMap[userNama])otMap[userNama]=0;otMap[userNama]+=dur;}
   }});
+  console.log('[PAYROLL DEBUG] otMap keys:', Object.keys(otMap), 'values:', otMap);
+  console.log('[PAYROLL DEBUG] Periode:', periodeStart, '->', periodeEnd);
   // Dinas luar map: userId -> jumlah hari dinas dalam periode
   const dinasMap={};
   dinasLuarSnap.forEach(d=>{const dl=d.data();if(dl.status!=='approved')return;const uid=dl.userId||dl.nama;const startD=dl.tanggalMulai||dl.tanggal;const endD=dl.tanggalSelesai||dl.tanggal;if(!startD)return;let days=0;const endTime=new Date(endD||startD).getTime();let maxIter=366;for(let dt=new Date(startD);dt.getTime()<=endTime;dt.setDate(dt.getDate()+1)){if(--maxIter<0)break;const ds=dt.toISOString().split('T')[0];if(ds>=periodeStart&&ds<=periodeEnd)days++;}if(!dinasMap[uid])dinasMap[uid]=0;dinasMap[uid]+=days;});
@@ -131,6 +137,7 @@ async function doGenerateAllGaji(){
     // Lembur: 1.5x gaji per jam untuk 1 jam pertama, 2x setelahnya (UU Cipta Kerja)
     const autoLembur=absenMap[uid]?.lembur||0;
     const manualLembur=otMap[uid]||otMap[namaLow]||0;
+    console.log(`[PAYROLL] ${k.nama} (uid:${uid}, namaLow:"${namaLow}"): autoLembur=${autoLembur}, manualLembur=${manualLembur}, otMap[namaLow]=${otMap[namaLow]}, otMap[uid]=${otMap[uid]}`);
     const lemburJam=autoLembur+manualLembur;
     const gajiPerJam=Math.round(gaji/(hariKerja*8)); // 8 jam per hari
     let lemburNominal=0;
