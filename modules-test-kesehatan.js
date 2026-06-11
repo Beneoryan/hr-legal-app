@@ -80,9 +80,9 @@ async function showTestKesehatanTab(tab) {
           (d.nama || "").toLowerCase().trim() === (currentUser.nama || "").toLowerCase().trim()
         );
       } else if (!hasAccess(6)) {
-        // manager/head: see records from their department or unassigned
+        // manager/head: see records from their department or their own
         filtered = filtered.filter((d) =>
-          !d.departemen || d.departemen === currentUser.departemen ||
+          d.departemen === currentUser.departemen ||
           d.userId === currentUser.id ||
           (d.nama || "").toLowerCase().trim() === (currentUser.nama || "").toLowerCase().trim()
         );

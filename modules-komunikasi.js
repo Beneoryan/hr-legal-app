@@ -390,7 +390,18 @@ function shareMeetingWA(roomId,judul){
 
 async function endOnlineMeeting(id){
   if(!confirm('Akhiri meeting online ini?'))return;
+  const meetDoc = await db.collection('hrd_online_meeting').doc(id).get();
+  const meetData = meetDoc.data();
   await db.collection('hrd_online_meeting').doc(id).update({status:'ended',endedAt:new Date().toISOString()});
+  // Propagate meetingClosed to related invite records
+  if (meetData && meetData.roomId) {
+    try {
+      const invSnap = await db.collection('hrd_meeting_invites').where('meetingId','==',meetData.roomId).get();
+      const batch = db.batch();
+      invSnap.forEach(d => batch.update(d.ref, { meetingClosed: true }));
+      if (!invSnap.empty) await batch.commit();
+    } catch(e) { /* non-critical */ }
+  }
   toast('Meeting diakhiri','success');
   loadMeetingTab('online');
 }

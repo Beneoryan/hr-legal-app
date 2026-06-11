@@ -543,7 +543,8 @@ async function renderPenalty(){
     sumH = '<div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Departemen</th><th>Total Poin</th><th>Aksi</th></tr></thead><tbody>';
     summaryItems.forEach(s => {
       const badgeClass = s.poin >= 10 ? 'badge-danger' : s.poin >= 5 ? 'badge-warning' : 'badge-info';
-      sumH += `<tr><td class="fw-700">${escHtml(s.nama)}</td><td>${escHtml(s.departemen)}</td><td><span class="badge ${badgeClass}">${s.poin}</span></td><td><button class="btn btn-xs btn-primary" onclick="modalPenalty('${escHtml(s.nama)}')">+ Tambah</button></td></tr>`;
+      const jsName = escHtml(s.nama).replace(/'/g, "\\'");
+      sumH += `<tr><td class="fw-700">${escHtml(s.nama)}</td><td>${escHtml(s.departemen)}</td><td><span class="badge ${badgeClass}">${s.poin}</span></td><td><button class="btn btn-xs btn-primary" onclick="modalPenalty('${jsName}')">+ Tambah</button></td></tr>`;
     });
     sumH += '</tbody></table></div>';
   }
