@@ -70,22 +70,52 @@ async function showTestKesehatanTab(tab) {
     filtered = docs.filter((d) => d.tipe === "existing");
   } else {
     filtered = docs.filter((d) => d.status === "selesai");
-    // Filter riwayat by user access level
+    // Filter riwayat by user access level to prevent cross-division data leaks
     if (typeof currentUser !== "undefined" && typeof hasAccess === "function") {
+      const myLevel = ROLES[currentUser.role] || 0;
       if (!hasAccess(3)) {
-        // staff/leader: only see their own records
+        // staff/leader (level 1-2): only see their own records
         filtered = filtered.filter((d) =>
           d.userId === currentUser.id ||
           d.userId === currentUser.linkedKaryawan ||
           (d.nama || "").toLowerCase().trim() === (currentUser.nama || "").toLowerCase().trim()
         );
+      } else if (!hasAccess(5)) {
+        // manager/head (level 3-4): see records from own department only,
+        // AND only for users whose level is equal to or lower than theirs.
+        // This prevents managers from seeing bod/head/admin health data,
+        // and prevents cross-division data leaks.
+        filtered = filtered.filter((d) => {
+          // Always allow seeing own records
+          if (
+            d.userId === currentUser.id ||
+            d.userId === currentUser.linkedKaryawan ||
+            (d.nama || "").toLowerCase().trim() === (currentUser.nama || "").toLowerCase().trim()
+          ) {
+            return true;
+          }
+          // Must be same department
+          if (d.departemen !== currentUser.departemen) return false;
+          // Must be equal or lower level (if roleLevel is stored)
+          // If roleLevel is not stored (legacy data), default to hiding it
+          // to avoid accidental exposure of higher-level data
+          const recordLevel = d.roleLevel || 0;
+          if (recordLevel === 0) return false;
+          return recordLevel <= myLevel;
+        });
       } else if (!hasAccess(6)) {
-        // manager/head: see records from their department or their own
-        filtered = filtered.filter((d) =>
-          d.departemen === currentUser.departemen ||
-          d.userId === currentUser.id ||
-          (d.nama || "").toLowerCase().trim() === (currentUser.nama || "").toLowerCase().trim()
-        );
+        // bod (level 5): can see all departments but not admin records
+        filtered = filtered.filter((d) => {
+          if (
+            d.userId === currentUser.id ||
+            d.userId === currentUser.linkedKaryawan ||
+            (d.nama || "").toLowerCase().trim() === (currentUser.nama || "").toLowerCase().trim()
+          ) {
+            return true;
+          }
+          const recordLevel = d.roleLevel || 0;
+          return recordLevel < 6; // hide admin records
+        });
       }
       // admin (level 6): sees all - no filter needed
     }
@@ -199,12 +229,40 @@ async function simpanJadwalTestKesehatan(tipe) {
     });
   }
 
+  // Look up departemen and role level from karyawan data
+  let empDepartemen = "";
+  let empRoleLevel = 0;
+  if (personId) {
+    const col = tipe === "calon" ? "hrd_kandidat" : "hrd_karyawan";
+    const empDoc = await db.collection(col).doc(personId).get();
+    if (empDoc.exists) {
+      const empData = empDoc.data();
+      empDepartemen = empData.departemen || "";
+      // For existing employees, look up their user account role level
+      if (tipe === "existing") {
+        const userSnap = await db.collection("hrd_users").get();
+        userSnap.forEach((uDoc) => {
+          const uData = uDoc.data();
+          if (
+            uDoc.id === personId ||
+            uData.linkedKaryawan === personId ||
+            (uData.nama || "").toLowerCase().trim() === (empData.nama || "").toLowerCase().trim()
+          ) {
+            empRoleLevel = ROLES[uData.role] || 0;
+          }
+        });
+      }
+    }
+  }
+
   const data = {
     id: generateId(),
     nama: nama,
     tipe: tipe,
     tanggal: tanggal,
     catatan: catatan,
+    departemen: empDepartemen,
+    roleLevel: empRoleLevel,
     dataUmum: {},
     riwayatKesehatan: {},
     pemeriksaanFisik: {},
@@ -909,6 +967,27 @@ async function simpanTestKesehatan(id) {
         // If userId was set to linkedKaryawan (karyawan doc id), also store user login id
         updateData.userId = currentUser.id;
       }
+      // Store departemen and roleLevel if not yet set (for older records)
+      if (!existingData.departemen || !existingData.roleLevel) {
+        const targetUserId = updateData.userId || existingData.userId || "";
+        if (targetUserId) {
+          const usersSnap = await db.collection("hrd_users").get();
+          usersSnap.forEach((uDoc) => {
+            const uData = uDoc.data();
+            if (uDoc.id === targetUserId || uData.linkedKaryawan === targetUserId) {
+              if (!existingData.departemen) updateData.departemen = uData.departemen || "";
+              if (!existingData.roleLevel) updateData.roleLevel = ROLES[uData.role] || 0;
+            }
+          });
+        }
+        // Fallback: use currentUser's info if this is their own record
+        if (!updateData.departemen && !existingData.departemen && currentUser.departemen) {
+          updateData.departemen = currentUser.departemen;
+        }
+        if (!updateData.roleLevel && !existingData.roleLevel) {
+          updateData.roleLevel = ROLES[currentUser.role] || 0;
+        }
+      }
     }
     try {
       await db.collection("hrd_test_kesehatan").doc(id).update(updateData);
@@ -929,9 +1008,11 @@ async function simpanTestKesehatan(id) {
     updateData.tanggal = todayStr();
     updateData.status = kesimpulan.status ? "selesai" : "pending";
     updateData.createdAt = new Date().toISOString();
-    // Set userId for new records created by the current user
+    // Set userId, departemen, and roleLevel for new records
     if (typeof currentUser !== "undefined" && currentUser && currentUser.id) {
       updateData.userId = currentUser.id;
+      updateData.departemen = currentUser.departemen || "";
+      updateData.roleLevel = ROLES[currentUser.role] || 0;
     }
     await db.collection("hrd_test_kesehatan").add(updateData);
   }
@@ -960,6 +1041,39 @@ async function detailTestKesehatan(id) {
   const doc = await db.collection("hrd_test_kesehatan").doc(id).get();
   if (!doc.exists) return toast("Data tidak ditemukan", "warning");
   const data = doc.data();
+
+  // Enforce access control: prevent unauthorized viewing
+  if (typeof currentUser !== "undefined" && typeof hasAccess === "function") {
+    const myLevel = ROLES[currentUser.role] || 0;
+    const isOwnRecord =
+      data.userId === currentUser.id ||
+      data.userId === currentUser.linkedKaryawan ||
+      (data.nama || "").toLowerCase().trim() === (currentUser.nama || "").toLowerCase().trim();
+
+    if (!isOwnRecord) {
+      if (myLevel < 3) {
+        // staff/leader cannot view other people's records
+        return toast("Anda tidak memiliki akses untuk melihat data ini", "warning");
+      } else if (myLevel < 5) {
+        // manager/head: only own department + equal or lower level
+        if (data.departemen !== currentUser.departemen) {
+          return toast("Anda tidak memiliki akses untuk melihat data lintas divisi", "warning");
+        }
+        const recordLevel = data.roleLevel || 0;
+        if (recordLevel > myLevel) {
+          return toast("Anda tidak memiliki akses untuk melihat data level di atas Anda", "warning");
+        }
+      } else if (myLevel < 6) {
+        // bod: can see all except admin
+        const recordLevel = data.roleLevel || 0;
+        if (recordLevel >= 6) {
+          return toast("Anda tidak memiliki akses untuk melihat data ini", "warning");
+        }
+      }
+      // admin (level 6): no restriction
+    }
+  }
+
   const du = data.dataUmum || {};
   const rk = data.riwayatKesehatan || {};
   const pf = data.pemeriksaanFisik || {};
