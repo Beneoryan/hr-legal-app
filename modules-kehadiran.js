@@ -513,9 +513,96 @@ async function checkHoliday(dateStr) {
 }
 
 // ── PENALTY ───────────────────────────────────────────────────
-async function renderPenalty(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>⚠️ Penalty Point</span><button class="btn btn-primary btn-sm" onclick="modalPenalty()">+ Tambah</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Tanggal</th><th>Jenis</th><th>Poin</th><th>Aksi</th></tr></thead><tbody id="tblPenalty"></tbody></table></div></div>`;const snap=await db.collection('hrd_penalty').get();let h='';if(snap.empty)h='<tr><td colspan="5" class="text-center">Belum ada</td></tr>';else snap.forEach(d=>{const p=d.data();h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggal)}</td><td>${escHtml(p.jenis)}</td><td><span class="badge badge-danger">${p.poin}</span></td><td><button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_penalty','${d.id}','penalty')">🗑️</button></td></tr>`;});document.getElementById('tblPenalty').innerHTML=h;}
-function modalPenalty(){openModal(`<div class="modal-title">Tambah Penalty</div><div class="grid-2"><div class="form-group"><label>Karyawan</label><input class="form-control" id="penNama"></div><div class="form-group"><label>Tanggal</label><input class="form-control" type="date" id="penTgl" value="${todayStr()}"></div></div><div class="grid-2"><div class="form-group"><label>Jenis</label><select class="form-control" id="penJenis"><option>Terlambat</option><option>Mangkir</option><option>SP I</option><option>SP II</option><option>SP III</option></select></div><div class="form-group"><label>Poin</label><input class="form-control" type="number" id="penPoin" value="1"></div></div><button class="btn btn-primary" onclick="simpanPenalty()">Simpan</button>`);}
-async function simpanPenalty(){const data={nama:document.getElementById('penNama').value,tanggal:document.getElementById('penTgl').value,jenis:document.getElementById('penJenis').value,poin:parseInt(document.getElementById('penPoin').value)||1,createdAt:new Date().toISOString()};if(!data.nama)return toast('Nama wajib','warning');await db.collection('hrd_penalty').add(data);closeModalDirect();toast('Ditambahkan','success');renderPenalty();}
+async function renderPenalty(){
+  const main=document.getElementById('mainContent');
+  main.innerHTML=`<div class="page-title"><span>⚠️ Penalty Point</span><button class="btn btn-primary btn-sm" onclick="modalPenalty()">+ Tambah</button></div>
+    <div class="card mb-16"><div class="card-title mb-8">📊 Ringkasan Poin per Karyawan</div><div id="penaltySummary">Loading...</div></div>
+    <div class="card"><div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Tanggal</th><th>Jenis</th><th>Poin</th><th>Aksi</th></tr></thead><tbody id="tblPenalty"></tbody></table></div></div>`;
+  const [penSnap, karyawanSnap] = await Promise.all([
+    db.collection('hrd_penalty').get(),
+    db.collection('hrd_karyawan').where('status','==','aktif').get()
+  ]);
+  // Build summary grouped by employee name
+  const summary = {};
+  karyawanSnap.forEach(d => {
+    const k = d.data();
+    summary[k.nama] = { nama: k.nama, departemen: k.departemen || '-', poin: 0 };
+  });
+  penSnap.forEach(d => {
+    const p = d.data();
+    if (!summary[p.nama]) summary[p.nama] = { nama: p.nama, departemen: '-', poin: 0 };
+    summary[p.nama].poin += (parseInt(p.poin) || 0);
+  });
+  // Render summary - only employees with points > 0
+  const summaryItems = Object.values(summary).filter(s => s.poin > 0);
+  summaryItems.sort((a, b) => b.poin - a.poin);
+  let sumH = '';
+  if (!summaryItems.length) {
+    sumH = '<p class="text-sm" style="color:#999">Belum ada karyawan dengan penalty point</p>';
+  } else {
+    sumH = '<div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Departemen</th><th>Total Poin</th><th>Aksi</th></tr></thead><tbody>';
+    summaryItems.forEach(s => {
+      const badgeClass = s.poin >= 10 ? 'badge-danger' : s.poin >= 5 ? 'badge-warning' : 'badge-info';
+      sumH += `<tr><td class="fw-700">${escHtml(s.nama)}</td><td>${escHtml(s.departemen)}</td><td><span class="badge ${badgeClass}">${s.poin}</span></td><td><button class="btn btn-xs btn-primary" onclick="modalPenalty('${escHtml(s.nama)}')">+ Tambah</button></td></tr>`;
+    });
+    sumH += '</tbody></table></div>';
+  }
+  document.getElementById('penaltySummary').innerHTML = sumH;
+  // Render detail table
+  let h = '';
+  if (penSnap.empty) h = '<tr><td colspan="5" class="text-center">Belum ada</td></tr>';
+  else {
+    const items = [];
+    penSnap.forEach(d => items.push({ id: d.id, ...d.data() }));
+    items.sort((a, b) => (b.tanggal || '').localeCompare(a.tanggal || ''));
+    items.forEach(p => {
+      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggal)}</td><td>${escHtml(p.jenis)}</td><td><span class="badge badge-danger">${p.poin}</span></td><td><button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_penalty','${p.id}','penalty')">🗑️</button></td></tr>`;
+    });
+  }
+  document.getElementById('tblPenalty').innerHTML = h;
+}
+
+async function modalPenalty(prefillNama){
+  // Load active employees for dropdown
+  const kSnap = await db.collection('hrd_karyawan').where('status','==','aktif').get();
+  let opts = '<option value="">-- Pilih Karyawan --</option>';
+  kSnap.forEach(d => {
+    const k = d.data();
+    const sel = (prefillNama && k.nama === prefillNama) ? ' selected' : '';
+    opts += `<option value="${escHtml(k.nama)}"${sel}>${escHtml(k.nama)} — ${escHtml(k.departemen || '-')} (${escHtml(k.posisi || '-')})</option>`;
+  });
+  openModal(`<div class="modal-title">Tambah Penalty</div>
+    <div class="grid-2">
+      <div class="form-group"><label>Karyawan</label>
+        <select class="form-control" id="penNamaSelect" onchange="document.getElementById('penNama').value=this.value">${opts}</select>
+        <input class="form-control mt-4" id="penNama" placeholder="Atau ketik nama manual..." value="${escHtml(prefillNama || '')}">
+      </div>
+      <div class="form-group"><label>Tanggal</label><input class="form-control" type="date" id="penTgl" value="${todayStr()}"></div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group"><label>Jenis</label><select class="form-control" id="penJenis"><option>Terlambat</option><option>Mangkir</option><option>SP I</option><option>SP II</option><option>SP III</option></select></div>
+      <div class="form-group"><label>Poin</label><input class="form-control" type="number" id="penPoin" value="1"></div>
+    </div>
+    <button class="btn btn-primary" onclick="simpanPenalty()">Simpan</button>`);
+}
+
+async function simpanPenalty(){
+  const selectVal = document.getElementById('penNamaSelect').value;
+  const inputVal = document.getElementById('penNama').value;
+  const nama = selectVal || inputVal;
+  const data = {
+    nama: nama,
+    tanggal: document.getElementById('penTgl').value,
+    jenis: document.getElementById('penJenis').value,
+    poin: parseInt(document.getElementById('penPoin').value) || 1,
+    createdAt: new Date().toISOString()
+  };
+  if (!data.nama) return toast('Nama wajib', 'warning');
+  await db.collection('hrd_penalty').add(data);
+  closeModalDirect();
+  toast('Ditambahkan', 'success');
+  renderPenalty();
+}
 
 
 // ── DAILY TASK & REMINDER ─────────────────────────────────────
