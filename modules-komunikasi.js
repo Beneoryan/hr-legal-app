@@ -32,7 +32,7 @@ async function loadMeetingTab(tab) {
       items.forEach(m=>{
         const isActive=m.status==='active';
         const canManage=m.createdBy===currentUser.id||hasAccess(4);
-        html+=`<tr><td class="fw-700">${escHtml(m.judul||'Meeting Online')}</td><td>${escHtml(m.createdByName||'-')}</td><td>${formatDateTime(m.createdAt)}</td><td>${(m.pesertaNames||[]).length+1} orang</td><td><span class="badge badge-${isActive?'success':'default'}">${isActive?'🟢 Aktif':'Selesai'}</span></td><td><button class="btn btn-xs btn-info" onclick="viewOnlineMeeting('${m.id}')">👁️</button> <button class="btn btn-xs btn-success" onclick="joinOnlineMeeting('${m.roomId}')">🎥</button>${canManage?` <button class="btn btn-xs btn-primary" onclick="editOnlineMeeting('${m.id}')">✏️</button> <button class="btn btn-xs btn-warning" onclick="modalNotulensiOnline('${m.id}')">📝</button> <button class="btn btn-xs btn-danger" onclick="hapusOnlineMeeting('${m.id}')">🗑️</button>`:''}</td></tr>`;
+        html+=`<tr><td class="fw-700">${escHtml(m.judul||'Meeting Online')}</td><td>${escHtml(m.createdByName||'-')}</td><td>${formatDateTime(m.createdAt)}</td><td>${(m.pesertaNames||[]).length+1} orang</td><td><span class="badge badge-${isActive?'success':'default'}">${isActive?'🟢 Aktif':'Selesai'}</span></td><td><button class="btn btn-xs btn-info" onclick="viewOnlineMeeting('${m.id}')">👁️</button>${isActive?` <button class="btn btn-xs btn-success" onclick="joinOnlineMeeting('${m.roomId}')">🎥</button>`:''}${canManage&&isActive?` <button class="btn btn-xs btn-primary" onclick="editOnlineMeeting('${m.id}')">✏️</button> <button class="btn btn-xs btn-warning" onclick="modalNotulensiOnline('${m.id}')">📝</button> <button class="btn btn-xs btn-danger" onclick="hapusOnlineMeeting('${m.id}')">🗑️</button>`:''}</td></tr>`;
       });
       html+='</tbody></table></div>';
     }
@@ -51,16 +51,20 @@ async function loadMeetingTab(tab) {
   if (snap.empty) {
     html += '<div class="empty-state"><div class="icon">📅</div><p>Belum ada meeting</p></div>';
   } else {
-    html += '<div class="table-wrap"><table><thead><tr><th>Judul</th><th>Tanggal</th><th>Waktu</th><th>Pembuat</th><th>Peserta</th><th>Aksi</th></tr></thead><tbody>';
+    html += '<div class="table-wrap"><table><thead><tr><th>Judul</th><th>Tanggal</th><th>Waktu</th><th>Pembuat</th><th>Peserta</th><th>Status</th><th>Aksi</th></tr></thead><tbody>';
     snap.forEach(d => {
       const p = d.data();
+      const isSelesai = p.status === 'selesai' || p.status === 'dibatalkan';
+      const canManage = p.createdBy === currentUser.id || hasAccess(4);
+      const statusBadge = p.status === 'selesai' ? '<span class="badge badge-default">Selesai</span>' : p.status === 'dibatalkan' ? '<span class="badge badge-danger">Dibatalkan</span>' : p.status === 'berlangsung' ? '<span class="badge badge-success">Berlangsung</span>' : '<span class="badge badge-info">Terjadwal</span>';
       html += `<tr>
         <td class="fw-700">${escHtml(p.judul)}</td>
         <td>${formatDate(p.tanggal)}</td>
         <td>${p.waktu||'-'}</td>
         <td><span class="badge badge-primary">${escHtml(p.createdByName||'-')}</span></td>
         <td>${(p.pesertaIds||[]).length} orang</td>
-        <td><button class="btn btn-xs btn-info" onclick="detailMeeting('${d.id}')">👁️</button> <button class="btn btn-xs btn-warning" onclick="modalNotulensi('${d.id}')">📝</button>${p.onlineRoomId?` <button class="btn btn-xs btn-success" onclick="joinOnlineMeeting('${p.onlineRoomId}')">🎥</button>`:''} <button class="btn btn-xs btn-primary" onclick="editMeeting('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusMeeting('${d.id}')">🗑️</button></td>
+        <td>${statusBadge}</td>
+        <td><button class="btn btn-xs btn-info" onclick="detailMeeting('${d.id}')">👁️</button>${isSelesai?'':` <button class="btn btn-xs btn-warning" onclick="modalNotulensi('${d.id}')">📝</button>${p.onlineRoomId?` <button class="btn btn-xs btn-success" onclick="joinOnlineMeeting('${p.onlineRoomId}')">🎥</button>`:''}${canManage?` <button class="btn btn-xs btn-primary" onclick="editMeeting('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusMeeting('${d.id}')">🗑️</button>`:''}`}</td>
       </tr>`;
     });
     html += '</tbody></table></div>';
@@ -172,6 +176,7 @@ async function simpanMeeting() {
 function detailMeeting(id) {
   db.collection('hrd_meeting').doc(id).get().then(d => {
     const p = d.data();
+    const isSelesai = p.status === 'selesai' || p.status === 'dibatalkan';
     let rsvpHtml = '';
     (p.pesertaNames || []).forEach((name, i) => {
       const uid = (p.pesertaIds || [])[i];
@@ -187,10 +192,11 @@ function detailMeeting(id) {
         <div><b>Waktu:</b> ${p.waktu} (${p.durasi} menit)</div>
         <div><b>Lokasi:</b> ${escHtml(p.lokasi||'-')}</div>
         <div><b>Pembuat:</b> ${escHtml(p.createdByName)}</div>
+        <div><b>Status:</b> <span class="badge badge-${isSelesai?'default':'info'}">${escHtml(p.status||'terjadwal')}</span></div>
       </div>
       <div class="mb-16"><b>Agenda:</b><div class="text-sm mt-8">${escHtml(p.agenda||'-')}</div></div>
       <div class="mb-16"><b>RSVP Peserta:</b>${rsvpHtml||'<p class="text-sm" style="color:#999">Belum ada peserta</p>'}</div>
-      ${p.onlineRoomId?`<div class="mb-16"><button class="btn btn-success btn-sm" onclick="joinOnlineMeeting('${p.onlineRoomId}')">🎥 Join Video Call</button></div>`:''}
+      ${isSelesai?'<div class="mb-16"><span class="badge badge-default">Meeting telah selesai</span></div>':p.onlineRoomId?`<div class="mb-16"><button class="btn btn-success btn-sm" onclick="joinOnlineMeeting('${p.onlineRoomId}')">🎥 Join Video Call</button></div>`:''}
       ${p.notulensi?`<div><b>Notulensi:</b><div class="text-sm mt-8" style="white-space:pre-wrap">${escHtml(p.notulensi)}</div></div>`:''}`, true);
   });
 }
@@ -224,6 +230,15 @@ async function simpanEditMeeting(id){
   };
   if(!data.judul)return toast('Judul wajib','warning');
   await db.collection('hrd_meeting').doc(id).update(data);
+  // If status changed to selesai, mark related invites
+  if (data.status === 'selesai') {
+    try {
+      const invSnap = await db.collection('hrd_meeting_invites').where('meetingId','==',id).get();
+      const batch = db.batch();
+      invSnap.forEach(d => batch.update(d.ref, { meetingClosed: true }));
+      if (!invSnap.empty) await batch.commit();
+    } catch(e) { /* non-critical */ }
+  }
   closeModalDirect();toast('Meeting diupdate','success');renderMeeting();
 }
 
@@ -243,6 +258,13 @@ function modalNotulensi(id) {
 }
 async function simpanNotulensi(id) {
   await db.collection('hrd_meeting').doc(id).update({notulensi:document.getElementById('notulIsi').value,status:'selesai'});
+  // Mark related invites as meetingClosed
+  try {
+    const invSnap = await db.collection('hrd_meeting_invites').where('meetingId','==',id).get();
+    const batch = db.batch();
+    invSnap.forEach(d => batch.update(d.ref, { meetingClosed: true }));
+    if (!invSnap.empty) await batch.commit();
+  } catch(e) { /* non-critical */ }
   closeModalDirect(); toast('Notulensi disimpan','success'); renderMeeting();
 }
 
@@ -314,7 +336,18 @@ async function createAndJoinMeeting(mode){
   joinOnlineMeeting(roomId,mode);
 }
 
-function joinOnlineMeeting(roomId,mode){
+async function joinOnlineMeeting(roomId,mode){
+  // Check if the online meeting has ended
+  try {
+    const meetSnap = await db.collection('hrd_online_meeting').where('roomId','==',roomId).limit(1).get();
+    if (!meetSnap.empty) {
+      const meetData = meetSnap.docs[0].data();
+      if (meetData.status === 'ended') {
+        toast('Meeting ini sudah berakhir','warning');
+        return;
+      }
+    }
+  } catch(e) { /* proceed if check fails */ }
   const jitsiDomain='meet.jit.si';
   const displayName=encodeURIComponent(currentUser.nama);
   let url=`https://${jitsiDomain}/${roomId}#userInfo.displayName=%22${displayName}%22`;
@@ -357,7 +390,18 @@ function shareMeetingWA(roomId,judul){
 
 async function endOnlineMeeting(id){
   if(!confirm('Akhiri meeting online ini?'))return;
+  const meetDoc = await db.collection('hrd_online_meeting').doc(id).get();
+  const meetData = meetDoc.data();
   await db.collection('hrd_online_meeting').doc(id).update({status:'ended',endedAt:new Date().toISOString()});
+  // Propagate meetingClosed to related invite records
+  if (meetData && meetData.roomId) {
+    try {
+      const invSnap = await db.collection('hrd_meeting_invites').where('meetingId','==',meetData.roomId).get();
+      const batch = db.batch();
+      invSnap.forEach(d => batch.update(d.ref, { meetingClosed: true }));
+      if (!invSnap.empty) await batch.commit();
+    } catch(e) { /* non-critical */ }
+  }
   toast('Meeting diakhiri','success');
   loadMeetingTab('online');
 }

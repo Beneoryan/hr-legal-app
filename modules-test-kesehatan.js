@@ -70,6 +70,25 @@ async function showTestKesehatanTab(tab) {
     filtered = docs.filter((d) => d.tipe === "existing");
   } else {
     filtered = docs.filter((d) => d.status === "selesai");
+    // Filter riwayat by user access level
+    if (typeof currentUser !== "undefined" && typeof hasAccess === "function") {
+      if (!hasAccess(3)) {
+        // staff/leader: only see their own records
+        filtered = filtered.filter((d) =>
+          d.userId === currentUser.id ||
+          d.userId === currentUser.linkedKaryawan ||
+          (d.nama || "").toLowerCase().trim() === (currentUser.nama || "").toLowerCase().trim()
+        );
+      } else if (!hasAccess(6)) {
+        // manager/head: see records from their department or their own
+        filtered = filtered.filter((d) =>
+          d.departemen === currentUser.departemen ||
+          d.userId === currentUser.id ||
+          (d.nama || "").toLowerCase().trim() === (currentUser.nama || "").toLowerCase().trim()
+        );
+      }
+      // admin (level 6): sees all - no filter needed
+    }
   }
 
   if (searchLower) {
@@ -789,6 +808,31 @@ async function simpanTestKesehatan(id) {
       .querySelectorAll(".tkDisease:checked")
       .forEach((c) => penyakitArr.push(c.value));
 
+  // Mandatory field validation
+  const missingFields = [];
+  if (!(document.getElementById("tkfNama").value || "").trim()) missingFields.push("Nama");
+  if (!(document.getElementById("tkfUsia").value || "").trim()) missingFields.push("Usia");
+  if (!(document.getElementById("tkfGender").value || "").trim()) missingFields.push("Jenis Kelamin");
+  if (!(document.getElementById("tkfGolDarah").value || "").trim()) missingFields.push("Golongan Darah");
+  if (!(document.getElementById("tkfTinggi").value || "").trim()) missingFields.push("Tinggi Badan");
+  if (!(document.getElementById("tkfBerat").value || "").trim()) missingFields.push("Berat Badan");
+  const hasSystole = (document.getElementById("tkfSystole").value || "").trim();
+  const hasDiastole = (document.getElementById("tkfDiastole").value || "").trim();
+  const hasNadi = (document.getElementById("tkfNadi").value || "").trim();
+  const hasSuhu = (document.getElementById("tkfSuhu").value || "").trim();
+  if (!hasSystole && !hasDiastole && !hasNadi && !hasSuhu) missingFields.push("Pemeriksaan Fisik (minimal salah satu: Systole/Diastole/Nadi/Suhu)");
+  if (!(document.getElementById("tkfMental").value || "").trim()) missingFields.push("Gangguan Mental");
+  if (!(document.getElementById("tkfStres").value || "").trim()) missingFields.push("Tingkat Stres");
+  if (!(document.getElementById("tkfTidur").value || "").trim()) missingFields.push("Kualitas Tidur");
+  if (!(document.getElementById("tkfMerokok").value || "").trim()) missingFields.push("Merokok");
+  if (!(document.getElementById("tkfAlkohol").value || "").trim()) missingFields.push("Alkohol");
+  if (!(document.getElementById("tkfOlahraga").value || "").trim()) missingFields.push("Olahraga");
+
+  if (missingFields.length > 0) {
+    toast("Field wajib belum diisi: " + missingFields.join(", "), "warning");
+    return;
+  }
+
   const dataUmum = {
     nama: document.getElementById("tkfNama").value,
     usia: document.getElementById("tkfUsia").value,
@@ -855,6 +899,17 @@ async function simpanTestKesehatan(id) {
   }
 
   if (id && id.trim()) {
+    // Ensure userId is set for existing employee tests so portal queries work
+    if (typeof currentUser !== "undefined" && currentUser && currentUser.id) {
+      const existingDoc = await db.collection("hrd_test_kesehatan").doc(id).get();
+      const existingData = existingDoc.exists ? existingDoc.data() : {};
+      if (existingData.tipe === "existing" && !existingData.userId) {
+        updateData.userId = currentUser.id;
+      } else if (existingData.tipe === "existing" && existingData.userId === currentUser.linkedKaryawan && currentUser.linkedKaryawan !== currentUser.id) {
+        // If userId was set to linkedKaryawan (karyawan doc id), also store user login id
+        updateData.userId = currentUser.id;
+      }
+    }
     try {
       await db.collection("hrd_test_kesehatan").doc(id).update(updateData);
     } catch (updateErr) {
@@ -874,6 +929,10 @@ async function simpanTestKesehatan(id) {
     updateData.tanggal = todayStr();
     updateData.status = kesimpulan.status ? "selesai" : "pending";
     updateData.createdAt = new Date().toISOString();
+    // Set userId for new records created by the current user
+    if (typeof currentUser !== "undefined" && currentUser && currentUser.id) {
+      updateData.userId = currentUser.id;
+    }
     await db.collection("hrd_test_kesehatan").add(updateData);
   }
 

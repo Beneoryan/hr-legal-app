@@ -232,20 +232,33 @@ async function renderPortalMeeting(){
   main.innerHTML=`<div class="page-title"><span>📅 Meeting</span><div class="flex gap-8"><button class="btn btn-success btn-sm" onclick="startInstantMeeting()">🎥 Meeting Online</button><button class="btn btn-primary btn-sm" onclick="modalMeetingCreate()">+ Buat Meeting</button></div></div>
     <div class="card mb-16"><div class="card-title mb-8">🎥 Meeting Online Aktif</div><div id="portalOnlineMeetings">Loading...</div></div>
     <div class="card" id="portalMtList">Loading...</div>`;
-  // Load online meetings
+  // Load online meetings - only show active ones where user is invited or is creator
   const onlineSnap=await db.collection('hrd_online_meeting').where('status','==','active').get();
   let onlineH='';
-  if(onlineSnap.empty)onlineH='<p class="text-sm" style="color:#999">Tidak ada meeting online aktif saat ini</p>';
-  else onlineSnap.forEach(d=>{const m=d.data();onlineH+=`<div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between"><div><div class="fw-700 text-sm">${escHtml(m.judul||'Meeting Online')}</div><div class="text-xs" style="color:#999">${escHtml(m.createdByName||'')} — ${formatDateTime(m.createdAt)}</div></div><button class="btn btn-xs btn-success" onclick="joinOnlineMeeting('${m.roomId}')">🎥 Join</button></div>`;});
+  const myOnlineMeetings=[];
+  onlineSnap.forEach(d=>{
+    const m=d.data();
+    if(m.createdBy===currentUser.id||(m.pesertaIds||[]).includes(currentUser.id)){
+      myOnlineMeetings.push({id:d.id,...m});
+    }
+  });
+  if(!myOnlineMeetings.length)onlineH='<p class="text-sm" style="color:#999">Tidak ada meeting online aktif saat ini</p>';
+  else myOnlineMeetings.forEach(m=>{onlineH+=`<div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between"><div><div class="fw-700 text-sm">${escHtml(m.judul||'Meeting Online')}</div><div class="text-xs" style="color:#999">${escHtml(m.createdByName||'')} — ${formatDateTime(m.createdAt)}</div></div><button class="btn btn-xs btn-success" onclick="joinOnlineMeeting('${m.roomId}')">🎥 Join</button></div>`;});
   document.getElementById('portalOnlineMeetings').innerHTML=onlineH;
-  // Load regular meetings
+  // Load regular meetings - only show meetings where user is participant or creator
   const snap=await db.collection('hrd_meeting').get();
-  const items=[];snap.forEach(d=>items.push({id:d.id,...d.data()}));
+  const items=[];
+  snap.forEach(d=>{
+    const m=d.data();
+    if(m.createdBy===currentUser.id||(m.pesertaIds||[]).includes(currentUser.id)){
+      items.push({id:d.id,...m});
+    }
+  });
   items.sort((a,b)=>(b.tanggal||'').localeCompare(a.tanggal||''));
-  // Group: Upcoming vs Selesai
+  // Group: Active (upcoming/berlangsung) vs Selesai (closed or past date)
   const today=todayStr();
-  const upcoming=items.filter(p=>p.tanggal>=today);
-  const past=items.filter(p=>p.tanggal<today);
+  const upcoming=items.filter(p=>p.status!=='selesai'&&p.status!=='dibatalkan'&&p.tanggal>=today);
+  const past=items.filter(p=>p.status==='selesai'||p.status==='dibatalkan'||p.tanggal<today);
   let h='';
   // Upcoming
   h+=`<div class="portal-accordion mb-8">
@@ -254,16 +267,16 @@ async function renderPortalMeeting(){
     </div>
     <div style="display:none;padding:8px 16px;border:1px solid #e8f5e9;border-top:none;border-radius:0 0 8px 8px">`;
   if(!upcoming.length) h+='<p class="text-sm" style="color:#999">Tidak ada meeting mendatang</p>';
-  else upcoming.forEach(p=>{h+=`<div style="padding:10px 0;border-bottom:1px solid var(--border)"><div class="fw-700 text-sm">${escHtml(p.judul||p.agenda||'Meeting')}</div><div class="text-xs" style="color:#999">📅 ${formatDate(p.tanggal)} ${p.jam||''} — 📍 ${escHtml(p.lokasi||'-')}</div>${p.agenda?`<div class="text-xs mt-4" style="color:#555">${escHtml(p.agenda)}</div>`:''}</div>`;});
+  else upcoming.forEach(p=>{h+=`<div style="padding:10px 0;border-bottom:1px solid var(--border)"><div class="fw-700 text-sm">${escHtml(p.judul||p.agenda||'Meeting')}</div><div class="text-xs" style="color:#999">📅 ${formatDate(p.tanggal)} ${p.waktu||''} — 📍 ${escHtml(p.lokasi||'-')}</div>${p.agenda?`<div class="text-xs mt-4" style="color:#555">${escHtml(p.agenda)}</div>`:''}${p.onlineRoomId?`<button class="btn btn-xs btn-success mt-4" onclick="joinOnlineMeeting('${p.onlineRoomId}')">🎥 Join</button>`:''}</div>`;});
   h+=`</div></div>`;
-  // Past
+  // Selesai (history only - no join link)
   h+=`<div class="portal-accordion mb-8">
     <div onclick="toggleAccordion(this)" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#eceff1;border-radius:8px;cursor:pointer;font-weight:700;font-size:.9rem">
       <span>⚪ Selesai</span><span class="badge" style="background:#9e9e9e;color:#fff;font-size:.7rem">${past.length}</span>
     </div>
     <div style="display:none;padding:8px 16px;border:1px solid #eceff1;border-top:none;border-radius:0 0 8px 8px">`;
   if(!past.length) h+='<p class="text-sm" style="color:#999">Belum ada meeting selesai</p>';
-  else past.slice(0,20).forEach(p=>{h+=`<div style="padding:10px 0;border-bottom:1px solid var(--border)"><div class="fw-700 text-sm" style="color:#999">${escHtml(p.judul||p.agenda||'Meeting')}</div><div class="text-xs" style="color:#bbb">📅 ${formatDate(p.tanggal)} ${p.jam||''} — 📍 ${escHtml(p.lokasi||'-')}</div></div>`;});
+  else past.slice(0,20).forEach(p=>{h+=`<div style="padding:10px 0;border-bottom:1px solid var(--border)"><div class="fw-700 text-sm" style="color:#999">${escHtml(p.judul||p.agenda||'Meeting')}</div><div class="text-xs" style="color:#bbb">📅 ${formatDate(p.tanggal)} ${p.waktu||''} — 📍 ${escHtml(p.lokasi||'-')}</div></div>`;});
   h+=`</div></div>`;
   document.getElementById('portalMtList').innerHTML=h;
 }
