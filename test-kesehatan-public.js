@@ -864,6 +864,31 @@ async function submitTestKesehatan(docId) {
     penyakitArr.push(c.value);
   });
 
+  // Mandatory field validation
+  var missingFields = [];
+  if (!(document.getElementById("tkfNama").value || "").trim()) missingFields.push("Nama");
+  if (!(document.getElementById("tkfUsia").value || "").trim()) missingFields.push("Usia");
+  if (!(document.getElementById("tkfGender").value || "").trim()) missingFields.push("Jenis Kelamin");
+  if (!(document.getElementById("tkfGolDarah").value || "").trim()) missingFields.push("Golongan Darah");
+  if (!(document.getElementById("tkfTinggi").value || "").trim()) missingFields.push("Tinggi Badan");
+  if (!(document.getElementById("tkfBerat").value || "").trim()) missingFields.push("Berat Badan");
+  var hasSystole = (document.getElementById("tkfSystole").value || "").trim();
+  var hasDiastole = (document.getElementById("tkfDiastole").value || "").trim();
+  var hasNadi = (document.getElementById("tkfNadi").value || "").trim();
+  var hasSuhu = (document.getElementById("tkfSuhu").value || "").trim();
+  if (!hasSystole && !hasDiastole && !hasNadi && !hasSuhu) missingFields.push("Pemeriksaan Fisik (minimal salah satu: Systole/Diastole/Nadi/Suhu)");
+  if (!(document.getElementById("tkfMental").value || "").trim()) missingFields.push("Gangguan Mental");
+  if (!(document.getElementById("tkfStres").value || "").trim()) missingFields.push("Tingkat Stres");
+  if (!(document.getElementById("tkfTidur").value || "").trim()) missingFields.push("Kualitas Tidur");
+  if (!(document.getElementById("tkfMerokok").value || "").trim()) missingFields.push("Merokok");
+  if (!(document.getElementById("tkfAlkohol").value || "").trim()) missingFields.push("Alkohol");
+  if (!(document.getElementById("tkfOlahraga").value || "").trim()) missingFields.push("Olahraga");
+
+  if (missingFields.length > 0) {
+    toast("Field wajib belum diisi: " + missingFields.join(", "), "warning");
+    return;
+  }
+
   var dataUmum = {
     nama: document.getElementById("tkfNama").value,
     usia: document.getElementById("tkfUsia").value,
