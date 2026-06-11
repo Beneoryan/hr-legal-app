@@ -61,7 +61,7 @@ async function showTestKesehatanTab(tab) {
   const searchLower = search.toLowerCase();
   const snap = await db.collection("hrd_test_kesehatan").get();
   const docs = [];
-  snap.forEach((d) => docs.push({ id: d.id, ...d.data() }));
+  snap.forEach((d) => docs.push({ ...d.data(), id: d.id }));
 
   let filtered = [];
   if (tab === "calon") {
@@ -1200,19 +1200,19 @@ async function loadPortalTestKesehatan() {
   const snap = await db.collection("hrd_test_kesehatan").where("userId", "==", u.id).get();
   const myTests = [];
   snap.forEach((d) => {
-    myTests.push({ id: d.id, ...d.data() });
+    myTests.push({ ...d.data(), id: d.id });
   });
   // Also check by nama if linkedKaryawan might have different userId
   if (u.linkedKaryawan && u.linkedKaryawan !== u.id) {
     const snap2 = await db.collection("hrd_test_kesehatan").where("userId", "==", u.linkedKaryawan).get();
     snap2.forEach((d) => {
-      if (!myTests.find(t => t.id === d.id)) myTests.push({ id: d.id, ...d.data() });
+      if (!myTests.find(t => t.id === d.id)) myTests.push({ ...d.data(), id: d.id });
     });
   }
   // Fallback: also query by nama field for records that may not have userId set
   const namaSnap = await db.collection("hrd_test_kesehatan").where("nama", "==", u.nama).get();
   namaSnap.forEach((d) => {
-    if (!myTests.find(t => t.id === d.id)) myTests.push({ id: d.id, ...d.data() });
+    if (!myTests.find(t => t.id === d.id)) myTests.push({ ...d.data(), id: d.id });
   });
 
   const pending = myTests.filter((t) => t.status === "pending");
