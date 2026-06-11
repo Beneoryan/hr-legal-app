@@ -59,9 +59,25 @@ async function showTestKesehatanTab(tab) {
   const search =
     (document.getElementById("searchTestKesehatan") || {}).value || "";
   const searchLower = search.toLowerCase();
-  const snap = await db.collection("hrd_test_kesehatan").get();
+  const [snap, karySnap] = await Promise.all([
+    db.collection("hrd_test_kesehatan").get(),
+    db.collection("hrd_karyawan").get()
+  ]);
+  // Build karyawan map for name resolution
+  const karyMapById = {};
+  karySnap.forEach((d) => { karyMapById[d.id] = d.data().nama || ""; });
   const docs = [];
-  snap.forEach((d) => docs.push({ ...d.data(), id: d.id }));
+  snap.forEach((d) => {
+    const data = { ...d.data(), id: d.id };
+    // Resolve nama from karyawanId/userId if nama is empty
+    if ((!data.nama || data.nama === "-") && data.karyawanId && karyMapById[data.karyawanId]) {
+      data.nama = karyMapById[data.karyawanId];
+    }
+    if ((!data.nama || data.nama === "-") && data.userId && karyMapById[data.userId]) {
+      data.nama = karyMapById[data.userId];
+    }
+    docs.push(data);
+  });
 
   let filtered = [];
   if (tab === "calon") {
@@ -83,10 +99,7 @@ async function showTestKesehatanTab(tab) {
       } else if (!hasAccess(5)) {
         // manager/head (level 3-4): see records from own department only,
         // AND only for users whose level is equal to or lower than theirs.
-        // This prevents managers from seeing bod/head/admin health data,
-        // and prevents cross-division data leaks.
         filtered = filtered.filter((d) => {
-          // Always allow seeing own records
           if (
             d.userId === currentUser.id ||
             d.userId === currentUser.linkedKaryawan ||
@@ -94,11 +107,7 @@ async function showTestKesehatanTab(tab) {
           ) {
             return true;
           }
-          // Must be same department
           if (d.departemen !== currentUser.departemen) return false;
-          // Must be equal or lower level (if roleLevel is stored)
-          // If roleLevel is not stored (legacy data), default to hiding it
-          // to avoid accidental exposure of higher-level data
           const recordLevel = d.roleLevel || 0;
           if (recordLevel === 0) return false;
           return recordLevel <= myLevel;
@@ -151,9 +160,9 @@ async function showTestKesehatanTab(tab) {
         <td>${kesimpulanStatus}</td>
         <td>
           <button class="btn btn-xs btn-info" onclick="detailTestKesehatan('${p.id}')">&#x1F441;&#xFE0F;</button>
-          ${tab !== 'riwayat' ? `<button class="btn btn-xs btn-primary" onclick="modalFormTestKesehatan('${p.id}')">&#x1F4DD;</button>
+          <button class="btn btn-xs btn-primary" onclick="modalFormTestKesehatan('${p.id}')">&#x1F4DD;</button>
           ${p.tipe === "calon" && p.status !== "selesai" ? `<button class="btn btn-xs btn-success" onclick="(function(){var url=window.location.origin+'/test-kesehatan?id=${p.id}';if(navigator.clipboard){navigator.clipboard.writeText(url).then(function(){toast('Link disalin ke clipboard','success')}).catch(function(){prompt('Salin link berikut:',url)})}else{prompt('Salin link berikut:',url)}})()">&#x1F4CB; Copy Link</button>` : ""}
-          <button class="btn btn-xs btn-danger" onclick="hapusTestKesehatan('${p.id}')">&#x1F5D1;&#xFE0F;</button>` : ''}
+          <button class="btn btn-xs btn-danger" onclick="hapusTestKesehatan('${p.id}')">&#x1F5D1;&#xFE0F;</button>
         </td>
       </tr>`;
     });
@@ -300,6 +309,14 @@ async function modalFormTestKesehatan(id) {
   if (id) {
     const doc = await db.collection("hrd_test_kesehatan").doc(id).get();
     if (doc.exists) data = doc.data();
+  }
+  // Resolve nama from karyawanId/userId if empty
+  if ((!data.nama || data.nama === "-") && (data.karyawanId || data.userId)) {
+    try {
+      const kId = data.karyawanId || data.userId;
+      const kDoc = await db.collection("hrd_karyawan").doc(kId).get();
+      if (kDoc.exists) data.nama = kDoc.data().nama || "";
+    } catch (e) {}
   }
   const du = data.dataUmum || {};
 
@@ -1041,6 +1058,15 @@ async function detailTestKesehatan(id) {
   const doc = await db.collection("hrd_test_kesehatan").doc(id).get();
   if (!doc.exists) return toast("Data tidak ditemukan", "warning");
   const data = doc.data();
+
+  // Resolve nama from karyawanId/userId if empty
+  if ((!data.nama || data.nama === "-") && (data.karyawanId || data.userId)) {
+    try {
+      const kId = data.karyawanId || data.userId;
+      const kDoc = await db.collection("hrd_karyawan").doc(kId).get();
+      if (kDoc.exists) data.nama = kDoc.data().nama || "";
+    } catch (e) {}
+  }
 
   // Enforce access control: prevent unauthorized viewing
   if (typeof currentUser !== "undefined" && typeof hasAccess === "function") {
