@@ -635,19 +635,23 @@ async function updatePenalty(id) {
 }
 
 async function syncPenaltyToKPI() {
-  if (!confirm('Sinkronisasi penalty point ke data KPI?\n\nIni akan menghitung ulang skor akhir KPI berdasarkan total penalty masing-masing karyawan.')) return;
-  const [kpiSnap, penSnap] = await Promise.all([
+  if (!confirm('Sinkronisasi penalty point ke data KPI?\n\nIni akan menghitung ulang skor akhir KPI berdasarkan total penalty masing-masing karyawan.\nJika karyawan belum punya KPI, akan dibuatkan record KPI default.')) return;
+  const [kpiSnap, penSnap, karySnap] = await Promise.all([
     db.collection('hrd_kpi').get(),
-    db.collection('hrd_penalty').get()
+    db.collection('hrd_penalty').get(),
+    db.collection('hrd_karyawan').where('status','==','aktif').get()
   ]);
   // Calculate total penalty per nama
   const penaltyMap = {};
   penSnap.forEach(d => { const p = d.data(); const n = (p.nama || '').toLowerCase().trim(); penaltyMap[n] = (penaltyMap[n] || 0) + (parseInt(p.poin) || 0); });
-  // Update each KPI record with penalty deduction
+  // Track which names already have KPI records
+  const kpiNames = new Set();
   let count = 0;
+  // Update existing KPI records
   for (const doc of kpiSnap.docs) {
     const r = doc.data();
     const n = (r.nama || '').toLowerCase().trim();
+    kpiNames.add(n);
     const totalPenalty = penaltyMap[n] || 0;
     const skorMurni = r.skorMurni != null ? r.skorMurni : r.skor;
     const skorAkhir = Math.max(0, skorMurni - (totalPenalty * 2));
@@ -662,7 +666,34 @@ async function syncPenaltyToKPI() {
       count++;
     }
   }
-  toast(`Sinkronisasi selesai: ${count} data KPI diperbarui`, 'success');
+  // Create KPI records for employees that have penalty but NO KPI record yet
+  for (const [namaLower, totalPenalty] of Object.entries(penaltyMap)) {
+    if (totalPenalty > 0 && !kpiNames.has(namaLower)) {
+      // Find original nama from karyawan
+      let originalNama = namaLower;
+      karySnap.forEach(d => { const k = d.data(); if ((k.nama || '').toLowerCase().trim() === namaLower) originalNama = k.nama; });
+      const skorMurni = 80; // Default skor murni
+      const skorAkhir = Math.max(0, skorMurni - (totalPenalty * 2));
+      await db.collection('hrd_kpi').add({
+        nama: originalNama,
+        periode: new Date().toISOString().slice(0, 7),
+        produktivitas: 80,
+        kualitas: 80,
+        kedisiplinan: 80,
+        kerjasama: 80,
+        skorMurni: skorMurni,
+        skor: skorAkhir,
+        penaltyPoin: totalPenalty,
+        penaltyDeduction: totalPenalty * 2,
+        penilai: 'Auto-Sync Penalty',
+        catatan: `Auto-generated dari sinkronisasi penalty (${totalPenalty} poin)`,
+        createdAt: new Date().toISOString(),
+        syncedAt: new Date().toISOString()
+      });
+      count++;
+    }
+  }
+  toast(`Sinkronisasi selesai: ${count} data KPI diperbarui/dibuat`, 'success');
 }
 
 async function modalPenalty(prefillNama){
