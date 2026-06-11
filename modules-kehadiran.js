@@ -515,9 +515,9 @@ async function checkHoliday(dateStr) {
 // ── PENALTY ───────────────────────────────────────────────────
 async function renderPenalty(){
   const main=document.getElementById('mainContent');
-  main.innerHTML=`<div class="page-title"><span>⚠️ Penalty Point</span><button class="btn btn-primary btn-sm" onclick="modalPenalty()">+ Tambah</button></div>
+  main.innerHTML=`<div class="page-title"><span>⚠️ Penalty Point</span><div class="flex gap-8"><button class="btn btn-info btn-sm" onclick="syncPenaltyToKPI()">🔄 Sinkronisasi ke KPI</button><button class="btn btn-primary btn-sm" onclick="modalPenalty()">+ Tambah</button></div></div>
     <div class="card mb-16"><div class="card-title mb-8">📊 Ringkasan Poin per Karyawan</div><div id="penaltySummary">Loading...</div></div>
-    <div class="card"><div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Tanggal</th><th>Jenis</th><th>Poin</th><th>Aksi</th></tr></thead><tbody id="tblPenalty"></tbody></table></div></div>`;
+    <div class="card"><div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Tanggal</th><th>Jenis</th><th>Poin</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="tblPenalty"></tbody></table></div></div>`;
   const [penSnap, karyawanSnap] = await Promise.all([
     db.collection('hrd_penalty').get(),
     db.collection('hrd_karyawan').where('status','==','aktif').get()
@@ -540,27 +540,129 @@ async function renderPenalty(){
   if (!summaryItems.length) {
     sumH = '<p class="text-sm" style="color:#999">Belum ada karyawan dengan penalty point</p>';
   } else {
-    sumH = '<div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Departemen</th><th>Total Poin</th><th>Aksi</th></tr></thead><tbody>';
+    sumH = '<div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Departemen</th><th>Total Poin</th><th>Status</th><th>Aksi</th></tr></thead><tbody>';
     summaryItems.forEach(s => {
       const badgeClass = s.poin >= 10 ? 'badge-danger' : s.poin >= 5 ? 'badge-warning' : 'badge-info';
+      const statusLabel = s.poin >= 10 ? '<span class="badge badge-danger">SP III</span>' : s.poin >= 7 ? '<span class="badge badge-danger">SP II</span>' : s.poin >= 4 ? '<span class="badge badge-warning">SP I</span>' : '<span class="badge badge-info">Peringatan</span>';
       const jsName = escHtml(s.nama).replace(/'/g, "\\'");
-      sumH += `<tr><td class="fw-700">${escHtml(s.nama)}</td><td>${escHtml(s.departemen)}</td><td><span class="badge ${badgeClass}">${s.poin}</span></td><td><button class="btn btn-xs btn-primary" onclick="modalPenalty('${jsName}')">+ Tambah</button></td></tr>`;
+      sumH += `<tr><td class="fw-700">${escHtml(s.nama)}</td><td>${escHtml(s.departemen)}</td><td><span class="badge ${badgeClass}">${s.poin}</span></td><td>${statusLabel}</td><td><button class="btn btn-xs btn-info" onclick="viewPenaltyDetail('${jsName}')">👁️</button> <button class="btn btn-xs btn-primary" onclick="modalPenalty('${jsName}')">+ Tambah</button></td></tr>`;
     });
     sumH += '</tbody></table></div>';
   }
   document.getElementById('penaltySummary').innerHTML = sumH;
   // Render detail table
   let h = '';
-  if (penSnap.empty) h = '<tr><td colspan="5" class="text-center">Belum ada</td></tr>';
+  if (penSnap.empty) h = '<tr><td colspan="6" class="text-center">Belum ada</td></tr>';
   else {
     const items = [];
     penSnap.forEach(d => items.push({ id: d.id, ...d.data() }));
     items.sort((a, b) => (b.tanggal || '').localeCompare(a.tanggal || ''));
     items.forEach(p => {
-      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggal)}</td><td>${escHtml(p.jenis)}</td><td><span class="badge badge-danger">${p.poin}</span></td><td><button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_penalty','${p.id}','penalty')">🗑️</button></td></tr>`;
+      const statusBadge = p.jenis === 'SP III' ? '<span class="badge badge-danger">Berat</span>' : p.jenis === 'SP II' ? '<span class="badge badge-warning">Sedang</span>' : p.jenis === 'SP I' ? '<span class="badge badge-warning">Ringan</span>' : p.jenis === 'Mangkir' ? '<span class="badge badge-danger">Mangkir</span>' : '<span class="badge badge-info">Ringan</span>';
+      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggal)}</td><td>${escHtml(p.jenis)}</td><td><span class="badge badge-danger">${p.poin}</span></td><td>${statusBadge}</td><td><button class="btn btn-xs btn-info" onclick="viewPenaltyItem('${p.id}')">👁️</button> <button class="btn btn-xs btn-primary" onclick="editPenalty('${p.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_penalty','${p.id}','penalty')">🗑️</button></td></tr>`;
     });
   }
   document.getElementById('tblPenalty').innerHTML = h;
+}
+
+function viewPenaltyDetail(nama) {
+  db.collection('hrd_penalty').get().then(snap => {
+    const items = [];
+    snap.forEach(d => { const p = d.data(); if (p.nama === nama) items.push({ id: d.id, ...p }); });
+    items.sort((a, b) => (b.tanggal || '').localeCompare(a.tanggal || ''));
+    const totalPoin = items.reduce((sum, p) => sum + (parseInt(p.poin) || 0), 0);
+    const statusLabel = totalPoin >= 10 ? '🔴 SP III - Pelanggaran Berat' : totalPoin >= 7 ? '🟠 SP II - Pelanggaran Sedang' : totalPoin >= 4 ? '🟡 SP I - Pelanggaran Ringan' : '⚪ Peringatan';
+    let h = `<div class="modal-title">👁️ Detail Penalty - ${escHtml(nama)}</div>
+      <div style="background:#f8f9ff;padding:16px;border-radius:8px;margin-bottom:16px;border-left:4px solid var(--accent)">
+        <div class="fw-700" style="font-size:1.05rem">${escHtml(nama)}</div>
+        <div class="text-sm mt-8">Total Poin: <span class="badge badge-danger">${totalPoin}</span></div>
+        <div class="text-sm mt-4">Status: <b>${statusLabel}</b></div>
+      </div>
+      <div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Jenis</th><th>Poin</th></tr></thead><tbody>`;
+    items.forEach(p => { h += `<tr><td>${formatDate(p.tanggal)}</td><td>${escHtml(p.jenis)}</td><td><span class="badge badge-danger">${p.poin}</span></td></tr>`; });
+    h += '</tbody></table></div>';
+    openModal(h, true);
+  });
+}
+
+async function viewPenaltyItem(id) {
+  const doc = await db.collection('hrd_penalty').doc(id).get();
+  if (!doc.exists) return toast('Data tidak ditemukan', 'warning');
+  const p = doc.data();
+  const statusBadge = p.jenis === 'SP III' ? '🔴 Berat' : p.jenis === 'SP II' ? '🟠 Sedang' : p.jenis === 'SP I' ? '🟡 Ringan' : p.jenis === 'Mangkir' ? '🔴 Mangkir' : '⚪ Ringan';
+  openModal(`<div class="modal-title">👁️ Detail Penalty</div>
+    <div style="background:#f8f9ff;padding:16px;border-radius:8px;border-left:4px solid var(--danger)">
+      <div class="text-sm" style="line-height:2">
+        <div><b>Karyawan:</b> ${escHtml(p.nama)}</div>
+        <div><b>Tanggal:</b> ${formatDate(p.tanggal)}</div>
+        <div><b>Jenis:</b> ${escHtml(p.jenis)}</div>
+        <div><b>Poin:</b> <span class="badge badge-danger">${p.poin}</span></div>
+        <div><b>Status:</b> ${statusBadge}</div>
+        <div><b>Dibuat:</b> ${formatDate(p.createdAt)}</div>
+      </div>
+    </div>`);
+}
+
+async function editPenalty(id) {
+  const doc = await db.collection('hrd_penalty').doc(id).get();
+  if (!doc.exists) return toast('Data tidak ditemukan', 'warning');
+  const p = doc.data();
+  openModal(`<div class="modal-title">✏️ Edit Penalty</div>
+    <div class="grid-2">
+      <div class="form-group"><label>Karyawan</label><input class="form-control" id="editPenNama" value="${escHtml(p.nama || '')}"></div>
+      <div class="form-group"><label>Tanggal</label><input class="form-control" type="date" id="editPenTgl" value="${p.tanggal || ''}"></div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group"><label>Jenis</label><select class="form-control" id="editPenJenis"><option ${p.jenis==='Terlambat'?'selected':''}>Terlambat</option><option ${p.jenis==='Mangkir'?'selected':''}>Mangkir</option><option ${p.jenis==='SP I'?'selected':''}>SP I</option><option ${p.jenis==='SP II'?'selected':''}>SP II</option><option ${p.jenis==='SP III'?'selected':''}>SP III</option></select></div>
+      <div class="form-group"><label>Poin</label><input class="form-control" type="number" id="editPenPoin" value="${p.poin || 1}"></div>
+    </div>
+    <button class="btn btn-primary" onclick="updatePenalty('${id}')">💾 Simpan</button>`);
+}
+
+async function updatePenalty(id) {
+  const data = {
+    nama: document.getElementById('editPenNama').value,
+    tanggal: document.getElementById('editPenTgl').value,
+    jenis: document.getElementById('editPenJenis').value,
+    poin: parseInt(document.getElementById('editPenPoin').value) || 1,
+    updatedAt: new Date().toISOString()
+  };
+  if (!data.nama) return toast('Nama wajib', 'warning');
+  await db.collection('hrd_penalty').doc(id).update(data);
+  closeModalDirect();
+  toast('Penalty diperbarui', 'success');
+  renderPenalty();
+}
+
+async function syncPenaltyToKPI() {
+  if (!confirm('Sinkronisasi penalty point ke data KPI?\n\nIni akan menghitung ulang skor akhir KPI berdasarkan total penalty masing-masing karyawan.')) return;
+  const [kpiSnap, penSnap] = await Promise.all([
+    db.collection('hrd_kpi').get(),
+    db.collection('hrd_penalty').get()
+  ]);
+  // Calculate total penalty per nama
+  const penaltyMap = {};
+  penSnap.forEach(d => { const p = d.data(); const n = (p.nama || '').toLowerCase().trim(); penaltyMap[n] = (penaltyMap[n] || 0) + (parseInt(p.poin) || 0); });
+  // Update each KPI record with penalty deduction
+  let count = 0;
+  for (const doc of kpiSnap.docs) {
+    const r = doc.data();
+    const n = (r.nama || '').toLowerCase().trim();
+    const totalPenalty = penaltyMap[n] || 0;
+    const skorMurni = r.skorMurni != null ? r.skorMurni : r.skor;
+    const skorAkhir = Math.max(0, skorMurni - (totalPenalty * 2));
+    if (r.penaltyPoin !== totalPenalty || r.skor !== skorAkhir || r.skorMurni == null) {
+      await db.collection('hrd_kpi').doc(doc.id).update({
+        skorMurni: skorMurni,
+        skor: skorAkhir,
+        penaltyPoin: totalPenalty,
+        penaltyDeduction: totalPenalty * 2,
+        syncedAt: new Date().toISOString()
+      });
+      count++;
+    }
+  }
+  toast(`Sinkronisasi selesai: ${count} data KPI diperbarui`, 'success');
 }
 
 async function modalPenalty(prefillNama){
