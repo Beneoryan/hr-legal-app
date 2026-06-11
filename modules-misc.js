@@ -1,8 +1,154 @@
 'use strict';
 // ── KPI ───────────────────────────────────────────────────────
-async function renderKPI(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>📈 KPI & Penilaian</span><button class="btn btn-primary btn-sm" onclick="modalKPI()">+ Tambah</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Periode</th><th>Skor</th><th>Grade</th><th>Penilai</th></tr></thead><tbody id="tblKPI"></tbody></table></div></div>`;const snap=await db.collection('hrd_kpi').get();let h='';if(snap.empty)h='<tr><td colspan="5" class="text-center">Belum ada</td></tr>';else snap.forEach(d=>{const p=d.data();const grade=p.skor>=90?'A':p.skor>=80?'B':p.skor>=70?'C':p.skor>=60?'D':'E';h+=`<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.periode)}</td><td><span class="badge badge-${p.skor>=80?'success':p.skor>=60?'warning':'danger'}">${p.skor}/100</span></td><td class="fw-700">${grade}</td><td>${escHtml(p.penilai||'-')}</td></tr>`;});document.getElementById('tblKPI').innerHTML=h;}
-function modalKPI(){openModal(`<div class="modal-title">Tambah Penilaian KPI</div><div class="grid-2"><div class="form-group"><label>Karyawan</label><input class="form-control" id="kpiNama"></div><div class="form-group"><label>Periode</label><input class="form-control" id="kpiPeriode" value="${monthStr()}"></div></div><div class="grid-2"><div class="form-group"><label>Produktivitas (0-100)</label><input class="form-control" type="number" id="kpiProd" value="80"></div><div class="form-group"><label>Kualitas (0-100)</label><input class="form-control" type="number" id="kpiQual" value="80"></div></div><div class="grid-2"><div class="form-group"><label>Kedisiplinan (0-100)</label><input class="form-control" type="number" id="kpiDisc" value="80"></div><div class="form-group"><label>Kerjasama (0-100)</label><input class="form-control" type="number" id="kpiTeam" value="80"></div></div><div class="form-group"><label>Catatan</label><textarea class="form-control" id="kpiNote"></textarea></div><button class="btn btn-primary" onclick="simpanKPI()">Simpan</button>`);}
-async function simpanKPI(){const prod=Number(document.getElementById('kpiProd').value)||0,qual=Number(document.getElementById('kpiQual').value)||0,disc=Number(document.getElementById('kpiDisc').value)||0,team=Number(document.getElementById('kpiTeam').value)||0;const skor=Math.round((prod+qual+disc+team)/4);await db.collection('hrd_kpi').add({nama:document.getElementById('kpiNama').value,periode:document.getElementById('kpiPeriode').value,produktivitas:prod,kualitas:qual,kedisiplinan:disc,kerjasama:team,skor,catatan:document.getElementById('kpiNote').value,penilai:currentUser.nama,createdAt:new Date().toISOString()});closeModalDirect();toast('KPI disimpan','success');renderKPI();}
+
+function kpiFormulaInfoHtml() {
+  return `<div style="background:#f0f7ff;border:1px solid #c8e0ff;border-radius:8px;padding:16px;margin-bottom:16px">
+    <div style="font-weight:700;margin-bottom:8px;color:var(--primary)">📐 Formula Perhitungan KPI</div>
+    <div style="font-size:.85rem;line-height:1.7">
+      <b>1. Komponen Penilaian (masing-masing 0-100, bobot 25%):</b><br>
+      &nbsp;&nbsp;• Produktivitas (25%)<br>
+      &nbsp;&nbsp;• Kualitas Kerja (25%)<br>
+      &nbsp;&nbsp;• Kedisiplinan (25%)<br>
+      &nbsp;&nbsp;• Kerjasama (25%)<br><br>
+      <b>2. Skor Murni</b> = Rata-rata 4 komponen<br><br>
+      <b>3. Dampak Penalty:</b><br>
+      &nbsp;&nbsp;• Setiap 1 poin penalty = pengurangan 2 poin dari skor<br>
+      &nbsp;&nbsp;• Terlambat = 1 poin, Mangkir = 2 poin<br>
+      &nbsp;&nbsp;• SP I = 3 poin, SP II = 5 poin, SP III = 10 poin<br><br>
+      <b>4. Skor Akhir</b> = max(0, Skor Murni - (Total Poin Penalty x 2))<br><br>
+      <b>5. Grade:</b> A &ge; 90 | B &ge; 80 | C &ge; 70 | D &ge; 60 | E &lt; 60
+    </div>
+  </div>`;
+}
+
+async function renderKPI() {
+  const main = document.getElementById('mainContent');
+  main.innerHTML = `<div class="page-title"><span>📈 KPI & Penilaian</span><button class="btn btn-primary btn-sm" onclick="modalKPI()">+ Tambah</button></div>
+    <div class="card mb-16" id="kpiInfoToggle">
+      <button class="btn btn-sm btn-info" onclick="document.getElementById('kpiInfoPanel').style.display=document.getElementById('kpiInfoPanel').style.display==='none'?'block':'none'">ℹ️ Lihat Formula KPI</button>
+      <div id="kpiInfoPanel" style="display:none;margin-top:12px">${kpiFormulaInfoHtml()}</div>
+    </div>
+    <div class="card"><div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Periode</th><th>Skor Murni</th><th>Penalty</th><th>Skor Akhir</th><th>Grade</th><th>Penilai</th></tr></thead><tbody id="tblKPI"></tbody></table></div></div>`;
+
+  // Fetch KPI data and live penalty data
+  const [kpiSnap, penSnap] = await Promise.all([
+    db.collection('hrd_kpi').get(),
+    db.collection('hrd_penalty').get()
+  ]);
+
+  // Build live penalty totals by employee name
+  const livePenalty = {};
+  penSnap.forEach(d => {
+    const p = d.data();
+    if (!livePenalty[p.nama]) livePenalty[p.nama] = 0;
+    livePenalty[p.nama] += (parseInt(p.poin) || 0);
+  });
+
+  let h = '';
+  if (kpiSnap.empty) {
+    h = '<tr><td colspan="7" class="text-center">Belum ada</td></tr>';
+  } else {
+    kpiSnap.forEach(d => {
+      const p = d.data();
+      // Use live penalty data for real-time sync
+      const livePoin = livePenalty[p.nama] || 0;
+      const liveDeduction = livePoin * 2;
+      const skorMurni = p.skorMurni || p.skor || Math.round((p.produktivitas + p.kualitas + p.kedisiplinan + p.kerjasama) / 4);
+      const skorAkhir = Math.max(0, skorMurni - liveDeduction);
+      const grade = skorAkhir >= 90 ? 'A' : skorAkhir >= 80 ? 'B' : skorAkhir >= 70 ? 'C' : skorAkhir >= 60 ? 'D' : 'E';
+      const penaltyDisplay = livePoin > 0 ? `<span class="badge badge-danger">-${liveDeduction} (${livePoin} poin)</span>` : '<span class="badge badge-success">0</span>';
+      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.periode)}</td><td>${skorMurni}/100</td><td>${penaltyDisplay}</td><td><span class="badge badge-${skorAkhir>=80?'success':skorAkhir>=60?'warning':'danger'}">${skorAkhir}/100</span></td><td class="fw-700">${grade}</td><td>${escHtml(p.penilai||'-')}</td></tr>`;
+    });
+  }
+  document.getElementById('tblKPI').innerHTML = h;
+}
+
+async function modalKPI() {
+  // Load active employees for dropdown
+  const kSnap = await db.collection('hrd_karyawan').where('status', '==', 'aktif').get();
+  let opts = '<option value="">-- Pilih Karyawan --</option>';
+  kSnap.forEach(d => {
+    const k = d.data();
+    opts += `<option value="${escHtml(k.nama)}">${escHtml(k.nama)} — ${escHtml(k.departemen || '-')}</option>`;
+  });
+
+  openModal(`<div class="modal-title">Tambah Penilaian KPI</div>
+    ${kpiFormulaInfoHtml()}
+    <div class="grid-2">
+      <div class="form-group"><label>Karyawan</label>
+        <select class="form-control" id="kpiNamaSelect" onchange="kpiLoadPenalty(this.value)">${opts}</select>
+      </div>
+      <div class="form-group"><label>Periode</label><input class="form-control" id="kpiPeriode" value="${monthStr()}"></div>
+    </div>
+    <div id="kpiPenaltyPreview" style="margin-bottom:12px"></div>
+    <div class="grid-2">
+      <div class="form-group"><label>Produktivitas (0-100)</label><input class="form-control" type="number" id="kpiProd" value="80"></div>
+      <div class="form-group"><label>Kualitas (0-100)</label><input class="form-control" type="number" id="kpiQual" value="80"></div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group"><label>Kedisiplinan (0-100)</label><input class="form-control" type="number" id="kpiDisc" value="80"></div>
+      <div class="form-group"><label>Kerjasama (0-100)</label><input class="form-control" type="number" id="kpiTeam" value="80"></div>
+    </div>
+    <div class="form-group"><label>Catatan</label><textarea class="form-control" id="kpiNote"></textarea></div>
+    <button class="btn btn-primary" onclick="simpanKPI()">Simpan</button>`);
+}
+
+async function kpiLoadPenalty(nama) {
+  const el = document.getElementById('kpiPenaltyPreview');
+  if (!nama) { el.innerHTML = ''; return; }
+  const snap = await db.collection('hrd_penalty').where('nama', '==', nama).get();
+  let total = 0;
+  snap.forEach(d => { total += (parseInt(d.data().poin) || 0); });
+  const deduction = total * 2;
+  if (total > 0) {
+    el.innerHTML = `<div style="background:#fff3f3;border:1px solid #ffcdd2;border-radius:6px;padding:10px;font-size:.85rem">
+      <b>⚠️ Penalty aktif:</b> ${total} poin (pengurangan skor: <b>-${deduction}</b>)
+    </div>`;
+  } else {
+    el.innerHTML = `<div style="background:#f1f8e9;border:1px solid #c8e6c9;border-radius:6px;padding:10px;font-size:.85rem">
+      <b>✅ Tidak ada penalty</b> - Skor tidak dikurangi
+    </div>`;
+  }
+}
+
+async function simpanKPI() {
+  const nama = document.getElementById('kpiNamaSelect').value;
+  if (!nama) return toast('Pilih karyawan', 'warning');
+
+  const prod = Number(document.getElementById('kpiProd').value) || 0;
+  const qual = Number(document.getElementById('kpiQual').value) || 0;
+  const disc = Number(document.getElementById('kpiDisc').value) || 0;
+  const team = Number(document.getElementById('kpiTeam').value) || 0;
+
+  // Calculate raw score
+  const skorMurni = Math.round((prod + qual + disc + team) / 4);
+
+  // Fetch penalty points for this employee
+  const penSnap = await db.collection('hrd_penalty').where('nama', '==', nama).get();
+  let totalPenaltyPoin = 0;
+  penSnap.forEach(d => { totalPenaltyPoin += (parseInt(d.data().poin) || 0); });
+  const penaltyDeduction = totalPenaltyPoin * 2;
+  const skor = Math.max(0, skorMurni - penaltyDeduction);
+
+  await db.collection('hrd_kpi').add({
+    nama: nama,
+    periode: document.getElementById('kpiPeriode').value,
+    produktivitas: prod,
+    kualitas: qual,
+    kedisiplinan: disc,
+    kerjasama: team,
+    skorMurni: skorMurni,
+    totalPenaltyPoin: totalPenaltyPoin,
+    penaltyDeduction: penaltyDeduction,
+    skor: skor,
+    catatan: document.getElementById('kpiNote').value,
+    penilai: currentUser.nama,
+    createdAt: new Date().toISOString()
+  });
+  closeModalDirect();
+  toast('KPI disimpan', 'success');
+  renderKPI();
+}
 
 // ── PELATIHAN ─────────────────────────────────────────────────
 async function renderPelatihan(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>🎓 Pelatihan & Sertifikasi</span><button class="btn btn-primary btn-sm" onclick="modalPelatihan()">+ Tambah</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Judul</th><th>Jenis</th><th>Tanggal</th><th>Peserta</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="tblPelatihan"></tbody></table></div></div>`;const snap=await db.collection('hrd_pelatihan').get();let h='';if(snap.empty)h='<tr><td colspan="6" class="text-center">Belum ada</td></tr>';else snap.forEach(d=>{const p=d.data();h+=`<tr><td class="fw-700">${escHtml(p.judul)}</td><td>${escHtml(p.jenis)}</td><td>${formatDate(p.tanggal)}</td><td>${(p.peserta||[]).length}</td><td><span class="badge badge-${p.status==='selesai'?'success':'info'}">${p.status||'terjadwal'}</span></td><td><button class="btn btn-xs btn-info" onclick="modalPelatihan('${d.id}')">✏️</button></td></tr>`;});document.getElementById('tblPelatihan').innerHTML=h;}

@@ -763,7 +763,55 @@ async function renderPortalReimburse(){const main=document.getElementById('mainC
 async function renderPortalKasbon(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>💳 Kasbon & Loan Saya</span><button class="btn btn-primary btn-sm" onclick="modalKasbon()">+ Ajukan</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Jenis</th><th>Total</th><th>Angsuran/Bln</th><th>Sudah Bayar</th><th>Sisa</th><th>Status</th></tr></thead><tbody id="tblMyKasbon"></tbody></table></div></div>`;const snap=await db.collection('hrd_kasbon').where('nama','==',currentUser.nama).get();const items=[];snap.forEach(d=>{items.push(d.data());});let h='';if(!items.length)h='<tr><td colspan="6" class="text-center">Belum ada</td></tr>';else items.forEach(p=>{const angsuran=Math.ceil((p.jumlah||0)/(p.cicilan||1));const sisa=Math.max(0,(p.jumlah||0)-(p.sudahBayar||0));h+=`<tr><td>${escHtml(p.jenis||'-')}</td><td>${formatCurrency(p.jumlah)}</td><td>${formatCurrency(angsuran)}</td><td>${formatCurrency(p.sudahBayar||0)}</td><td class="fw-700" style="color:${sisa>0?'var(--danger)':'var(--success)'}">${formatCurrency(sisa)}</td><td><span class="badge badge-${p.status==='aktif'?'success':p.status==='lunas'?'primary':'warning'}">${p.status}</span></td></tr>`;});document.getElementById('tblMyKasbon').innerHTML=h;}
 
 // ── PORTAL: KPI ───────────────────────────────────────────────
-async function renderPortalKPI(){const main=document.getElementById('mainContent');main.innerHTML=`<div class="page-title"><span>📈 KPI Saya</span></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Periode</th><th>Skor</th><th>Grade</th><th>Penilai</th><th>Catatan</th></tr></thead><tbody id="tblMyKPI"></tbody></table></div></div>`;const snap=await db.collection('hrd_kpi').where('nama','==',currentUser.nama).get();const items=[];snap.forEach(d=>{items.push(d.data());});items.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));let h='';if(!items.length)h='<tr><td colspan="5" class="text-center">Belum ada penilaian</td></tr>';else items.forEach(p=>{const grade=p.skor>=90?'A':p.skor>=80?'B':p.skor>=70?'C':p.skor>=60?'D':'E';h+=`<tr><td>${escHtml(p.periode||'-')}</td><td><span class="badge badge-${p.skor>=80?'success':p.skor>=60?'warning':'danger'}">${p.skor}/100</span></td><td class="fw-700">${grade}</td><td>${escHtml(p.penilai||'-')}</td><td style="font-size:.78rem">${escHtml(p.catatan||'-')}</td></tr>`;});document.getElementById('tblMyKPI').innerHTML=h;}
+async function renderPortalKPI() {
+  const main = document.getElementById('mainContent');
+  main.innerHTML = `<div class="page-title"><span>📈 KPI Saya</span></div>
+    <div class="card mb-16">
+      <div style="background:#f0f7ff;border:1px solid #c8e0ff;border-radius:8px;padding:16px">
+        <div style="font-weight:700;margin-bottom:8px;color:var(--primary)">📐 Cara Perhitungan KPI</div>
+        <div style="font-size:.85rem;line-height:1.7">
+          <b>Komponen Penilaian (masing-masing bobot 25%):</b><br>
+          &nbsp;&nbsp;• Produktivitas | Kualitas Kerja | Kedisiplinan | Kerjasama<br><br>
+          <b>Skor Murni</b> = Rata-rata dari 4 komponen (0-100)<br><br>
+          <b>Dampak Penalty:</b><br>
+          &nbsp;&nbsp;• Setiap 1 poin penalty = pengurangan 2 poin dari skor<br>
+          &nbsp;&nbsp;• Contoh: 3 poin penalty = skor dikurangi 6<br><br>
+          <b>Skor Akhir</b> = Skor Murni - (Total Poin Penalty x 2)<br><br>
+          <b>Grade:</b> A &ge; 90 | B &ge; 80 | C &ge; 70 | D &ge; 60 | E &lt; 60
+        </div>
+      </div>
+    </div>
+    <div class="card"><div class="table-wrap"><table><thead><tr><th>Periode</th><th>Skor Murni</th><th>Penalty</th><th>Skor Akhir</th><th>Grade</th><th>Penilai</th><th>Catatan</th></tr></thead><tbody id="tblMyKPI"></tbody></table></div></div>`;
+
+  // Fetch KPI and live penalty data
+  const [kpiSnap, penSnap] = await Promise.all([
+    db.collection('hrd_kpi').where('nama', '==', currentUser.nama).get(),
+    db.collection('hrd_penalty').where('nama', '==', currentUser.nama).get()
+  ]);
+
+  // Calculate live penalty total
+  let livePenaltyPoin = 0;
+  penSnap.forEach(d => { livePenaltyPoin += (parseInt(d.data().poin) || 0); });
+  const liveDeduction = livePenaltyPoin * 2;
+
+  const items = [];
+  kpiSnap.forEach(d => { items.push(d.data()); });
+  items.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+  let h = '';
+  if (!items.length) {
+    h = '<tr><td colspan="7" class="text-center">Belum ada penilaian</td></tr>';
+  } else {
+    items.forEach(p => {
+      const skorMurni = p.skorMurni || p.skor || Math.round((p.produktivitas + p.kualitas + p.kedisiplinan + p.kerjasama) / 4);
+      const skorAkhir = Math.max(0, skorMurni - liveDeduction);
+      const grade = skorAkhir >= 90 ? 'A' : skorAkhir >= 80 ? 'B' : skorAkhir >= 70 ? 'C' : skorAkhir >= 60 ? 'D' : 'E';
+      const penaltyDisplay = livePenaltyPoin > 0 ? `<span class="badge badge-danger">-${liveDeduction} (${livePenaltyPoin} poin)</span>` : '<span class="badge badge-success">0</span>';
+      h += `<tr><td>${escHtml(p.periode || '-')}</td><td>${skorMurni}/100</td><td>${penaltyDisplay}</td><td><span class="badge badge-${skorAkhir>=80?'success':skorAkhir>=60?'warning':'danger'}">${skorAkhir}/100</span></td><td class="fw-700">${grade}</td><td>${escHtml(p.penilai || '-')}</td><td style="font-size:.78rem">${escHtml(p.catatan || '-')}</td></tr>`;
+    });
+  }
+  document.getElementById('tblMyKPI').innerHTML = h;
+}
 
 // ── PORTAL: SETTING AKUN ──────────────────────────────────────
 function renderPortalSetting(){const u=currentUser;const main=document.getElementById('mainContent');const avatar=u.profilePic||'';main.innerHTML=`<div class="page-title"><span>⚙️ Setting Akun</span></div><div class="card"><h4 class="color-primary mb-16">👤 Data Pribadi</h4>
