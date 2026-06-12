@@ -1415,8 +1415,12 @@ async function modalAddTask() {
       assignHtml = '';
     }
   }
+  const catHtml = hasAccess(2)
+    ? `<div class="form-group"><label>Kategori</label><select class="form-control" id="dtKategori">${getReportCategoryOptions()}</select></div>`
+    : '';
   openModal(`<div class="modal-title">+ Tambah Task</div>
     ${assignHtml}
+    ${catHtml}
     <div class="form-group"><label>Judul Task *</label><input class="form-control" id="dtTitle" placeholder="Contoh: Meeting dengan klien"></div>
     <div class="form-group"><label>Deskripsi</label><textarea class="form-control" id="dtDesc" rows="2" placeholder="Detail task..."></textarea></div>
     <div class="grid-2"><div class="form-group"><label>Tanggal *</label><input class="form-control" type="date" id="dtDate" value="${todayStr()}"></div><div class="form-group"><label>Waktu</label><input class="form-control" type="time" id="dtTime"></div></div>
@@ -1448,11 +1452,13 @@ async function simpanDailyTask() {
       priority: document.getElementById('dtPriority').value,
       reminder: document.getElementById('dtReminder').value,
       repeat: document.getElementById('dtRepeat').value || '',
+      kategori: document.getElementById('dtKategori')?.value || '',
       done: false,
       type: 'task',
       userId: targetUserId,
       targetUserName,
       departemen: currentUser.departemen || '',
+      ownerLevel: ROLES[currentUser.role] || 0,
       assignedBy,
       assignedByName,
       createdAt: new Date().toISOString(),
