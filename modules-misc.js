@@ -104,23 +104,21 @@ async function simpanKPI() {
   });
   const penaltyDeduction = totalPenaltyPoin * 2;
   const skor = Math.max(0, skorMurni - penaltyDeduction);
-  await db
-    .collection('hrd_kpi')
-    .add({
-      nama,
-      periode: document.getElementById('kpiPeriode').value,
-      produktivitas: prod,
-      kualitas: qual,
-      kedisiplinan: disc,
-      kerjasama: team,
-      skorMurni,
-      totalPenaltyPoin,
-      penaltyDeduction,
-      skor,
-      catatan: document.getElementById('kpiNote').value,
-      penilai: currentUser.nama,
-      createdAt: new Date().toISOString(),
-    });
+  await db.collection('hrd_kpi').add({
+    nama,
+    periode: document.getElementById('kpiPeriode').value,
+    produktivitas: prod,
+    kualitas: qual,
+    kedisiplinan: disc,
+    kerjasama: team,
+    skorMurni,
+    totalPenaltyPoin,
+    penaltyDeduction,
+    skor,
+    catatan: document.getElementById('kpiNote').value,
+    penilai: currentUser.nama,
+    createdAt: new Date().toISOString(),
+  });
   closeModalDirect();
   toast('KPI disimpan', 'success');
   renderKPI();
@@ -1251,15 +1249,12 @@ async function approveItem(col, id, status, catatan) {
   if (catatan) entry.catatan = catatan;
   history.push(entry);
   if (status === 'rejected') {
-    await db
-      .collection(col)
-      .doc(id)
-      .update({
-        status: 'rejected',
-        approvedBy: currentUser.nama,
-        approvedAt: new Date().toISOString(),
-        approvalHistory: history,
-      });
+    await db.collection(col).doc(id).update({
+      status: 'rejected',
+      approvedBy: currentUser.nama,
+      approvedAt: new Date().toISOString(),
+      approvalHistory: history,
+    });
     if (data.userId)
       await sendNotification(
         data.userId,
@@ -1308,16 +1303,13 @@ async function approveItem(col, id, status, catatan) {
           `Disetujui ${currentUser.nama}, menunggu ${nextApprover?.nama || 'selanjutnya'}`
         );
     } else {
-      await db
-        .collection(col)
-        .doc(id)
-        .update({
-          status: 'approved',
-          approvedBy: currentUser.nama,
-          approvedAt: new Date().toISOString(),
-          approvalStep: nextStep,
-          approvalHistory: history,
-        });
+      await db.collection(col).doc(id).update({
+        status: 'approved',
+        approvedBy: currentUser.nama,
+        approvedAt: new Date().toISOString(),
+        approvalStep: nextStep,
+        approvalHistory: history,
+      });
       if (data.userId)
         await sendNotification(
           data.userId,
@@ -1562,15 +1554,13 @@ async function simpanApprovalFlow() {
   if (s2) steps.push({ role: s2, nama: s2 });
   if (s3) steps.push({ role: s3, nama: s3 });
   if (!steps.length) return toast('Minimal 1 approver', 'warning');
-  await db
-    .collection('hrd_approval_flow')
-    .add({
-      jenis: document.getElementById('afJenis').value,
-      departemen: document.getElementById('afDept').value,
-      pengaju: document.getElementById('afPengaju').value,
-      steps,
-      createdAt: new Date().toISOString(),
-    });
+  await db.collection('hrd_approval_flow').add({
+    jenis: document.getElementById('afJenis').value,
+    departemen: document.getElementById('afDept').value,
+    pengaju: document.getElementById('afPengaju').value,
+    steps,
+    createdAt: new Date().toISOString(),
+  });
   closeModalDirect();
   toast('Flow disimpan', 'success');
   renderApprovalMgmt();
@@ -1661,14 +1651,12 @@ async function shareAppBroadcast() {
   const url = 'https://hrlegal.netlify.app';
   const users = await getAllUsers();
   const pesan = `📱 Install Aplikasi HRD IJEF Corp di perangkat Anda: ${url}\n\nCara: Buka link di browser → Install/Add to Home Screen. Login dengan akun karyawan.`;
-  await db
-    .collection('hrd_broadcast')
-    .add({
-      pesan,
-      targetLabel: 'Semua',
-      pengirim: currentUser.nama,
-      createdAt: new Date().toISOString(),
-    });
+  await db.collection('hrd_broadcast').add({
+    pesan,
+    targetLabel: 'Semua',
+    pengirim: currentUser.nama,
+    createdAt: new Date().toISOString(),
+  });
   await sendNotificationBulk(
     users.map((u) => u.id),
     '📱 Install Aplikasi',
@@ -2237,23 +2225,21 @@ async function syncAllDiscToKPI() {
       .get();
     if (existing.empty) {
       const kpiScore = r.kpiScore || 70;
-      await db
-        .collection('hrd_kpi')
-        .add({
-          nama: r.nama,
-          periode: r.evaluasiPeriode || r.tanggalTes || todayStr(),
-          produktivitas: kpiScore,
-          kualitas: kpiScore,
-          kedisiplinan: kpiScore,
-          kerjasama: kpiScore,
-          skor: kpiScore,
-          catatan: `[DISC] Tipe: ${r.pattern || '-'} | Profil: ${r.profileName || '-'}`,
-          penilai: 'DISC Auto-Sync',
-          discResultId: doc.id,
-          discPattern: r.pattern || '',
-          discProfile: r.profileName || '',
-          createdAt: new Date().toISOString(),
-        });
+      await db.collection('hrd_kpi').add({
+        nama: r.nama,
+        periode: r.evaluasiPeriode || r.tanggalTes || todayStr(),
+        produktivitas: kpiScore,
+        kualitas: kpiScore,
+        kedisiplinan: kpiScore,
+        kerjasama: kpiScore,
+        skor: kpiScore,
+        catatan: `[DISC] Tipe: ${r.pattern || '-'} | Profil: ${r.profileName || '-'}`,
+        penilai: 'DISC Auto-Sync',
+        discResultId: doc.id,
+        discPattern: r.pattern || '',
+        discProfile: r.profileName || '',
+        createdAt: new Date().toISOString(),
+      });
       count++;
     }
   }
@@ -2414,4 +2400,113 @@ async function resetEntireSystem() {
   });
   await batch.commit();
   toast('Sistem berhasil direset. Hanya akun admin yang tersisa.', 'success');
+}
+
+// ── PANDUAN SISTEM ────────────────────────────────────────────
+function renderPanduan() {
+  const main = document.getElementById('mainContent');
+  const role = currentUser.role || 'staff';
+  const level = ROLES[role] || 0;
+
+  let content = '';
+
+  // Common for all users
+  content += `<div class="card mb-16" style="border-left:4px solid var(--primary)"><div class="fw-700 mb-8" style="font-size:1rem;color:var(--primary)">📱 Cara Menggunakan Aplikasi</div>
+    <div class="text-sm" style="line-height:2">
+      <div><b>1. Login:</b> Masukkan username & password yang diberikan admin.</div>
+      <div><b>2. Navigasi:</b> Gunakan menu sidebar (kiri) untuk berpindah halaman.</div>
+      <div><b>3. Mobile:</b> Klik ☰ di pojok kiri atas untuk buka menu.</div>
+      <div><b>4. Install App:</b> Klik "Download Aplikasi" untuk install PWA di HP/Laptop.</div>
+    </div></div>`;
+
+  // Staff instructions
+  if (level >= 1) {
+    content += `<div class="card mb-16" style="border-left:4px solid #1565c0"><div class="fw-700 mb-8" style="color:#1565c0">📋 Daily Report (Wajib)</div>
+      <div class="text-sm" style="line-height:2">
+        <div><b>1.</b> Buka menu <b>Daily Task</b> → klik <b>+ Tambah</b> (atau + Daily Report untuk Staff).</div>
+        <div><b>2.</b> Pilih <b>"Daily Report"</b> → isi tanggal, kategori, aktivitas, hasil, kendala, solusi.</div>
+        <div><b>3.</b> Upload <b>eviden</b> (foto/dokumen) via tombol 📁 atau 📷 kamera.</div>
+        <div><b>4.</b> Klik <b>"📤 Kirim Daily Report"</b>.</div>
+        <div><b>5.</b> Laporan akan diteruskan otomatis ke atasan (Leader/Manager).</div>
+      </div></div>`;
+
+    content += `<div class="card mb-16" style="border-left:4px solid #2e7d32"><div class="fw-700 mb-8" style="color:#2e7d32">📍 Absensi</div>
+      <div class="text-sm" style="line-height:2">
+        <div><b>1.</b> Buka menu <b>Absensi</b> → klik <b>Clock In</b> saat mulai kerja.</div>
+        <div><b>2.</b> Pastikan lokasi GPS aktif (untuk verifikasi lokasi kantor).</div>
+        <div><b>3.</b> Klik <b>Clock Out</b> saat selesai kerja.</div>
+      </div></div>`;
+
+    content += `<div class="card mb-16" style="border-left:4px solid #ff6f00"><div class="fw-700 mb-8" style="color:#ff6f00">🏖️ Cuti & Izin</div>
+      <div class="text-sm" style="line-height:2">
+        <div><b>1.</b> Buka menu <b>Cuti/Izin</b> → klik <b>+ Pengajuan</b>.</div>
+        <div><b>2.</b> Pilih jenis (Cuti Tahunan, Izin, WFH, dll), isi tanggal & keterangan.</div>
+        <div><b>3.</b> Pengajuan masuk ke Approval atasan & HR.</div>
+      </div></div>`;
+  }
+
+  // Leader instructions
+  if (level >= 2) {
+    content += `<div class="card mb-16" style="border-left:4px solid #7b1fa2"><div class="fw-700 mb-8" style="color:#7b1fa2">📋 Instruksi Task ke Bawahan (Leader)</div>
+      <div class="text-sm" style="line-height:2">
+        <div><b>1.</b> Buka <b>Daily Task</b> → klik <b>+ Tambah</b> → pilih <b>"Daily Task"</b>.</div>
+        <div><b>2.</b> Di field "Tugaskan Ke", pilih anggota tim dari divisi Anda.</div>
+        <div><b>3.</b> Isi judul, deskripsi, tanggal deadline, prioritas.</div>
+        <div><b>4.</b> Bawahan akan menerima notifikasi & task muncul di portal mereka.</div>
+        <div><b>5.</b> Monitor progress di tab <b>"📊 Report Tim"</b>.</div>
+      </div></div>`;
+
+    content += `<div class="card mb-16" style="border-left:4px solid #e65100"><div class="fw-700 mb-8" style="color:#e65100">⚠️ Penalty Point (Leader/Manager)</div>
+      <div class="text-sm" style="line-height:2">
+        <div><b>1.</b> Buka menu <b>Penalty Point</b> → klik <b>+ Tambah</b>.</div>
+        <div><b>2.</b> Pilih karyawan (hanya divisi sendiri), jenis pelanggaran, poin.</div>
+        <div><b>3.</b> Penalty otomatis mengurangi skor KPI karyawan.</div>
+        <div><b>4.</b> Klik <b>"🔄 Sinkronisasi ke KPI"</b> untuk update skor.</div>
+      </div></div>`;
+  }
+
+  // Manager instructions
+  if (level >= 3) {
+    content += `<div class="card mb-16" style="border-left:4px solid #00695c"><div class="fw-700 mb-8" style="color:#00695c">📊 Monitoring Tim (Manager)</div>
+      <div class="text-sm" style="line-height:2">
+        <div><b>1.</b> Tab <b>"📊 Report Tim"</b>: lihat semua daily report anggota divisi.</div>
+        <div><b>2.</b> Gunakan <b>filter tanggal</b> untuk melihat laporan periode tertentu.</div>
+        <div><b>3.</b> Report dikelompokkan berdasarkan <b>kategori</b> pekerjaan.</div>
+        <div><b>4.</b> Approval: cek <b>Approval Center</b> untuk cuti/overtime/reimburse.</div>
+      </div></div>`;
+
+    content += `<div class="card mb-16" style="border-left:4px solid #1565c0"><div class="fw-700 mb-8" style="color:#1565c0">📅 Meeting & Broadcast</div>
+      <div class="text-sm" style="line-height:2">
+        <div><b>Meeting:</b> Buat meeting → pilih tipe (General/Divisi) → undang peserta.</div>
+        <div><b>Online:</b> Meeting online via video call (Jitsi). Link aktif 15 menit sebelum jadwal.</div>
+        <div><b>Broadcast:</b> Kirim pengumuman ke divisi sendiri atau semua. Tidak lintas divisi kecuali General.</div>
+      </div></div>`;
+  }
+
+  // Head instructions
+  if (level >= 4) {
+    content += `<div class="card mb-16" style="border-left:4px solid #c62828"><div class="fw-700 mb-8" style="color:#c62828">🏢 Laporan Semua Divisi (Head)</div>
+      <div class="text-sm" style="line-height:2">
+        <div><b>1.</b> Tab <b>"🏢 Semua Divisi"</b>: lihat gabungan report dari semua departemen.</div>
+        <div><b>2.</b> Report dikelompokkan per <b>Departemen → Kategori</b>.</div>
+        <div><b>3.</b> Gunakan filter tanggal untuk periode tertentu.</div>
+        <div><b>4.</b> Bisa melihat semua broadcast & meeting lintas divisi.</div>
+      </div></div>`;
+  }
+
+  // Admin instructions
+  if (level >= 6) {
+    content += `<div class="card mb-16" style="border-left:4px solid #1a1a1a"><div class="fw-700 mb-8" style="color:#1a1a1a">🔧 Administrasi Sistem (Admin)</div>
+      <div class="text-sm" style="line-height:2">
+        <div><b>Akun:</b> Manajemen Akun → tambah/edit user, set role & departemen.</div>
+        <div><b>KPI:</b> KPI & Penilaian → input nilai, edit, hapus, sinkron penalty.</div>
+        <div><b>Data:</b> Admin punya akses penuh ke semua modul (edit/hapus semua data).</div>
+        <div><b>Reset:</b> System Admin → backup data / reset sistem (hati-hati!).</div>
+        <div><b>Rekrutmen:</b> Kelola lowongan, pipeline kandidat, DISC test, test kesehatan.</div>
+      </div></div>`;
+  }
+
+  main.innerHTML = `<div class="page-title"><span>📖 Panduan Penggunaan Sistem</span></div>
+    <div class="card mb-16" style="background:#e3f2fd;border:none"><div style="display:flex;align-items:center;gap:12px"><div style="font-size:2rem">👋</div><div><div class="fw-700">Halo, ${escHtml(currentUser.nama)}!</div><div class="text-sm" style="color:#555">Role Anda: <b>${role.toUpperCase()}</b> | Departemen: <b>${escHtml(currentUser.departemen || '-')}</b></div><div class="text-xs" style="color:#999;margin-top:4px">Panduan di bawah disesuaikan dengan level akses Anda.</div></div></div></div>
+    ${content}`;
 }

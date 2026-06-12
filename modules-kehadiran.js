@@ -1236,11 +1236,17 @@ async function loadDailyTasks(filter) {
       (t) => t.assignedBy === currentUser.id && t.userId !== currentUser.id
     );
   else if (filter === 'report')
-    filtered = _dailyTaskData.filter((t) => t.type === 'report' && t.userId === currentUser.id);
+    filtered = _dailyTaskData.filter(
+      (t) =>
+        (t.type === 'report' || (t.title && t.title.includes('Daily Report'))) &&
+        t.userId === currentUser.id
+    );
   else if (filter === 'team-report') {
     const myDept2 = (currentUser.departemen || '').toLowerCase().trim();
     filtered = _dailyTaskData.filter(
-      (t) => t.type === 'report' && (t.departemen || '').toLowerCase().trim() === myDept2
+      (t) =>
+        (t.type === 'report' || (t.title && t.title.includes('Daily Report'))) &&
+        (t.departemen || '').toLowerCase().trim() === myDept2
     );
     // Apply date range filter
     const drFrom = document.getElementById('reportDateFrom')?.value || '';
@@ -1254,7 +1260,9 @@ async function loadDailyTasks(filter) {
         (b.tanggal || '').localeCompare(a.tanggal || '')
     );
   } else if (filter === 'all-report') {
-    filtered = _dailyTaskData.filter((t) => t.type === 'report');
+    filtered = _dailyTaskData.filter(
+      (t) => t.type === 'report' || (t.title && t.title.includes('Daily Report'))
+    );
     // Apply date range filter
     const drFrom = document.getElementById('reportDateFrom')?.value || '';
     const drTo = document.getElementById('reportDateTo')?.value || '';
@@ -1303,7 +1311,7 @@ async function loadDailyTasks(filter) {
   if (!filtered.length) {
     listEl.innerHTML =
       dateFilterHtml +
-      '<div style="text-align:center;padding:32px;color:var(--text-light)"><div style="font-size:2rem;margin-bottom:8px">✅</div><p>Tidak ada data untuk periode ini</p></div>';
+      '<div style="text-align:center;padding:32px;color:var(--text-light)"><div style="font-size:2rem;margin-bottom:8px">✅</div><p>Tidak ada data</p></div>';
     return;
   }
   const isAdmin = hasAccess(3);
