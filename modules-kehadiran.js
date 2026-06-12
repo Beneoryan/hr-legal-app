@@ -1579,11 +1579,13 @@ async function modalAddDailyReport() {
     <div class="form-group"><label>Aktivitas Hari Ini *</label><textarea class="form-control" id="drAktivitas" rows="4" placeholder="1. Meeting dengan tim marketing\n2. Follow up client ABC\n3. Buat proposal project X\n..."></textarea></div>
     <div class="form-group"><label>Hasil / Output</label><textarea class="form-control" id="drHasil" rows="2" placeholder="Proposal selesai 80%, meeting berhasil dapat approval..."></textarea></div>
     <div class="form-group"><label>Kendala / Hambatan</label><textarea class="form-control" id="drKendala" rows="2" placeholder="Tidak ada / Menunggu data dari divisi lain..."></textarea></div>
+    <div class="form-group"><label>Solusi / Tindakan atas Kendala</label><textarea class="form-control" id="drSolusi" rows="2" placeholder="Koordinasi dengan divisi terkait / Eskalasi ke atasan..."></textarea></div>
     <div class="form-group"><label>Rencana Besok</label><textarea class="form-control" id="drRencana" rows="2" placeholder="1. Finalisasi proposal\n2. Kirim ke client..."></textarea></div>
     <div class="grid-2">
+      <div class="form-group"><label>Durasi Pekerjaan (jam)</label><input class="form-control" type="number" id="drDurasi" min="0" max="24" step="0.5" value="8" placeholder="Contoh: 8"></div>
       <div class="form-group"><label>Progress Keseluruhan (%)</label><input class="form-control" type="number" id="drProgress" min="0" max="100" value="100" placeholder="0-100"></div>
-      <div class="form-group"><label>Mood Hari Ini</label><select class="form-control" id="drMood"><option value="baik">😊 Baik / Produktif</option><option value="cukup">😐 Cukup / Biasa</option><option value="kurang">😞 Kurang / Banyak Hambatan</option></select></div>
     </div>
+    <div class="form-group"><label>Mood Hari Ini</label><select class="form-control" id="drMood"><option value="baik">😊 Baik / Produktif</option><option value="cukup">😐 Cukup / Biasa</option><option value="kurang">😞 Kurang / Banyak Hambatan</option></select></div>
     <button class="btn btn-primary" onclick="simpanDailyReport()">📤 Kirim Daily Report</button>`,
     true
   );
@@ -1602,7 +1604,9 @@ async function simpanDailyReport() {
     aktivitas,
     hasil: document.getElementById('drHasil').value.trim(),
     kendala: document.getElementById('drKendala').value.trim(),
+    solusi: document.getElementById('drSolusi').value.trim(),
     rencana: document.getElementById('drRencana').value.trim(),
+    durasi: parseFloat(document.getElementById('drDurasi').value) || 0,
     progress: parseInt(document.getElementById('drProgress').value) || 0,
     mood: document.getElementById('drMood').value,
     description: aktivitas,
@@ -1635,11 +1639,12 @@ function viewDailyReport(id) {
     <div style="background:#f8f9ff;padding:16px;border-radius:8px;margin-bottom:16px;border-left:4px solid var(--primary)">
       <div class="fw-700">${escHtml(task.targetUserName || currentUser.nama)}</div>
       <div class="text-sm" style="color:#666">📅 ${formatDate(task.tanggal)} | ⏰ ${task.jamMasuk || '-'} - ${task.jamKeluar || '-'} | ${moodIcon} ${task.mood || '-'}</div>
-      <div class="text-sm mt-4">Progress: <span style="color:${progressColor};font-weight:700">${task.progress || 0}%</span></div>
+      <div class="text-sm mt-4">Progress: <span style="color:${progressColor};font-weight:700">${task.progress || 0}%</span> | Durasi Kerja: <b>${task.durasi || '-'} jam</b></div>
     </div>
     <div class="mb-16"><div class="fw-700 mb-4" style="color:var(--primary)">📋 Aktivitas</div><div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:12px;font-size:.85rem;white-space:pre-wrap;line-height:1.7">${escHtml(task.aktivitas || task.description || '-')}</div></div>
     ${task.hasil ? `<div class="mb-16"><div class="fw-700 mb-4" style="color:#2e7d32">✅ Hasil / Output</div><div style="background:#f1f8e9;border-radius:8px;padding:12px;font-size:.85rem;white-space:pre-wrap">${escHtml(task.hasil)}</div></div>` : ''}
     ${task.kendala ? `<div class="mb-16"><div class="fw-700 mb-4" style="color:#c62828">⚠️ Kendala</div><div style="background:#fff8f8;border-radius:8px;padding:12px;font-size:.85rem;white-space:pre-wrap">${escHtml(task.kendala)}</div></div>` : ''}
+    ${task.solusi ? `<div class="mb-16"><div class="fw-700 mb-4" style="color:#ff6f00">💡 Solusi / Tindakan</div><div style="background:#fff8e1;border-radius:8px;padding:12px;font-size:.85rem;white-space:pre-wrap">${escHtml(task.solusi)}</div></div>` : ''}
     ${task.rencana ? `<div class="mb-16"><div class="fw-700 mb-4" style="color:#1565c0">📌 Rencana Besok</div><div style="background:#e3f2fd;border-radius:8px;padding:12px;font-size:.85rem;white-space:pre-wrap">${escHtml(task.rencana)}</div></div>` : ''}
     <div class="text-xs" style="color:#999">Dikirim: ${formatDateTime(task.createdAt)}</div>`,
     true
