@@ -2467,30 +2467,56 @@ function renderPanduan() {
 
   // Manager instructions
   if (level >= 3) {
-    content += `<div class="card mb-16" style="border-left:4px solid #00695c"><div class="fw-700 mb-8" style="color:#00695c">📊 Monitoring Tim (Manager)</div>
+    content += `<div class="card mb-16" style="border-left:4px solid #00695c"><div class="fw-700 mb-8" style="color:#00695c">📊 Monitoring & Approval (Manager)</div>
       <div class="text-sm" style="line-height:2">
-        <div><b>1.</b> Tab <b>"📊 Report Tim"</b>: lihat semua daily report anggota divisi.</div>
-        <div><b>2.</b> Gunakan <b>filter tanggal</b> untuk melihat laporan periode tertentu.</div>
-        <div><b>3.</b> Report dikelompokkan berdasarkan <b>kategori</b> pekerjaan.</div>
-        <div><b>4.</b> Approval: cek <b>Approval Center</b> untuk cuti/overtime/reimburse.</div>
+        <div><b>📊 Report Tim:</b> Lihat semua daily report anggota divisi Anda, dikelompokkan per kategori.</div>
+        <div><b>📅 Filter Tanggal:</b> Gunakan filter tanggal di tab Report Tim untuk melihat laporan periode tertentu.</div>
+        <div><b>✅ Approval Center:</b> Approve/reject pengajuan cuti, overtime, reimburse dari bawahan.</div>
+        <div><b>📋 Penugasan:</b> Assign task ke karyawan divisi sendiri (tidak bisa lintas divisi).</div>
+        <div><b>⚠️ Penalty:</b> Berikan penalty point ke karyawan divisi sendiri.</div>
+        <div><b>📈 KPI:</b> Lihat skor KPI tim — penalty otomatis mengurangi skor.</div>
       </div></div>`;
 
-    content += `<div class="card mb-16" style="border-left:4px solid #1565c0"><div class="fw-700 mb-8" style="color:#1565c0">📅 Meeting & Broadcast</div>
+    content += `<div class="card mb-16" style="border-left:4px solid #1565c0"><div class="fw-700 mb-8" style="color:#1565c0">📅 Meeting & Broadcast (Manager)</div>
       <div class="text-sm" style="line-height:2">
-        <div><b>Meeting:</b> Buat meeting → pilih tipe (General/Divisi) → undang peserta.</div>
-        <div><b>Online:</b> Meeting online via video call (Jitsi). Link aktif 15 menit sebelum jadwal.</div>
-        <div><b>Broadcast:</b> Kirim pengumuman ke divisi sendiri atau semua. Tidak lintas divisi kecuali General.</div>
+        <div><b>Buat Meeting:</b> Pilih tipe General (semua divisi) atau Divisi (hanya divisi sendiri).</div>
+        <div><b>Meeting Online:</b> Video call via Jitsi. Link aktif 15 menit sebelum jadwal.</div>
+        <div><b>Broadcast:</b> Kirim ke divisi sendiri atau General. Broadcast divisi lain tidak tampil ke Anda.</div>
+        <div><b>Undangan:</b> Hanya menerima undangan yang ditujukan untuk divisi/perorangan Anda.</div>
+      </div></div>`;
+
+    content += `<div class="card mb-16" style="border-left:4px solid #37474f"><div class="fw-700 mb-8" style="color:#37474f">👥 Rekrutmen & Karyawan (Manager)</div>
+      <div class="text-sm" style="line-height:2">
+        <div><b>Lowongan:</b> Buat lowongan (pilih posisi & departemen dari dropdown).</div>
+        <div><b>Pipeline:</b> Kelola kandidat dari Applied → DISC → Interview → Offering → Hired.</div>
+        <div><b>Test Kesehatan:</b> Jadwalkan test kesehatan untuk calon/karyawan, lihat hasil divisi sendiri.</div>
+        <div><b>Data Karyawan:</b> Lihat & edit data karyawan, onboarding, offboarding.</div>
       </div></div>`;
   }
 
   // Head instructions
   if (level >= 4) {
-    content += `<div class="card mb-16" style="border-left:4px solid #c62828"><div class="fw-700 mb-8" style="color:#c62828">🏢 Laporan Semua Divisi (Head)</div>
+    content += `<div class="card mb-16" style="border-left:4px solid #c62828"><div class="fw-700 mb-8" style="color:#c62828">🏢 Akses Head (Lintas Divisi)</div>
       <div class="text-sm" style="line-height:2">
-        <div><b>1.</b> Tab <b>"🏢 Semua Divisi"</b>: lihat gabungan report dari semua departemen.</div>
-        <div><b>2.</b> Report dikelompokkan per <b>Departemen → Kategori</b>.</div>
-        <div><b>3.</b> Gunakan filter tanggal untuk periode tertentu.</div>
-        <div><b>4.</b> Bisa melihat semua broadcast & meeting lintas divisi.</div>
+        <div><b>🏢 Semua Divisi:</b> Tab khusus untuk melihat gabungan report SEMUA departemen.</div>
+        <div><b>📊 Grouping:</b> Report dikelompokkan per Departemen → Kategori → Nama.</div>
+        <div><b>📡 Broadcast:</b> Bisa melihat semua broadcast dari semua divisi.</div>
+        <div><b>📅 Meeting:</b> Bisa melihat semua meeting lintas divisi.</div>
+        <div><b>⚠️ Penalty:</b> Bisa memberikan penalty ke karyawan dari semua divisi.</div>
+        <div><b>🩺 Test Kesehatan:</b> Melihat semua hasil test kesehatan lintas divisi.</div>
+        <div><b>📈 KPI:</b> Melihat seluruh data KPI karyawan.</div>
+      </div></div>`;
+  }
+
+  // BOD instructions
+  if (level >= 5) {
+    content += `<div class="card mb-16" style="border-left:4px solid #4a148c"><div class="fw-700 mb-8" style="color:#4a148c">🎯 Board of Directors (BOD)</div>
+      <div class="text-sm" style="line-height:2">
+        <div><b>Dashboard:</b> Melihat ringkasan keseluruhan perusahaan (karyawan, absensi, pengajuan).</div>
+        <div><b>📊 Report:</b> Melihat gabungan daily report dari semua divisi (tanpa perlu input task sendiri).</div>
+        <div><b>📈 KPI:</b> Monitor performa semua karyawan.</div>
+        <div><b>📡 Broadcast:</b> Lihat semua komunikasi broadcast.</div>
+        <div><b>📋 Tidak perlu:</b> BOD tidak perlu mengisi daily task — hanya monitoring & decision making.</div>
       </div></div>`;
   }
 
@@ -2498,11 +2524,14 @@ function renderPanduan() {
   if (level >= 6) {
     content += `<div class="card mb-16" style="border-left:4px solid #1a1a1a"><div class="fw-700 mb-8" style="color:#1a1a1a">🔧 Administrasi Sistem (Admin)</div>
       <div class="text-sm" style="line-height:2">
-        <div><b>Akun:</b> Manajemen Akun → tambah/edit user, set role & departemen.</div>
-        <div><b>KPI:</b> KPI & Penilaian → input nilai, edit, hapus, sinkron penalty.</div>
-        <div><b>Data:</b> Admin punya akses penuh ke semua modul (edit/hapus semua data).</div>
-        <div><b>Reset:</b> System Admin → backup data / reset sistem (hati-hati!).</div>
-        <div><b>Rekrutmen:</b> Kelola lowongan, pipeline kandidat, DISC test, test kesehatan.</div>
+        <div><b>👤 Manajemen Akun:</b> Tambah/edit user, set role (staff/leader/manager/head/bod/admin) & departemen.</div>
+        <div><b>📈 KPI & Penilaian:</b> Input nilai KPI, edit, hapus semua data. Sinkron penalty ke KPI.</div>
+        <div><b>✏️ Full Edit:</b> Admin bisa edit & hapus semua data (task, report, penalty, dll) milik user manapun.</div>
+        <div><b>🔧 System Admin:</b> Backup data / reset sistem. Hati-hati dengan reset!</div>
+        <div><b>🔍 Rekrutmen:</b> Kelola lowongan, pipeline, kandidat, DISC test, test kesehatan.</div>
+        <div><b>📄 Legal & Aset:</b> Kontrak, asset management, peraturan perusahaan, generator surat.</div>
+        <div><b>💰 Penggajian:</b> Generate slip gaji, tax & BPJS, insentif, tunjangan.</div>
+        <div><b>📱 QR & PWA:</b> Share aplikasi, generate QR code untuk akses karyawan.</div>
       </div></div>`;
   }
 

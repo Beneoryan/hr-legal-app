@@ -1223,14 +1223,12 @@ async function loadDailyTasks(filter) {
   }
   const today = todayStr();
   let filtered = _dailyTaskData;
-  if (filter === 'today')
-    filtered = _dailyTaskData.filter((t) => t.tanggal === today && !t.done && t.type !== 'report');
+  if (filter === 'today') filtered = _dailyTaskData.filter((t) => t.tanggal === today && !t.done);
   else if (filter === 'upcoming')
-    filtered = _dailyTaskData.filter((t) => t.tanggal > today && !t.done && t.type !== 'report');
-  else if (filter === 'done')
-    filtered = _dailyTaskData.filter((t) => t.done && t.type !== 'report');
+    filtered = _dailyTaskData.filter((t) => t.tanggal > today && !t.done);
+  else if (filter === 'done') filtered = _dailyTaskData.filter((t) => t.done);
   else if (filter === 'overdue')
-    filtered = _dailyTaskData.filter((t) => t.tanggal < today && !t.done && t.type !== 'report');
+    filtered = _dailyTaskData.filter((t) => t.tanggal < today && !t.done);
   else if (filter === 'assigned')
     filtered = _dailyTaskData.filter(
       (t) => t.assignedBy === currentUser.id && t.userId !== currentUser.id
@@ -1239,7 +1237,9 @@ async function loadDailyTasks(filter) {
     filtered = _dailyTaskData.filter(
       (t) =>
         (t.type === 'report' || (t.title && t.title.includes('Daily Report'))) &&
-        t.userId === currentUser.id
+        (t.userId === currentUser.id ||
+          (t.targetUserName || '').toLowerCase().trim() ===
+            (currentUser.nama || '').toLowerCase().trim())
     );
   else if (filter === 'team-report') {
     const myDept2 = (currentUser.departemen || '').toLowerCase().trim();

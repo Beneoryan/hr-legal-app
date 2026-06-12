@@ -307,9 +307,13 @@ function buildNavItems(isPortalUser) {
       ['approval-mgmt', '⚙️', 'Approval Mgmt'],
       ['system-admin', '🔧', 'Reset & Backup'],
       ['qr-share', '📱', 'QR & PWA'],
+      ['panduan', '📖', 'Panduan Sistem'],
     ]);
   } else if (hasAccess(3)) {
-    nav += navGroup('⚙️ Pengaturan', [['qr-share', '📱', 'QR & PWA']]);
+    nav += navGroup('⚙️ Pengaturan', [
+      ['qr-share', '📱', 'QR & PWA'],
+      ['panduan', '📖', 'Panduan Sistem'],
+    ]);
   }
   return nav;
 }
