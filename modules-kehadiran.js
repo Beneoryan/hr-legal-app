@@ -1090,26 +1090,49 @@ function buildGCalUrl(t) {
 
 async function renderDailyTask() {
   const main = document.getElementById('mainContent');
-  const teamTab = hasAccess(2)
-    ? '<div class="tab" onclick="filterDailyTasks(\'team\')">👥 Tim Saya</div>'
-    : '';
-  const assignedTab = hasAccess(3)
-    ? '<div class="tab" onclick="filterDailyTasks(\'assigned\')">Ditugaskan</div>'
-    : '';
+  // Build tabs based on role hierarchy
+  let tabs = '<div class="tab active" onclick="filterDailyTasks(\'all\')">Semua</div>';
+  tabs += '<div class="tab" onclick="filterDailyTasks(\'today\')">Hari Ini</div>';
+  if (!hasAccess(5)) {
+    // Staff to Head have tasks
+    tabs += '<div class="tab" onclick="filterDailyTasks(\'upcoming\')">Mendatang</div>';
+    tabs += '<div class="tab" onclick="filterDailyTasks(\'done\')">Selesai</div>';
+    tabs += '<div class="tab" onclick="filterDailyTasks(\'overdue\')">Terlambat</div>';
+  }
+  tabs += '<div class="tab" onclick="filterDailyTasks(\'report\')">📝 Daily Report</div>';
+  if (hasAccess(2)) {
+    // Leader+ can see team reports
+    tabs += '<div class="tab" onclick="filterDailyTasks(\'team-report\')">📊 Report Tim</div>';
+  }
+  if (hasAccess(4)) {
+    // Head+ sees all divisions
+    tabs += '<div class="tab" onclick="filterDailyTasks(\'all-report\')">🏢 Semua Divisi</div>';
+  }
+  if (hasAccess(2) && !hasAccess(5)) {
+    // Leader/Manager/Head can assign tasks
+    tabs += '<div class="tab" onclick="filterDailyTasks(\'assigned\')">📋 Ditugaskan</div>';
+  }
+
+  // Button: Staff only sees report, Leader+ sees both
+  let addBtn = '';
+  if (hasAccess(5)) {
+    // BOD: no task, only view reports
+    addBtn = '';
+  } else if (hasAccess(2)) {
+    // Leader/Manager/Head: can add task + report
+    addBtn =
+      '<button class="btn btn-primary btn-sm" onclick="modalAddTaskChoice()">+ Tambah</button>';
+  } else {
+    // Staff: can only add report
+    addBtn =
+      '<button class="btn btn-primary btn-sm" onclick="modalAddDailyReport()">+ Daily Report</button>';
+  }
+
   main.innerHTML = `
-    <div class="page-title"><span>📋 Daily Task & Report</span><button class="btn btn-primary btn-sm" onclick="modalAddTaskChoice()">+ Tambah</button></div>
+    <div class="page-title"><span>📋 Daily Task & Report</span>${addBtn}</div>
     <div class="stats-grid mb-16" id="taskStats"></div>
     <div class="card">
-      <div class="tabs mb-16" id="taskTabs">
-        <div class="tab active" onclick="filterDailyTasks('all')">Semua</div>
-        <div class="tab" onclick="filterDailyTasks('today')">Hari Ini</div>
-        <div class="tab" onclick="filterDailyTasks('upcoming')">Mendatang</div>
-        <div class="tab" onclick="filterDailyTasks('done')">Selesai</div>
-        <div class="tab" onclick="filterDailyTasks('overdue')">Terlambat</div>
-        <div class="tab" onclick="filterDailyTasks('report')">📝 Daily Report</div>
-        ${teamTab}
-        ${assignedTab}
-      </div>
+      <div class="tabs mb-16" id="taskTabs">${tabs}</div>
       <div id="taskList">Loading...</div>
     </div>`;
   await loadDailyTasks('all');
@@ -1145,9 +1168,10 @@ async function loadDailyTasks(filter) {
       upcoming: 'Mendatang',
       done: 'Selesai',
       overdue: 'Terlambat',
-      assigned: 'Ditugaskan',
+      assigned: '📋 Ditugaskan',
       report: '📝 Daily Report',
-      team: '👥 Tim Saya',
+      'team-report': '📊 Report Tim',
+      'all-report': '🏢 Semua Divisi',
     };
     if (t.textContent.trim() === map[filter]) t.classList.add('active');
   });
@@ -1155,20 +1179,36 @@ async function loadDailyTasks(filter) {
     const snap = await db.collection('hrd_daily_tasks').get();
     _dailyTaskData = [];
     const myDept = (currentUser.departemen || '').toLowerCase().trim();
+    const myId = currentUser.id;
     snap.forEach((d) => {
       const t = d.data();
-      // Visibility rules:
-      // - Own tasks always visible
-      // - Leader/Manager/Head (level 2+): can see tasks from own department members
-      // - Admin: sees all
-      if (t.userId === currentUser.id || t.assignedBy === currentUser.id) {
+      const taskDept = (t.departemen || '').toLowerCase().trim();
+      // Hierarchy-based visibility:
+      if (hasAccess(6)) {
+        // Admin: all access
         _dailyTaskData.push({ id: d.id, ...t });
-      } else if (hasAccess(2) && !hasAccess(6)) {
-        // Leader/Manager/Head: see own department only
-        const taskDept = (t.departemen || '').toLowerCase().trim();
-        if (taskDept === myDept) _dailyTaskData.push({ id: d.id, ...t });
-      } else if (hasAccess(6)) {
-        _dailyTaskData.push({ id: d.id, ...t });
+      } else if (hasAccess(5)) {
+        // BOD: sees all reports (gabungan semua divisi), no tasks
+        if (t.type === 'report') _dailyTaskData.push({ id: d.id, ...t });
+      } else if (hasAccess(4)) {
+        // Head: own data + all divisions reports + own dept tasks
+        if (t.userId === myId || t.assignedBy === myId) {
+          _dailyTaskData.push({ id: d.id, ...t });
+        } else if (t.type === 'report') {
+          _dailyTaskData.push({ id: d.id, ...t }); // All divisions reports
+        } else if (taskDept === myDept) {
+          _dailyTaskData.push({ id: d.id, ...t }); // Own dept tasks
+        }
+      } else if (hasAccess(2)) {
+        // Leader/Manager: own data + own dept reports/tasks only
+        if (t.userId === myId || t.assignedBy === myId) {
+          _dailyTaskData.push({ id: d.id, ...t });
+        } else if (taskDept === myDept) {
+          _dailyTaskData.push({ id: d.id, ...t }); // Own dept only
+        }
+      } else {
+        // Staff: own data only (tasks assigned to them + own reports)
+        if (t.userId === myId) _dailyTaskData.push({ id: d.id, ...t });
       }
     });
   } catch (e) {
@@ -1188,8 +1228,17 @@ async function loadDailyTasks(filter) {
     filtered = _dailyTaskData.filter(
       (t) => t.assignedBy === currentUser.id && t.userId !== currentUser.id
     );
-  else if (filter === 'report') filtered = _dailyTaskData.filter((t) => t.type === 'report');
-  else if (filter === 'team') filtered = _dailyTaskData.filter((t) => t.userId !== currentUser.id);
+  else if (filter === 'report')
+    filtered = _dailyTaskData.filter((t) => t.type === 'report' && t.userId === currentUser.id);
+  else if (filter === 'team-report') {
+    const myDept2 = (currentUser.departemen || '').toLowerCase().trim();
+    filtered = _dailyTaskData.filter(
+      (t) => t.type === 'report' && (t.departemen || '').toLowerCase().trim() === myDept2
+    );
+  } else if (filter === 'all-report') {
+    filtered = _dailyTaskData.filter((t) => t.type === 'report');
+  } else if (filter === 'team')
+    filtered = _dailyTaskData.filter((t) => t.userId !== currentUser.id);
   const priorityOrder = { high: 0, medium: 1, low: 2 };
   filtered.sort((a, b) => {
     if (!a.done && !b.done) {
@@ -1312,19 +1361,39 @@ function viewDailyTask(id) {
 }
 
 async function modalAddTask() {
-  // If admin/manager/head/bod, show user assignment dropdown with self option
+  // Leader/Manager/Head can assign tasks to subordinates in SAME department only
   let assignHtml = '';
-  if (hasAccess(3)) {
+  if (hasAccess(2) && !hasAccess(5)) {
+    // Leader to Head (not BOD)
+    try {
+      const usersSnap = await db.collection('hrd_users').get();
+      const myDept = (currentUser.departemen || '').toLowerCase().trim();
+      let opts =
+        '<option value="self">\u{1F4DD} Untuk Diri Sendiri</option><option disabled>\u2500\u2500 Tugaskan ke Anggota Tim \u2500\u2500</option>';
+      usersSnap.forEach((d) => {
+        const u = d.data();
+        if (u.status !== 'nonaktif' && d.id !== currentUser.id) {
+          // Non-admin: only show same department
+          if (!hasAccess(6) && (u.departemen || '').toLowerCase().trim() !== myDept) return;
+          opts += `<option value="${d.id}" data-nama="${escHtml(u.nama)}">${escHtml(u.nama)} (${escHtml(u.departemen || '-')})</option>`;
+        }
+      });
+      assignHtml = `<div class="form-group"><label>Tugaskan Ke</label><select class="form-control" id="dtAssignUser">${opts}</select></div>`;
+    } catch (_e) {
+      assignHtml = '';
+    }
+  } else if (hasAccess(6)) {
+    // Admin: all users
     try {
       const usersSnap = await db.collection('hrd_users').get();
       let opts =
-        '<option value="self">\u{1F4DD} Untuk Diri Sendiri (Catatan Pribadi)</option><option disabled>\u2500\u2500 Tugaskan ke Karyawan \u2500\u2500</option>';
+        '<option value="self">\u{1F4DD} Untuk Diri Sendiri</option><option disabled>\u2500\u2500 Tugaskan ke Karyawan \u2500\u2500</option>';
       usersSnap.forEach((d) => {
         const u = d.data();
-        if (u.status !== 'nonaktif')
-          opts += `<option value="${d.id}" data-nama="${escHtml(u.nama)}">${escHtml(u.nama)} (${u.role})</option>`;
+        if (u.status !== 'nonaktif' && d.id !== currentUser.id)
+          opts += `<option value="${d.id}" data-nama="${escHtml(u.nama)}">${escHtml(u.nama)} (${escHtml(u.departemen || '-')})</option>`;
       });
-      assignHtml = `<div class="form-group"><label>Untuk Siapa</label><select class="form-control" id="dtAssignUser">${opts}</select></div>`;
+      assignHtml = `<div class="form-group"><label>Tugaskan Ke</label><select class="form-control" id="dtAssignUser">${opts}</select></div>`;
     } catch (_e) {
       assignHtml = '';
     }
