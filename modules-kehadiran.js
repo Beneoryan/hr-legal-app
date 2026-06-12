@@ -1242,6 +1242,11 @@ async function loadDailyTasks(filter) {
     filtered = _dailyTaskData.filter(
       (t) => t.type === 'report' && (t.departemen || '').toLowerCase().trim() === myDept2
     );
+    // Apply date range filter
+    const drFrom = document.getElementById('reportDateFrom')?.value || '';
+    const drTo = document.getElementById('reportDateTo')?.value || '';
+    if (drFrom) filtered = filtered.filter((t) => (t.tanggal || '') >= drFrom);
+    if (drTo) filtered = filtered.filter((t) => (t.tanggal || '') <= drTo);
     // Sort by kategori then date
     filtered.sort(
       (a, b) =>
@@ -1250,6 +1255,11 @@ async function loadDailyTasks(filter) {
     );
   } else if (filter === 'all-report') {
     filtered = _dailyTaskData.filter((t) => t.type === 'report');
+    // Apply date range filter
+    const drFrom = document.getElementById('reportDateFrom')?.value || '';
+    const drTo = document.getElementById('reportDateTo')?.value || '';
+    if (drFrom) filtered = filtered.filter((t) => (t.tanggal || '') >= drFrom);
+    if (drTo) filtered = filtered.filter((t) => (t.tanggal || '') <= drTo);
     // Sort by departemen then kategori then date
     filtered.sort(
       (a, b) =>
@@ -1277,13 +1287,27 @@ async function loadDailyTasks(filter) {
     statsEl.innerHTML = `<div class="stat-card" style="border-left-color:#1565c0"><div class="stat-value" style="color:#1565c0">${totalTasks}</div><div class="stat-label">Total Task</div></div><div class="stat-card" style="border-left-color:#f57f17"><div class="stat-value" style="color:#f57f17">${todayTasks}</div><div class="stat-label">Hari Ini</div></div><div class="stat-card" style="border-left-color:#c62828"><div class="stat-value" style="color:#c62828">${overdueTasks}</div><div class="stat-label">Terlambat</div></div><div class="stat-card" style="border-left-color:#2e7d32"><div class="stat-value" style="color:#2e7d32">${doneTasks}</div><div class="stat-label">Selesai</div></div>`;
   const listEl = document.getElementById('taskList');
   if (!listEl) return;
+  // Show date range filter for team-report and all-report tabs
+  let dateFilterHtml = '';
+  if (filter === 'team-report' || filter === 'all-report') {
+    const curFrom = document.getElementById('reportDateFrom')?.value || '';
+    const curTo = document.getElementById('reportDateTo')?.value || '';
+    dateFilterHtml = `<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;padding:10px;background:#f8f9ff;border-radius:8px">
+      <span class="text-sm fw-700">📅 Periode:</span>
+      <input type="date" class="form-control" id="reportDateFrom" value="${curFrom}" style="max-width:160px;padding:6px 10px" onchange="loadDailyTasks('${filter}')">
+      <span class="text-sm">s/d</span>
+      <input type="date" class="form-control" id="reportDateTo" value="${curTo}" style="max-width:160px;padding:6px 10px" onchange="loadDailyTasks('${filter}')">
+      <button class="btn btn-xs btn-outline" onclick="document.getElementById('reportDateFrom').value='';document.getElementById('reportDateTo').value='';loadDailyTasks('${filter}')">Reset</button>
+    </div>`;
+  }
   if (!filtered.length) {
     listEl.innerHTML =
-      '<div style="text-align:center;padding:32px;color:var(--text-light)"><div style="font-size:2rem;margin-bottom:8px">✅</div><p>Tidak ada task</p></div>';
+      dateFilterHtml +
+      '<div style="text-align:center;padding:32px;color:var(--text-light)"><div style="font-size:2rem;margin-bottom:8px">✅</div><p>Tidak ada data untuk periode ini</p></div>';
     return;
   }
   const isAdmin = hasAccess(3);
-  let html = '';
+  let html = dateFilterHtml;
   // Add group headers for report views
   let lastGroup = '';
   let lastSubGroup = '';
