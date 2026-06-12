@@ -413,21 +413,28 @@ async function renderPortalBroadcast() {
   // Filter: user hanya melihat broadcast yang ditujukan untuk mereka
   const myDept = (currentUser.departemen || '').toLowerCase().trim();
   const myId = currentUser.id || '';
+  const myNama = (currentUser.nama || '').toLowerCase().trim();
   const items = allItems.filter((p) => {
-    // General/all broadcast → tampil ke semua
-    if (!p.targetType || p.targetType === 'all') return true;
-    // Personal broadcast → hanya target user
-    if (p.targetType === 'personal') {
-      return (p.targetIds || []).includes(myId);
+    // New broadcasts with targetType field
+    if (p.targetType) {
+      if (p.targetType === 'all') return true;
+      if (p.targetType === 'personal') return (p.targetIds || []).includes(myId);
+      if (p.targetType === 'departemen') {
+        const bcDept = (p.targetDepartemen || '').toLowerCase().trim();
+        return bcDept === myDept || (p.targetIds || []).includes(myId);
+      }
     }
-    // Departemen broadcast → hanya user dari dept yang sama
-    if (p.targetType === 'departemen') {
-      const bcDept = (p.targetDepartemen || '').toLowerCase().trim();
-      return bcDept === myDept || (p.targetIds || []).includes(myId);
+    // Legacy broadcasts (no targetType) — infer from targetLabel
+    const label = (p.targetLabel || '').toLowerCase();
+    if (label === 'semua' || label.includes('general') || !label) return true;
+    if (label.includes('divisi')) {
+      const deptName = label.replace('divisi', '').trim();
+      return deptName === myDept;
     }
-    // Fallback: check targetIds array
+    // Personal target → check targetIds or name match
     if (p.targetIds && p.targetIds.length > 0) return p.targetIds.includes(myId);
-    return true;
+    if (label === myNama) return true;
+    return false;
   });
   items.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   // Group by target
