@@ -1246,7 +1246,7 @@ async function loadDailyTasks(filter) {
     filtered = _dailyTaskData.filter(
       (t) =>
         (t.type === 'report' || (t.title && t.title.includes('Daily Report'))) &&
-        (t.departemen || '').toLowerCase().trim() === myDept2
+        ((t.departemen || '').toLowerCase().trim() === myDept2 || !t.departemen)
     );
     // Apply date range filter
     const drFrom = document.getElementById('reportDateFrom')?.value || '';
