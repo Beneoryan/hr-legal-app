@@ -1326,8 +1326,24 @@ async function renderBroadcast() {
   const main = document.getElementById('mainContent');
   main.innerHTML = `<div class="page-title"><span>📡 Broadcast</span><button class="btn btn-primary btn-sm" onclick="modalBroadcast()">+ Kirim</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Pesan</th><th>Target</th><th>Pengirim</th><th>Tanggal</th><th>Aksi</th></tr></thead><tbody id="tblBroadcast"></tbody></table></div></div>`;
   const snap = await db.collection('hrd_broadcast').get();
-  const items = [];
-  snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
+  const allItems = [];
+  snap.forEach((d) => allItems.push({ id: d.id, ...d.data() }));
+  // Admin/head see all; others only see broadcasts targeted to them
+  let items = allItems;
+  if (!hasAccess(4)) {
+    const myDept = (currentUser.departemen || '').toLowerCase().trim();
+    const myId = currentUser.id || '';
+    items = allItems.filter((p) => {
+      if (!p.targetType || p.targetType === 'all') return true;
+      if (p.targetType === 'personal') return (p.targetIds || []).includes(myId);
+      if (p.targetType === 'departemen') {
+        const bcDept = (p.targetDepartemen || '').toLowerCase().trim();
+        return bcDept === myDept || (p.targetIds || []).includes(myId);
+      }
+      if (p.targetIds && p.targetIds.length > 0) return p.targetIds.includes(myId);
+      return true;
+    });
+  }
   items.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   let h = '';
   if (!items.length) h = '<tr><td colspan="5" class="text-center">Belum ada</td></tr>';
@@ -1370,20 +1386,35 @@ async function kirimBroadcast() {
   const users = await getAllUsers();
   let targetIds = [];
   let targetLabel = 'Semua';
+  let targetType = 'all';
+  let targetDepartemen = '';
   if (target === 'all') {
     targetIds = users.map((u) => u.id);
-    targetLabel = 'Semua';
+    targetLabel = 'Semua (General)';
+    targetType = 'all';
   } else if (target.startsWith('dept:')) {
     const dept = target.replace('dept:', '');
     targetIds = users.filter((u) => u.departemen === dept).map((u) => u.id);
     targetLabel = 'Divisi ' + dept;
+    targetType = 'departemen';
+    targetDepartemen = dept;
   } else if (target.startsWith('user:')) {
     targetIds = [target.replace('user:', '')];
-    targetLabel = users.find((u) => u.id === targetIds[0])?.nama || 'User';
+    const targetUser = users.find((u) => u.id === targetIds[0]);
+    targetLabel = targetUser?.nama || 'User';
+    targetType = 'personal';
+    targetDepartemen = targetUser?.departemen || '';
   }
-  await db
-    .collection('hrd_broadcast')
-    .add({ pesan, targetLabel, pengirim: currentUser.nama, createdAt: new Date().toISOString() });
+  await db.collection('hrd_broadcast').add({
+    pesan,
+    targetLabel,
+    targetType,
+    targetDepartemen,
+    targetIds,
+    pengirim: currentUser.nama,
+    pengirimDept: currentUser.departemen || '',
+    createdAt: new Date().toISOString(),
+  });
   await sendNotificationBulk(
     targetIds,
     '📡 Broadcast',
