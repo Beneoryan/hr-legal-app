@@ -1445,7 +1445,7 @@ function viewDailyTask(id) {
       ${task.targetUserName ? `<tr><td style="padding:8px;font-weight:700">Untuk</td><td style="padding:8px">${escHtml(task.targetUserName)}</td></tr>` : ''}
       ${task.doneAt ? `<tr><td style="padding:8px;font-weight:700">Selesai pada</td><td style="padding:8px">${formatDate(task.doneAt.split('T')[0])} ${task.doneAt.split('T')[1] ? task.doneAt.split('T')[1].substring(0, 5) : ''}</td></tr>` : ''}
     </table>
-    ${task.attachments && task.attachments.length ? `<div style="margin-top:16px;padding:16px;background:#f8f9ff;border-radius:10px;border:1px solid var(--border)"><div class="fw-700 mb-12" style="color:var(--primary)">📎 Lampiran Eviden (${task.attachments.length} file)</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px">${task.attachments.map((a, i) => (a.type && a.type.startsWith('image/') ? `<div style="text-align:center"><a href="${a.data}" target="_blank" style="display:block"><img src="${a.data}" style="width:100%;height:90px;object-fit:cover;border-radius:8px;border:2px solid var(--border)"></a><div style="font-size:.6rem;color:#666;margin-top:4px">${escHtml(a.name || 'Foto ' + (i + 1))}</div></div>` : `<a href="${a.data}" download="${escHtml(a.name)}" style="text-decoration:none;display:flex;flex-direction:column;align-items:center;padding:12px;background:#fff;border-radius:8px;border:1px solid var(--border)"><div style="font-size:2rem">${a.name && a.name.endsWith('.pdf') ? '📕' : '📄'}</div><div style="font-size:.6rem;color:#333;margin-top:4px;text-align:center;word-break:break-all">${escHtml(a.name)}</div><div style="font-size:.6rem;color:#1565c0;margin-top:4px">⬇️ Download</div></a>`)).join('')}</div></div>` : ''}
+    ${task.attachments && task.attachments.length ? `<div style="margin-top:16px;padding:16px;background:#f8f9ff;border-radius:10px;border:1px solid var(--border)"><div class="fw-700 mb-12" style="color:var(--primary)">📎 Lampiran Eviden (${task.attachments.length} file)</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px">${task.attachments.map((a, i) => (a.type && a.type.startsWith('image/') ? `<div style="text-align:center;cursor:pointer" onclick="viewEviden('${encodeURIComponent(JSON.stringify({ name: a.name, type: a.type, data: a.data }))}')"><img src="${a.data}" style="width:100%;height:90px;object-fit:cover;border-radius:8px;border:2px solid var(--border)"><div style="font-size:.6rem;color:#666;margin-top:4px">${escHtml(a.name || 'Foto ' + (i + 1))}</div></div>` : `<div style="cursor:pointer;display:flex;flex-direction:column;align-items:center;padding:12px;background:#fff;border-radius:8px;border:1px solid var(--border)" onclick="viewEviden('${encodeURIComponent(JSON.stringify({ name: a.name, type: a.type, data: a.data }))}')"><div style="font-size:2rem">${a.name && a.name.endsWith('.pdf') ? '📕' : a.name && a.name.match(/\\.docx?$/) ? '📘' : a.name && a.name.match(/\\.xlsx?$/) ? '📗' : '📄'}</div><div style="font-size:.6rem;color:#333;margin-top:4px;text-align:center;word-break:break-all">${escHtml(a.name)}</div><div style="font-size:.6rem;color:#1565c0;margin-top:4px">👁️ Lihat</div></div>`)).join('')}</div></div>` : ''}
     <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end"><a href="${buildGCalUrl(task)}" target="_blank" class="btn btn-sm btn-info" style="text-decoration:none">📅 Tambah ke Google Calendar</a><button class="btn btn-sm btn-outline" onclick="closeModalDirect()">Tutup</button></div>`);
 }
 
@@ -1937,6 +1937,41 @@ function stopCamera() {
   }
 }
 
+function viewEviden(encodedData) {
+  try {
+    const file = JSON.parse(decodeURIComponent(encodedData));
+    const isImage = file.type && file.type.startsWith('image/');
+    const isPdf =
+      (file.type && file.type === 'application/pdf') ||
+      (file.name && file.name.toLowerCase().endsWith('.pdf'));
+    let content = '';
+    if (isImage) {
+      content = `<img src="${file.data}" style="width:100%;max-height:70vh;object-fit:contain;border-radius:8px">`;
+    } else if (isPdf) {
+      content = `<iframe src="${file.data}" style="width:100%;height:70vh;border:none;border-radius:8px"></iframe>`;
+    } else {
+      const ext = (file.name || '').split('.').pop().toUpperCase();
+      const icon =
+        ext === 'PDF'
+          ? '📕'
+          : ext.match(/DOCX?/)
+            ? '📘'
+            : ext.match(/XLSX?/)
+              ? '📗'
+              : ext.match(/PPTX?/)
+                ? '📙'
+                : '📄';
+      content = `<div style="text-align:center;padding:40px"><div style="font-size:4rem;margin-bottom:16px">${icon}</div><div class="fw-700 mb-8" style="font-size:1.1rem">${escHtml(file.name)}</div><p class="text-sm mb-16" style="color:#666">Preview langsung tidak tersedia untuk format ${ext}.</p><div style="display:flex;gap:12px;justify-content:center"><a href="${file.data}" target="_blank" class="btn btn-primary">📂 Buka di Tab Baru</a><a href="${file.data}" download="${escHtml(file.name)}" class="btn btn-outline">⬇️ Download</a></div></div>`;
+    }
+    openModal(
+      `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div class="fw-700" style="font-size:1rem">📎 ${escHtml(file.name || 'Lampiran')}</div><button class="btn btn-xs btn-outline" onclick="closeModalDirect()">✕</button></div>${content}`,
+      true
+    );
+  } catch (e) {
+    toast('Gagal membuka file', 'error');
+  }
+}
+
 function startTaskReminderCheck() {
   if (_reminderCheckInterval) clearInterval(_reminderCheckInterval);
   // Check immediately then every 2 minutes
@@ -2071,7 +2106,7 @@ function viewDailyReport(id) {
     ${task.rencana ? `<div class="mb-16"><div class="fw-700 mb-4" style="color:#1565c0">📌 Rencana Besok</div><div style="background:#e3f2fd;border-radius:8px;padding:12px;font-size:.85rem;white-space:pre-wrap">${escHtml(task.rencana)}</div></div>` : ''}
     ${task.komentarAtasan ? `<div class="mb-16"><div class="fw-700 mb-4" style="color:#6a1b9a">💬 Komentar untuk Atasan</div><div style="background:#f3e5f5;border-radius:8px;padding:12px;font-size:.85rem;white-space:pre-wrap">${escHtml(task.komentarAtasan)}</div></div>` : ''}
     ${task.komentarRekan ? `<div class="mb-16"><div class="fw-700 mb-4" style="color:#00695c">🤝 Komentar untuk Rekan Kerja</div><div style="background:#e0f2f1;border-radius:8px;padding:12px;font-size:.85rem;white-space:pre-wrap">${escHtml(task.komentarRekan)}</div></div>` : ''}
-    ${task.attachments && task.attachments.length ? `<div class="mb-16" style="padding:16px;background:#f8f9ff;border-radius:10px;border:1px solid var(--border)"><div class="fw-700 mb-12" style="color:#37474f">📎 Lampiran Eviden (${task.attachments.length} file)</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px">${task.attachments.map((a, i) => (a.type && a.type.startsWith('image/') ? `<div style="text-align:center"><a href="${a.data}" target="_blank" style="display:block"><img src="${a.data}" style="width:100%;height:100px;object-fit:cover;border-radius:8px;border:2px solid var(--border)"></a><div style="font-size:.6rem;color:#666;margin-top:4px">${escHtml(a.name || 'Foto ' + (i + 1))}</div></div>` : `<a href="${a.data}" download="${escHtml(a.name)}" style="text-decoration:none;display:flex;flex-direction:column;align-items:center;padding:14px;background:#fff;border-radius:8px;border:1px solid var(--border)"><div style="font-size:2.5rem">${a.name && a.name.endsWith('.pdf') ? '📕' : a.name && a.name.match(/\\.docx?$/) ? '📘' : a.name && a.name.match(/\\.xlsx?$/) ? '📗' : '📄'}</div><div style="font-size:.65rem;color:#333;margin-top:6px;text-align:center;word-break:break-all">${escHtml(a.name)}</div><div style="font-size:.6rem;color:#1565c0;margin-top:4px;font-weight:600">⬇️ Download</div></a>`)).join('')}</div></div>` : ''}
+    ${task.attachments && task.attachments.length ? `<div class="mb-16" style="padding:16px;background:#f8f9ff;border-radius:10px;border:1px solid var(--border)"><div class="fw-700 mb-12" style="color:#37474f">📎 Lampiran Eviden (${task.attachments.length} file)</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px">${task.attachments.map((a, i) => (a.type && a.type.startsWith('image/') ? `<div style="text-align:center;cursor:pointer" onclick="viewEviden('${encodeURIComponent(JSON.stringify({ name: a.name, type: a.type, data: a.data }))}')"><img src="${a.data}" style="width:100%;height:100px;object-fit:cover;border-radius:8px;border:2px solid var(--border)"><div style="font-size:.6rem;color:#666;margin-top:4px">${escHtml(a.name || 'Foto ' + (i + 1))}</div></div>` : `<div style="cursor:pointer;display:flex;flex-direction:column;align-items:center;padding:14px;background:#fff;border-radius:8px;border:1px solid var(--border)" onclick="viewEviden('${encodeURIComponent(JSON.stringify({ name: a.name, type: a.type, data: a.data }))}')"><div style="font-size:2.5rem">${a.name && a.name.endsWith('.pdf') ? '📕' : a.name && a.name.match(/\\.docx?$/) ? '📘' : a.name && a.name.match(/\\.xlsx?$/) ? '📗' : '📄'}</div><div style="font-size:.65rem;color:#333;margin-top:6px;text-align:center;word-break:break-all">${escHtml(a.name)}</div><div style="font-size:.6rem;color:#1565c0;margin-top:4px;font-weight:600">👁️ Lihat</div></div>`)).join('')}</div></div>` : ''}
     <div class="text-xs" style="color:#999">Dikirim: ${formatDateTime(task.createdAt)}</div>`,
     true
   );
