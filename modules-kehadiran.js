@@ -1437,6 +1437,7 @@ function viewDailyTask(id) {
       ${task.targetUserName ? `<tr><td style="padding:8px;font-weight:700">Untuk</td><td style="padding:8px">${escHtml(task.targetUserName)}</td></tr>` : ''}
       ${task.doneAt ? `<tr><td style="padding:8px;font-weight:700">Selesai pada</td><td style="padding:8px">${formatDate(task.doneAt.split('T')[0])} ${task.doneAt.split('T')[1] ? task.doneAt.split('T')[1].substring(0, 5) : ''}</td></tr>` : ''}
     </table>
+    ${task.attachments && task.attachments.length ? `<div style="margin-top:16px"><div class="fw-700 mb-8">📎 Lampiran Eviden (${task.attachments.length})</div><div style="display:flex;gap:8px;flex-wrap:wrap">${task.attachments.map((a) => (a.type && a.type.startsWith('image/') ? `<a href="${a.data}" target="_blank"><img src="${a.data}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border)"></a>` : `<a href="${a.data}" download="${escHtml(a.name)}" class="btn btn-xs btn-outline" style="text-decoration:none">📄 ${escHtml(a.name)}</a>`)).join('')}</div></div>` : ''}
     <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end"><a href="${buildGCalUrl(task)}" target="_blank" class="btn btn-sm btn-info" style="text-decoration:none">📅 Tambah ke Google Calendar</a><button class="btn btn-sm btn-outline" onclick="closeModalDirect()">Tutup</button></div>`);
 }
 
@@ -1490,6 +1491,7 @@ async function modalAddTask() {
     <div class="grid-2"><div class="form-group"><label>Tanggal *</label><input class="form-control" type="date" id="dtDate" value="${todayStr()}"></div><div class="form-group"><label>Waktu</label><input class="form-control" type="time" id="dtTime"></div></div>
     <div class="grid-2"><div class="form-group"><label>Prioritas</label><select class="form-control" id="dtPriority"><option value="medium">Sedang</option><option value="high">Tinggi</option><option value="low">Rendah</option></select></div><div class="form-group"><label>Pengingat</label><select class="form-control" id="dtReminder"><option value="">Tidak ada</option><option value="15 menit">15 menit</option><option value="30 menit">30 menit</option><option value="1 jam">1 jam</option><option value="1 hari">1 hari</option></select></div></div>
     <div class="form-group"><label>Ulangi</label><select class="form-control" id="dtRepeat"><option value="">Tidak</option><option value="daily">Setiap Hari</option><option value="weekly">Setiap Minggu</option><option value="monthly">Setiap Bulan</option></select></div>
+    <div class="form-group"><label>📎 Lampiran (Eviden)</label><input type="file" id="dtFiles" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onchange="previewTaskFiles(this,'dtFilePreview')" style="font-size:.82rem"><div id="dtFilePreview" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"></div><div class="text-xs" style="color:#999;margin-top:4px">Maks 3 file (gambar/dokumen). Ukuran maks 2MB per file.</div></div>
     <button class="btn btn-primary" onclick="simpanDailyTask()">💾 Simpan</button>`);
 }
 
@@ -1509,6 +1511,7 @@ async function simpanDailyTask() {
   const assignedByName = targetUserId !== currentUser.id ? currentUser.nama : '';
   try {
     const kategoriEl = document.getElementById('dtKategori');
+    const attachments = await getFilesAsBase64('dtFiles');
     await db.collection('hrd_daily_tasks').add({
       title,
       description: document.getElementById('dtDesc').value.trim(),
@@ -1518,6 +1521,7 @@ async function simpanDailyTask() {
       reminder: document.getElementById('dtReminder').value,
       repeat: document.getElementById('dtRepeat').value || '',
       kategori: kategoriEl ? kategoriEl.value : '',
+      attachments,
       done: false,
       type: 'task',
       userId: targetUserId,
@@ -1789,6 +1793,48 @@ async function updateDailyReport(id) {
   await loadDailyTasks(_dailyTaskFilter);
 }
 
+// ── FILE UPLOAD HELPERS ───────────────────────────────────────
+function previewTaskFiles(input, previewId) {
+  const preview = document.getElementById(previewId);
+  if (!preview) return;
+  preview.innerHTML = '';
+  const files = Array.from(input.files).slice(0, 3);
+  files.forEach((file, i) => {
+    if (file.size > 2 * 1024 * 1024) {
+      toast(`File "${file.name}" terlalu besar (maks 2MB)`, 'warning');
+      return;
+    }
+    const isImage = file.type.startsWith('image/');
+    if (isImage) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        preview.innerHTML += `<div style="position:relative;display:inline-block"><img src="${e.target.result}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;border:1px solid var(--border)"><div style="position:absolute;top:-4px;right:-4px;background:#c62828;color:#fff;border-radius:50%;width:16px;height:16px;font-size:.6rem;display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="this.parentElement.remove()">✕</div></div>`;
+      };
+      reader.readAsDataURL(file);
+    } else {
+      const ext = file.name.split('.').pop().toUpperCase();
+      preview.innerHTML += `<div style="position:relative;display:inline-flex;align-items:center;gap:4px;padding:6px 10px;background:#f5f5f5;border-radius:6px;border:1px solid var(--border);font-size:.75rem">📄 ${ext}<div style="position:absolute;top:-4px;right:-4px;background:#c62828;color:#fff;border-radius:50%;width:16px;height:16px;font-size:.6rem;display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="this.parentElement.remove()">✕</div></div>`;
+    }
+  });
+}
+
+async function getFilesAsBase64(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input || !input.files.length) return [];
+  const files = Array.from(input.files).slice(0, 3);
+  const results = [];
+  for (const file of files) {
+    if (file.size > 2 * 1024 * 1024) continue;
+    const base64 = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.readAsDataURL(file);
+    });
+    results.push({ name: file.name, type: file.type, size: file.size, data: base64 });
+  }
+  return results;
+}
+
 function startTaskReminderCheck() {
   if (_reminderCheckInterval) clearInterval(_reminderCheckInterval);
   // Check immediately then every 2 minutes
@@ -1841,6 +1887,7 @@ async function modalAddDailyReport() {
     <div class="form-group"><label>Mood Hari Ini</label><select class="form-control" id="drMood"><option value="sangat_baik">🤩 Sangat Baik / Luar Biasa Produktif</option><option value="baik">😊 Baik / Produktif</option><option value="cukup">😐 Cukup / Biasa Saja</option><option value="kurang">😟 Kurang / Ada Hambatan</option><option value="buruk">😞 Buruk / Banyak Masalah</option><option value="sangat_buruk">😫 Sangat Buruk / Overwhelmed</option></select></div>
     <div class="form-group"><label>Komentar untuk Atasan</label><textarea class="form-control" id="drKomentarAtasan" rows="2" placeholder="Pesan/catatan khusus untuk atasan (opsional)..."></textarea></div>
     <div class="form-group"><label>Komentar untuk Rekan Kerja</label><textarea class="form-control" id="drKomentarRekan" rows="2" placeholder="Apresiasi/pesan untuk rekan tim (opsional)..."></textarea></div>
+    <div class="form-group"><label>📎 Lampiran Eviden</label><input type="file" id="drFiles" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onchange="previewTaskFiles(this,'drFilePreview')" style="font-size:.82rem"><div id="drFilePreview" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"></div><div class="text-xs" style="color:#999;margin-top:4px">Upload bukti pekerjaan (foto/dokumen). Maks 3 file, 2MB per file.</div></div>
     <button class="btn btn-primary" onclick="simpanDailyReport()">📤 Kirim Daily Report</button>`,
     true
   );
@@ -1878,8 +1925,11 @@ async function simpanDailyReport() {
     departemen: currentUser.departemen || '',
     ownerLevel: ROLES[currentUser.role] || 0,
     ownerRole: currentUser.role || '',
+    attachments: [],
     createdAt: new Date().toISOString(),
   };
+  // Get file attachments
+  data.attachments = await getFilesAsBase64('drFiles');
   try {
     await db.collection('hrd_daily_tasks').add(data);
     toast('Daily Report berhasil dikirim', 'success');
@@ -1919,6 +1969,7 @@ function viewDailyReport(id) {
     ${task.rencana ? `<div class="mb-16"><div class="fw-700 mb-4" style="color:#1565c0">📌 Rencana Besok</div><div style="background:#e3f2fd;border-radius:8px;padding:12px;font-size:.85rem;white-space:pre-wrap">${escHtml(task.rencana)}</div></div>` : ''}
     ${task.komentarAtasan ? `<div class="mb-16"><div class="fw-700 mb-4" style="color:#6a1b9a">💬 Komentar untuk Atasan</div><div style="background:#f3e5f5;border-radius:8px;padding:12px;font-size:.85rem;white-space:pre-wrap">${escHtml(task.komentarAtasan)}</div></div>` : ''}
     ${task.komentarRekan ? `<div class="mb-16"><div class="fw-700 mb-4" style="color:#00695c">🤝 Komentar untuk Rekan Kerja</div><div style="background:#e0f2f1;border-radius:8px;padding:12px;font-size:.85rem;white-space:pre-wrap">${escHtml(task.komentarRekan)}</div></div>` : ''}
+    ${task.attachments && task.attachments.length ? `<div class="mb-16"><div class="fw-700 mb-4" style="color:#37474f">📎 Lampiran Eviden (${task.attachments.length})</div><div style="display:flex;gap:8px;flex-wrap:wrap">${task.attachments.map((a) => (a.type && a.type.startsWith('image/') ? `<a href="${a.data}" target="_blank" style="display:inline-block"><img src="${a.data}" style="width:100px;height:100px;object-fit:cover;border-radius:8px;border:2px solid var(--border)"></a>` : `<a href="${a.data}" download="${escHtml(a.name)}" class="btn btn-sm btn-outline" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px">📄 ${escHtml(a.name)}</a>`)).join('')}</div></div>` : ''}
     <div class="text-xs" style="color:#999">Dikirim: ${formatDateTime(task.createdAt)}</div>`,
     true
   );
