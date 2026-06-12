@@ -1180,9 +1180,11 @@ async function loadDailyTasks(filter) {
     _dailyTaskData = [];
     const myDept = (currentUser.departemen || '').toLowerCase().trim();
     const myId = currentUser.id;
+    const myLevel = ROLES[currentUser.role] || 0;
     snap.forEach((d) => {
       const t = d.data();
       const taskDept = (t.departemen || '').toLowerCase().trim();
+      const ownerLevel = t.ownerLevel || 0;
       // Hierarchy-based visibility:
       if (hasAccess(6)) {
         // Admin: all access
@@ -1200,14 +1202,16 @@ async function loadDailyTasks(filter) {
           _dailyTaskData.push({ id: d.id, ...t }); // Own dept tasks
         }
       } else if (hasAccess(2)) {
-        // Leader/Manager: own data + own dept reports/tasks only
+        // Leader/Manager: own data + own dept (but NOT reports from manager+ level — those are private)
         if (t.userId === myId || t.assignedBy === myId) {
           _dailyTaskData.push({ id: d.id, ...t });
         } else if (taskDept === myDept) {
-          _dailyTaskData.push({ id: d.id, ...t }); // Own dept only
+          // Only show data from same or lower level (manager+ reports are private to staff/leader)
+          if (ownerLevel <= myLevel || ownerLevel === 0) _dailyTaskData.push({ id: d.id, ...t });
         }
       } else {
-        // Staff: own data only (tasks assigned to them + own reports)
+        // Staff: own data only + tasks assigned to them
+        // Cannot see leader/manager/head reports (those are private)
         if (t.userId === myId) _dailyTaskData.push({ id: d.id, ...t });
       }
     });
@@ -1235,8 +1239,21 @@ async function loadDailyTasks(filter) {
     filtered = _dailyTaskData.filter(
       (t) => t.type === 'report' && (t.departemen || '').toLowerCase().trim() === myDept2
     );
+    // Sort by kategori then date
+    filtered.sort(
+      (a, b) =>
+        (a.kategori || '').localeCompare(b.kategori || '') ||
+        (b.tanggal || '').localeCompare(a.tanggal || '')
+    );
   } else if (filter === 'all-report') {
     filtered = _dailyTaskData.filter((t) => t.type === 'report');
+    // Sort by departemen then kategori then date
+    filtered.sort(
+      (a, b) =>
+        (a.departemen || '').localeCompare(b.departemen || '') ||
+        (a.kategori || '').localeCompare(b.kategori || '') ||
+        (b.tanggal || '').localeCompare(a.tanggal || '')
+    );
   } else if (filter === 'team')
     filtered = _dailyTaskData.filter((t) => t.userId !== currentUser.id);
   const priorityOrder = { high: 0, medium: 1, low: 2 };
@@ -1280,9 +1297,9 @@ async function loadDailyTasks(filter) {
         (t.progress || 0) >= 80 ? '#2e7d32' : (t.progress || 0) >= 50 ? '#f57f17' : '#c62828';
       html += `<div style="display:flex;align-items:flex-start;gap:12px;padding:12px;border-left:4px solid #7b1fa2;margin-bottom:8px;background:#faf5ff;border-radius:0 8px 8px 0;cursor:pointer" onclick="viewDailyReport('${t.id}')">`;
       html += `<div style="font-size:1.5rem">📝</div>`;
-      html += `<div style="flex:1"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-weight:700;font-size:.9rem">${escHtml(t.title || 'Daily Report')}</span><span style="font-size:.65rem;padding:2px 6px;border-radius:4px;background:#7b1fa220;color:#7b1fa2;font-weight:600">Report</span>${moodIcon ? `<span>${moodIcon}</span>` : ''}</div>`;
+      html += `<div style="flex:1"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-weight:700;font-size:.9rem">${escHtml(t.title || 'Daily Report')}</span><span style="font-size:.65rem;padding:2px 6px;border-radius:4px;background:#7b1fa220;color:#7b1fa2;font-weight:600">Report</span>${t.kategori ? `<span style="font-size:.6rem;padding:2px 6px;border-radius:4px;background:#e3f2fd;color:#1565c0;font-weight:600">${escHtml(t.kategori)}</span>` : ''}${moodIcon ? `<span>${moodIcon}</span>` : ''}</div>`;
       html += `<div style="font-size:.8rem;color:var(--text-light);margin-top:4px">${escHtml((t.aktivitas || '').substring(0, 100))}${(t.aktivitas || '').length > 100 ? '...' : ''}</div>`;
-      html += `<div style="font-size:.7rem;color:#999;margin-top:4px">👤 ${escHtml(t.targetUserName || '')} | 📅 ${formatDate(t.tanggal)} | Progress: <span style="color:${progressColor};font-weight:600">${t.progress || 0}%</span></div>`;
+      html += `<div style="font-size:.7rem;color:#999;margin-top:4px">👤 ${escHtml(t.targetUserName || '')} | 🏢 ${escHtml(t.departemen || '-')} | 📅 ${formatDate(t.tanggal)} | Progress: <span style="color:${progressColor};font-weight:600">${t.progress || 0}%</span></div>`;
       html += `</div>`;
       html += `<div style="display:flex;gap:4px"><button class="btn btn-xs btn-info" onclick="event.stopPropagation();viewDailyReport('${t.id}')">👁️</button>${t.userId === currentUser.id || hasAccess(6) ? `<button class="btn btn-xs btn-danger" onclick="event.stopPropagation();hapusDailyTask('${t.id}')">🗑️</button>` : ''}</div></div>`;
       return;
@@ -1645,13 +1662,33 @@ function startTaskReminderCheck() {
 }
 
 // ── DAILY REPORT ──────────────────────────────────────────────
+const REPORT_CATEGORIES = {
+  ACADEMIC: ['SISWA', 'TSK-JOB', 'SENSEI', 'CURRICULUM'],
+  OFFICE: ["FACILITY'S", 'FINANCE', 'HR & LEGAL', 'PROMOSI', 'DOCUMENT', 'MARKETING & SALES'],
+};
+
+function getReportCategoryOptions() {
+  const dept = (currentUser.departemen || '').toUpperCase().trim();
+  const cats = REPORT_CATEGORIES[dept] || REPORT_CATEGORIES['OFFICE'] || [];
+  let opts = '<option value="">-- Pilih Kategori --</option>';
+  cats.forEach((c) => {
+    opts += `<option value="${c}">${c}</option>`;
+  });
+  return opts;
+}
+
 async function modalAddDailyReport() {
+  const catOpts = getReportCategoryOptions();
   openModal(
     `<div class="modal-title">📝 Daily Report</div>
     <p class="text-sm mb-16" style="color:#666">Isi laporan aktivitas harian Anda.</p>
     <div class="grid-2">
       <div class="form-group"><label>Tanggal Laporan *</label><input class="form-control" type="date" id="drTanggal" value="${todayStr()}"></div>
-      <div class="form-group"><label>Jam Kerja</label><div class="grid-2"><input class="form-control" type="time" id="drJamMasuk" placeholder="Masuk" value="08:00"><input class="form-control" type="time" id="drJamKeluar" placeholder="Keluar" value="17:00"></div></div>
+      <div class="form-group"><label>Kategori *</label><select class="form-control" id="drKategori">${catOpts}</select></div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group"><label>Jam Masuk</label><input class="form-control" type="time" id="drJamMasuk" value="08:00"></div>
+      <div class="form-group"><label>Jam Keluar</label><input class="form-control" type="time" id="drJamKeluar" value="17:00"></div>
     </div>
     <div class="form-group"><label>Aktivitas Hari Ini *</label><textarea class="form-control" id="drAktivitas" rows="4" placeholder="1. Meeting dengan tim marketing\n2. Follow up client ABC\n3. Buat proposal project X\n..."></textarea></div>
     <div class="form-group"><label>Hasil / Output</label><textarea class="form-control" id="drHasil" rows="2" placeholder="Proposal selesai 80%, meeting berhasil dapat approval..."></textarea></div>
@@ -1673,11 +1710,14 @@ async function modalAddDailyReport() {
 async function simpanDailyReport() {
   const tanggal = document.getElementById('drTanggal').value;
   const aktivitas = document.getElementById('drAktivitas').value.trim();
+  const kategori = document.getElementById('drKategori').value;
   if (!tanggal || !aktivitas) return toast('Tanggal dan aktivitas wajib diisi', 'warning');
+  if (!kategori) return toast('Kategori wajib dipilih', 'warning');
   const data = {
     type: 'report',
     title: '📝 Daily Report — ' + formatDate(tanggal),
     tanggal,
+    kategori,
     jamMasuk: document.getElementById('drJamMasuk').value || '',
     jamKeluar: document.getElementById('drJamKeluar').value || '',
     aktivitas,
@@ -1697,6 +1737,8 @@ async function simpanDailyReport() {
     userId: currentUser.id,
     targetUserName: currentUser.nama,
     departemen: currentUser.departemen || '',
+    ownerLevel: ROLES[currentUser.role] || 0,
+    ownerRole: currentUser.role || '',
     createdAt: new Date().toISOString(),
   };
   try {
@@ -1728,6 +1770,7 @@ function viewDailyReport(id) {
     <div style="background:#f8f9ff;padding:16px;border-radius:8px;margin-bottom:16px;border-left:4px solid var(--primary)">
       <div class="fw-700">${escHtml(task.targetUserName || currentUser.nama)}</div>
       <div class="text-sm" style="color:#666">📅 ${formatDate(task.tanggal)} | ⏰ ${task.jamMasuk || '-'} - ${task.jamKeluar || '-'}</div>
+      <div class="text-sm mt-4">🏢 ${escHtml(task.departemen || '-')} | 📂 ${escHtml(task.kategori || '-')}</div>
       <div class="text-sm mt-4">Progress: <span style="color:${progressColor};font-weight:700">${task.progress || 0}%</span> | Durasi: <b>${task.durasi || '-'} hari</b> | Mood: ${moodLabel}</div>
     </div>
     <div class="mb-16"><div class="fw-700 mb-4" style="color:var(--primary)">📋 Aktivitas</div><div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:12px;font-size:.85rem;white-space:pre-wrap;line-height:1.7">${escHtml(task.aktivitas || task.description || '-')}</div></div>
