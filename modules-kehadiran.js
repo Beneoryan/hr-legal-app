@@ -1284,7 +1284,41 @@ async function loadDailyTasks(filter) {
   }
   const isAdmin = hasAccess(3);
   let html = '';
+  // Add group headers for report views
+  let lastGroup = '';
+  let lastSubGroup = '';
   filtered.forEach((t) => {
+    if (_dailyTaskFilter === 'report' && t.type === 'report') {
+      const group = t.kategori || 'Tanpa Kategori';
+      if (group !== lastGroup) {
+        lastGroup = group;
+        html += `<div style="padding:10px 12px;margin:12px 0 8px;background:#e3f2fd;border-radius:8px;font-weight:700;font-size:.88rem;color:#1565c0;border-left:4px solid #1565c0">📂 ${escHtml(group)}</div>`;
+      }
+    } else if (_dailyTaskFilter === 'team-report' && t.type === 'report') {
+      const group = t.kategori || 'Tanpa Kategori';
+      if (group !== lastGroup) {
+        lastGroup = group;
+        lastSubGroup = '';
+        html += `<div style="padding:10px 12px;margin:16px 0 8px;background:#e8f5e9;border-radius:8px;font-weight:700;font-size:.92rem;color:#2e7d32;border-left:4px solid #2e7d32">📂 ${escHtml(group)}</div>`;
+      }
+      const sub = t.targetUserName || '-';
+      if (sub !== lastSubGroup) {
+        lastSubGroup = sub;
+        html += `<div style="padding:6px 12px;margin:4px 0;font-size:.8rem;color:#555;font-weight:600">👤 ${escHtml(sub)}</div>`;
+      }
+    } else if (_dailyTaskFilter === 'all-report' && t.type === 'report') {
+      const group = t.departemen || 'Tanpa Departemen';
+      const sub = t.kategori || 'Tanpa Kategori';
+      if (group !== lastGroup) {
+        lastGroup = group;
+        lastSubGroup = '';
+        html += `<div style="padding:12px 14px;margin:16px 0 8px;background:#1a1a1a;border-radius:8px;font-weight:700;font-size:.95rem;color:#fff">🏢 ${escHtml(group)}</div>`;
+      }
+      if (sub !== lastSubGroup) {
+        lastSubGroup = sub;
+        html += `<div style="padding:8px 12px;margin:4px 0 6px;background:#f3e5f5;border-radius:6px;font-size:.83rem;color:#7b1fa2;font-weight:700">📂 ${escHtml(sub)}</div>`;
+      }
+    }
     // Daily Report display
     if (t.type === 'report') {
       const moodMapList = {
