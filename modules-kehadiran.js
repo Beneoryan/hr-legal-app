@@ -1444,6 +1444,7 @@ async function simpanDailyTask() {
   const assignedBy = targetUserId !== currentUser.id ? currentUser.id : '';
   const assignedByName = targetUserId !== currentUser.id ? currentUser.nama : '';
   try {
+    const kategoriEl = document.getElementById('dtKategori');
     await db.collection('hrd_daily_tasks').add({
       title,
       description: document.getElementById('dtDesc').value.trim(),
@@ -1452,7 +1453,7 @@ async function simpanDailyTask() {
       priority: document.getElementById('dtPriority').value,
       reminder: document.getElementById('dtReminder').value,
       repeat: document.getElementById('dtRepeat').value || '',
-      kategori: document.getElementById('dtKategori')?.value || '',
+      kategori: kategoriEl ? kategoriEl.value : '',
       done: false,
       type: 'task',
       userId: targetUserId,
