@@ -458,7 +458,7 @@ async function renderMyCalendarView(container) {
   </div>`;
 
   let legendHtml =
-    '<div style="margin-bottom:12px"><span style="font-size:.75rem;color:var(--text-light)">🔴 Libur &nbsp; 🔵 Pending &nbsp; 🟢 Selesai &nbsp; 🟠 Terlambat &nbsp; 🟣 Ditugaskan</span></div>';
+    '<div style="margin-bottom:12px"><span style="font-size:.75rem;color:var(--text-light)">🔴 Libur &nbsp; 🔵 Task &nbsp; 🟢 Selesai &nbsp; 🟠 Terlambat &nbsp; 🟣 Report &nbsp; ⚫ Ditugaskan</span></div>';
   container.innerHTML =
     navHtml +
     legendHtml +
@@ -554,8 +554,10 @@ async function renderMyCalendarView(container) {
     // Show tasks
     dayTasks.forEach((t) => {
       let bgTask;
-      if (t._isAssigned) {
-        bgTask = '#7b1fa2';
+      if (t.type === 'report') {
+        bgTask = '#7b1fa2'; // Purple for reports
+      } else if (t._isAssigned) {
+        bgTask = '#6a1b9a';
       } else if (t.done) {
         bgTask = '#4caf50';
       } else if (t.tanggal < today) {
@@ -563,12 +565,13 @@ async function renderMyCalendarView(container) {
       } else {
         bgTask = '#1565c0';
       }
-      const priorityMark = t.priority === 'high' ? '! ' : '';
-      const taskLabel =
-        (priorityMark + t.title).length > 14
-          ? (priorityMark + t.title).substring(0, 14) + '...'
-          : priorityMark + t.title;
-      calHtml += `<div style="font-size:.6rem;background:${bgTask};color:#fff;padding:1px 4px;border-radius:3px;margin-top:2px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escHtml(t.title)}${t._isAssigned ? ' (ditugaskan ke ' + escHtml(t.targetUserName || '') + ')' : ''}" onclick="navigateTo('daily-task')">${escHtml(taskLabel)}</div>`;
+      const icon = t.type === 'report' ? '📝 ' : '';
+      const priorityMark = t.priority === 'high' && t.type !== 'report' ? '! ' : '';
+      const rawLabel = icon + priorityMark + (t.title || '');
+      const taskLabel = rawLabel.length > 14 ? rawLabel.substring(0, 14) + '...' : rawLabel;
+      const clickFn =
+        t.type === 'report' ? `viewDailyReport('${t.id}')` : `viewDailyTask('${t.id}')`;
+      calHtml += `<div style="font-size:.6rem;background:${bgTask};color:#fff;padding:1px 4px;border-radius:3px;margin-top:2px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escHtml(t.title || '')}${t._isAssigned ? ' (ditugaskan ke ' + escHtml(t.targetUserName || '') + ')' : ''}" onclick="${clickFn}">${escHtml(taskLabel)}</div>`;
     });
 
     calHtml += '</div>';
@@ -1301,7 +1304,7 @@ async function loadDailyTasks(filter) {
       html += `<div style="font-size:.8rem;color:var(--text-light);margin-top:4px">${escHtml((t.aktivitas || '').substring(0, 100))}${(t.aktivitas || '').length > 100 ? '...' : ''}</div>`;
       html += `<div style="font-size:.7rem;color:#999;margin-top:4px">👤 ${escHtml(t.targetUserName || '')} | 🏢 ${escHtml(t.departemen || '-')} | 📅 ${formatDate(t.tanggal)} | Progress: <span style="color:${progressColor};font-weight:600">${t.progress || 0}%</span></div>`;
       html += `</div>`;
-      html += `<div style="display:flex;gap:4px"><button class="btn btn-xs btn-info" onclick="event.stopPropagation();viewDailyReport('${t.id}')">👁️</button>${t.userId === currentUser.id || hasAccess(6) ? `<button class="btn btn-xs btn-danger" onclick="event.stopPropagation();hapusDailyTask('${t.id}')">🗑️</button>` : ''}</div></div>`;
+      html += `<div style="display:flex;gap:4px"><button class="btn btn-xs btn-info" onclick="event.stopPropagation();viewDailyReport('${t.id}')">👁️</button>${t.userId === currentUser.id ? `<button class="btn btn-xs btn-warning" onclick="event.stopPropagation();editDailyReport('${t.id}')">✏️</button>` : ''}${t.userId === currentUser.id || hasAccess(6) ? `<button class="btn btn-xs btn-danger" onclick="event.stopPropagation();hapusDailyTask('${t.id}')">🗑️</button>` : ''}</div></div>`;
       return;
     }
     // Regular task display
@@ -1333,11 +1336,12 @@ async function loadDailyTasks(filter) {
       html += `👤 Untuk: <strong>${escHtml(t.targetUserName)}</strong> | `;
     html += `📅 ${formatDate(t.tanggal)}${t.waktu ? ' ⏰ ' + t.waktu : ''}${t.reminder ? ' 🔔 ' + t.reminder : ''}${t.assignedByName ? ' | 👤 Ditugaskan oleh: ' + escHtml(t.assignedByName) : ''}`;
     html += `</div></div>`;
-    // Determine action buttons: admin always gets edit+delete, assigned tasks from others get view only
+    // Determine action buttons
+    const isOwn = t.userId === currentUser.id;
     const isAssignedByOther =
       t.assignedBy && t.assignedBy !== currentUser.id && t.userId === currentUser.id;
-    if (isAdmin || !isAssignedByOther) {
-      html += `<div style="display:flex;gap:4px;flex-wrap:wrap"><a href="${buildGCalUrl(t)}" target="_blank" class="btn btn-xs btn-info" title="Tambah ke Google Calendar" style="text-decoration:none">📅</a><button class="btn btn-xs btn-info" onclick="viewDailyTask('${t.id}')" title="Lihat">👁️</button><button class="btn btn-xs btn-warning" onclick="editDailyTask('${t.id}')">✏️</button><button class="btn btn-xs btn-danger" onclick="hapusDailyTask('${t.id}')">🗑️</button></div></div>`;
+    if (isAdmin || isOwn) {
+      html += `<div style="display:flex;gap:4px;flex-wrap:wrap"><a href="${buildGCalUrl(t)}" target="_blank" class="btn btn-xs btn-info" title="Tambah ke Google Calendar" style="text-decoration:none">📅</a><button class="btn btn-xs btn-info" onclick="viewDailyTask('${t.id}')" title="Lihat">👁️</button><button class="btn btn-xs btn-warning" onclick="editDailyTask('${t.id}')">✏️</button>${isAdmin || !isAssignedByOther ? `<button class="btn btn-xs btn-danger" onclick="hapusDailyTask('${t.id}')">🗑️</button>` : ''}</div></div>`;
     } else {
       html += `<div style="display:flex;gap:4px;flex-wrap:wrap"><a href="${buildGCalUrl(t)}" target="_blank" class="btn btn-xs btn-info" title="Tambah ke Google Calendar" style="text-decoration:none">📅</a><button class="btn btn-xs btn-info" onclick="viewDailyTask('${t.id}')" title="Lihat">👁️</button></div></div>`;
     }
@@ -1660,6 +1664,70 @@ async function checkTaskReminders() {
   } catch (_e) {
     /* silent */
   }
+}
+
+async function editDailyReport(id) {
+  const doc = await db.collection('hrd_daily_tasks').doc(id).get();
+  if (!doc.exists) return toast('Data tidak ditemukan', 'warning');
+  const t = doc.data();
+  const showKategori = !hasAccess(3);
+  let catHtml = '';
+  if (showKategori) {
+    const cats = REPORT_CATEGORIES[(currentUser.departemen || '').toUpperCase().trim()] || [];
+    let opts = '<option value="">-- Pilih --</option>';
+    cats.forEach((c) => {
+      opts += `<option value="${c}" ${t.kategori === c ? 'selected' : ''}>${c}</option>`;
+    });
+    catHtml = `<div class="form-group"><label>Kategori</label><select class="form-control" id="erKategori">${opts}</select></div>`;
+  }
+  openModal(
+    `<div class="modal-title">✏️ Edit Daily Report</div>
+    <div class="grid-2">
+      <div class="form-group"><label>Tanggal</label><input class="form-control" type="date" id="erTanggal" value="${t.tanggal || ''}"></div>
+      ${catHtml}
+    </div>
+    <div class="grid-2">
+      <div class="form-group"><label>Jam Masuk</label><input class="form-control" type="time" id="erJamMasuk" value="${t.jamMasuk || ''}"></div>
+      <div class="form-group"><label>Jam Keluar</label><input class="form-control" type="time" id="erJamKeluar" value="${t.jamKeluar || ''}"></div>
+    </div>
+    <div class="form-group"><label>Aktivitas *</label><textarea class="form-control" id="erAktivitas" rows="3">${escHtml(t.aktivitas || '')}</textarea></div>
+    <div class="form-group"><label>Hasil / Output</label><textarea class="form-control" id="erHasil" rows="2">${escHtml(t.hasil || '')}</textarea></div>
+    <div class="form-group"><label>Kendala</label><textarea class="form-control" id="erKendala" rows="2">${escHtml(t.kendala || '')}</textarea></div>
+    <div class="form-group"><label>Solusi</label><textarea class="form-control" id="erSolusi" rows="2">${escHtml(t.solusi || '')}</textarea></div>
+    <div class="form-group"><label>Rencana Besok</label><textarea class="form-control" id="erRencana" rows="2">${escHtml(t.rencana || '')}</textarea></div>
+    <div class="grid-2">
+      <div class="form-group"><label>Durasi (hari)</label><input class="form-control" type="number" id="erDurasi" value="${t.durasi || 1}" step="0.5"></div>
+      <div class="form-group"><label>Progress (%)</label><input class="form-control" type="number" id="erProgress" value="${t.progress || 0}" min="0" max="100"></div>
+    </div>
+    <button class="btn btn-primary" onclick="updateDailyReport('${id}')">💾 Simpan</button>`,
+    true
+  );
+}
+
+async function updateDailyReport(id) {
+  const aktivitas = document.getElementById('erAktivitas').value.trim();
+  if (!aktivitas) return toast('Aktivitas wajib', 'warning');
+  const updateData = {
+    tanggal: document.getElementById('erTanggal').value,
+    jamMasuk: document.getElementById('erJamMasuk').value,
+    jamKeluar: document.getElementById('erJamKeluar').value,
+    aktivitas,
+    hasil: document.getElementById('erHasil').value.trim(),
+    kendala: document.getElementById('erKendala').value.trim(),
+    solusi: document.getElementById('erSolusi').value.trim(),
+    rencana: document.getElementById('erRencana').value.trim(),
+    durasi: parseFloat(document.getElementById('erDurasi').value) || 0,
+    progress: parseInt(document.getElementById('erProgress').value) || 0,
+    description: aktivitas,
+    title: '📝 Daily Report — ' + formatDate(document.getElementById('erTanggal').value),
+    updatedAt: new Date().toISOString(),
+  };
+  const katEl = document.getElementById('erKategori');
+  if (katEl) updateData.kategori = katEl.value;
+  await db.collection('hrd_daily_tasks').doc(id).update(updateData);
+  closeModalDirect();
+  toast('Report diperbarui', 'success');
+  await loadDailyTasks(_dailyTaskFilter);
 }
 
 function startTaskReminderCheck() {
