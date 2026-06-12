@@ -1328,9 +1328,9 @@ async function renderBroadcast() {
   const snap = await db.collection('hrd_broadcast').get();
   const allItems = [];
   snap.forEach((d) => allItems.push({ id: d.id, ...d.data() }));
-  // Only admin (level 6) sees all; everyone else filtered by their department/targetIds
+  // Only admin (level 6) and head (level 4+) sees all; others filtered by their department/targetIds
   let items = allItems;
-  if (!hasAccess(6)) {
+  if (!hasAccess(4)) {
     const myDept = (currentUser.departemen || '').toLowerCase().trim();
     const myId = currentUser.id || '';
     const myNama = (currentUser.nama || '').toLowerCase().trim();
