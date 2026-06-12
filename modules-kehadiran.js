@@ -1218,7 +1218,15 @@ async function loadDailyTasks(filter) {
   filtered.forEach((t) => {
     // Daily Report display
     if (t.type === 'report') {
-      const moodIcon = t.mood === 'baik' ? '😊' : t.mood === 'kurang' ? '😞' : '😐';
+      const moodMapList = {
+        sangat_baik: '🤩',
+        baik: '😊',
+        cukup: '😐',
+        kurang: '😟',
+        buruk: '😞',
+        sangat_buruk: '😫',
+      };
+      const moodIcon = moodMapList[t.mood] || '😐';
       const progressColor =
         (t.progress || 0) >= 80 ? '#2e7d32' : (t.progress || 0) >= 50 ? '#f57f17' : '#c62828';
       html += `<div style="display:flex;align-items:flex-start;gap:12px;padding:12px;border-left:4px solid #7b1fa2;margin-bottom:8px;background:#faf5ff;border-radius:0 8px 8px 0;cursor:pointer" onclick="viewDailyReport('${t.id}')">`;
@@ -1582,10 +1590,12 @@ async function modalAddDailyReport() {
     <div class="form-group"><label>Solusi / Tindakan atas Kendala</label><textarea class="form-control" id="drSolusi" rows="2" placeholder="Koordinasi dengan divisi terkait / Eskalasi ke atasan..."></textarea></div>
     <div class="form-group"><label>Rencana Besok</label><textarea class="form-control" id="drRencana" rows="2" placeholder="1. Finalisasi proposal\n2. Kirim ke client..."></textarea></div>
     <div class="grid-2">
-      <div class="form-group"><label>Durasi Pekerjaan (jam)</label><input class="form-control" type="number" id="drDurasi" min="0" max="24" step="0.5" value="8" placeholder="Contoh: 8"></div>
+      <div class="form-group"><label>Durasi Pekerjaan (hari)</label><input class="form-control" type="number" id="drDurasi" min="0" max="30" step="0.5" value="1" placeholder="Contoh: 1"></div>
       <div class="form-group"><label>Progress Keseluruhan (%)</label><input class="form-control" type="number" id="drProgress" min="0" max="100" value="100" placeholder="0-100"></div>
     </div>
-    <div class="form-group"><label>Mood Hari Ini</label><select class="form-control" id="drMood"><option value="baik">😊 Baik / Produktif</option><option value="cukup">😐 Cukup / Biasa</option><option value="kurang">😞 Kurang / Banyak Hambatan</option></select></div>
+    <div class="form-group"><label>Mood Hari Ini</label><select class="form-control" id="drMood"><option value="sangat_baik">🤩 Sangat Baik / Luar Biasa Produktif</option><option value="baik">😊 Baik / Produktif</option><option value="cukup">😐 Cukup / Biasa Saja</option><option value="kurang">😟 Kurang / Ada Hambatan</option><option value="buruk">😞 Buruk / Banyak Masalah</option><option value="sangat_buruk">😫 Sangat Buruk / Overwhelmed</option></select></div>
+    <div class="form-group"><label>Komentar untuk Atasan</label><textarea class="form-control" id="drKomentarAtasan" rows="2" placeholder="Pesan/catatan khusus untuk atasan (opsional)..."></textarea></div>
+    <div class="form-group"><label>Komentar untuk Rekan Kerja</label><textarea class="form-control" id="drKomentarRekan" rows="2" placeholder="Apresiasi/pesan untuk rekan tim (opsional)..."></textarea></div>
     <button class="btn btn-primary" onclick="simpanDailyReport()">📤 Kirim Daily Report</button>`,
     true
   );
@@ -1609,6 +1619,8 @@ async function simpanDailyReport() {
     durasi: parseFloat(document.getElementById('drDurasi').value) || 0,
     progress: parseInt(document.getElementById('drProgress').value) || 0,
     mood: document.getElementById('drMood').value,
+    komentarAtasan: document.getElementById('drKomentarAtasan').value.trim(),
+    komentarRekan: document.getElementById('drKomentarRekan').value.trim(),
     description: aktivitas,
     done: true,
     doneAt: new Date().toISOString(),
@@ -1631,21 +1643,31 @@ async function simpanDailyReport() {
 function viewDailyReport(id) {
   const task = _dailyTaskData.find((t) => t.id === id);
   if (!task) return;
-  const moodIcon = task.mood === 'baik' ? '😊' : task.mood === 'kurang' ? '😞' : '😐';
+  const moodMap = {
+    sangat_baik: '🤩 Sangat Baik',
+    baik: '😊 Baik',
+    cukup: '😐 Cukup',
+    kurang: '😟 Kurang',
+    buruk: '😞 Buruk',
+    sangat_buruk: '😫 Sangat Buruk',
+  };
+  const moodLabel = moodMap[task.mood] || '😐 ' + (task.mood || '-');
   const progressColor =
     task.progress >= 80 ? '#2e7d32' : task.progress >= 50 ? '#f57f17' : '#c62828';
   openModal(
     `<div class="modal-title">📝 Daily Report</div>
     <div style="background:#f8f9ff;padding:16px;border-radius:8px;margin-bottom:16px;border-left:4px solid var(--primary)">
       <div class="fw-700">${escHtml(task.targetUserName || currentUser.nama)}</div>
-      <div class="text-sm" style="color:#666">📅 ${formatDate(task.tanggal)} | ⏰ ${task.jamMasuk || '-'} - ${task.jamKeluar || '-'} | ${moodIcon} ${task.mood || '-'}</div>
-      <div class="text-sm mt-4">Progress: <span style="color:${progressColor};font-weight:700">${task.progress || 0}%</span> | Durasi Kerja: <b>${task.durasi || '-'} jam</b></div>
+      <div class="text-sm" style="color:#666">📅 ${formatDate(task.tanggal)} | ⏰ ${task.jamMasuk || '-'} - ${task.jamKeluar || '-'}</div>
+      <div class="text-sm mt-4">Progress: <span style="color:${progressColor};font-weight:700">${task.progress || 0}%</span> | Durasi: <b>${task.durasi || '-'} hari</b> | Mood: ${moodLabel}</div>
     </div>
     <div class="mb-16"><div class="fw-700 mb-4" style="color:var(--primary)">📋 Aktivitas</div><div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:12px;font-size:.85rem;white-space:pre-wrap;line-height:1.7">${escHtml(task.aktivitas || task.description || '-')}</div></div>
     ${task.hasil ? `<div class="mb-16"><div class="fw-700 mb-4" style="color:#2e7d32">✅ Hasil / Output</div><div style="background:#f1f8e9;border-radius:8px;padding:12px;font-size:.85rem;white-space:pre-wrap">${escHtml(task.hasil)}</div></div>` : ''}
     ${task.kendala ? `<div class="mb-16"><div class="fw-700 mb-4" style="color:#c62828">⚠️ Kendala</div><div style="background:#fff8f8;border-radius:8px;padding:12px;font-size:.85rem;white-space:pre-wrap">${escHtml(task.kendala)}</div></div>` : ''}
     ${task.solusi ? `<div class="mb-16"><div class="fw-700 mb-4" style="color:#ff6f00">💡 Solusi / Tindakan</div><div style="background:#fff8e1;border-radius:8px;padding:12px;font-size:.85rem;white-space:pre-wrap">${escHtml(task.solusi)}</div></div>` : ''}
     ${task.rencana ? `<div class="mb-16"><div class="fw-700 mb-4" style="color:#1565c0">📌 Rencana Besok</div><div style="background:#e3f2fd;border-radius:8px;padding:12px;font-size:.85rem;white-space:pre-wrap">${escHtml(task.rencana)}</div></div>` : ''}
+    ${task.komentarAtasan ? `<div class="mb-16"><div class="fw-700 mb-4" style="color:#6a1b9a">💬 Komentar untuk Atasan</div><div style="background:#f3e5f5;border-radius:8px;padding:12px;font-size:.85rem;white-space:pre-wrap">${escHtml(task.komentarAtasan)}</div></div>` : ''}
+    ${task.komentarRekan ? `<div class="mb-16"><div class="fw-700 mb-4" style="color:#00695c">🤝 Komentar untuk Rekan Kerja</div><div style="background:#e0f2f1;border-radius:8px;padding:12px;font-size:.85rem;white-space:pre-wrap">${escHtml(task.komentarRekan)}</div></div>` : ''}
     <div class="text-xs" style="color:#999">Dikirim: ${formatDateTime(task.createdAt)}</div>`,
     true
   );
