@@ -1415,9 +1415,10 @@ async function modalAddTask() {
       assignHtml = '';
     }
   }
-  const catHtml = hasAccess(2)
-    ? `<div class="form-group"><label>Kategori</label><select class="form-control" id="dtKategori">${getReportCategoryOptions()}</select></div>`
-    : '';
+  const catHtml =
+    hasAccess(2) && !hasAccess(3)
+      ? `<div class="form-group"><label>Kategori</label><select class="form-control" id="dtKategori">${getReportCategoryOptions()}</select></div>`
+      : '';
   openModal(`<div class="modal-title">+ Tambah Task</div>
     ${assignHtml}
     ${catHtml}
@@ -1685,13 +1686,17 @@ function getReportCategoryOptions() {
 }
 
 async function modalAddDailyReport() {
-  const catOpts = getReportCategoryOptions();
+  // Kategori only for staff and leader (level 1-2), not manager+
+  const showKategori = !hasAccess(3);
+  const catHtml = showKategori
+    ? `<div class="form-group"><label>Kategori *</label><select class="form-control" id="drKategori">${getReportCategoryOptions()}</select></div>`
+    : '<input type="hidden" id="drKategori" value="">';
   openModal(
     `<div class="modal-title">📝 Daily Report</div>
     <p class="text-sm mb-16" style="color:#666">Isi laporan aktivitas harian Anda.</p>
     <div class="grid-2">
       <div class="form-group"><label>Tanggal Laporan *</label><input class="form-control" type="date" id="drTanggal" value="${todayStr()}"></div>
-      <div class="form-group"><label>Kategori *</label><select class="form-control" id="drKategori">${catOpts}</select></div>
+      ${catHtml}
     </div>
     <div class="grid-2">
       <div class="form-group"><label>Jam Masuk</label><input class="form-control" type="time" id="drJamMasuk" value="08:00"></div>
@@ -1719,7 +1724,7 @@ async function simpanDailyReport() {
   const aktivitas = document.getElementById('drAktivitas').value.trim();
   const kategori = document.getElementById('drKategori').value;
   if (!tanggal || !aktivitas) return toast('Tanggal dan aktivitas wajib diisi', 'warning');
-  if (!kategori) return toast('Kategori wajib dipilih', 'warning');
+  if (!hasAccess(3) && !kategori) return toast('Kategori wajib dipilih', 'warning');
   const data = {
     type: 'report',
     title: '📝 Daily Report — ' + formatDate(tanggal),
