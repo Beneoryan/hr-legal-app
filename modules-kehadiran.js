@@ -1090,11 +1090,14 @@ function buildGCalUrl(t) {
 
 async function renderDailyTask() {
   const main = document.getElementById('mainContent');
+  const teamTab = hasAccess(2)
+    ? '<div class="tab" onclick="filterDailyTasks(\'team\')">👥 Tim Saya</div>'
+    : '';
   const assignedTab = hasAccess(3)
     ? '<div class="tab" onclick="filterDailyTasks(\'assigned\')">Ditugaskan</div>'
     : '';
   main.innerHTML = `
-    <div class="page-title"><span>📋 Daily Task & Reminder</span><button class="btn btn-primary btn-sm" onclick="modalAddTask()">+ Tambah Task</button></div>
+    <div class="page-title"><span>📋 Daily Task & Report</span><button class="btn btn-primary btn-sm" onclick="modalAddTaskChoice()">+ Tambah</button></div>
     <div class="stats-grid mb-16" id="taskStats"></div>
     <div class="card">
       <div class="tabs mb-16" id="taskTabs">
@@ -1103,11 +1106,30 @@ async function renderDailyTask() {
         <div class="tab" onclick="filterDailyTasks('upcoming')">Mendatang</div>
         <div class="tab" onclick="filterDailyTasks('done')">Selesai</div>
         <div class="tab" onclick="filterDailyTasks('overdue')">Terlambat</div>
+        <div class="tab" onclick="filterDailyTasks('report')">📝 Daily Report</div>
+        ${teamTab}
         ${assignedTab}
       </div>
       <div id="taskList">Loading...</div>
     </div>`;
   await loadDailyTasks('all');
+}
+
+function modalAddTaskChoice() {
+  openModal(`<div class="modal-title">+ Tambah</div>
+    <p class="text-sm mb-16" style="color:#666">Pilih jenis yang ingin Anda buat:</p>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <div style="flex:1;min-width:200px;padding:20px;border:2px solid var(--border);border-radius:12px;cursor:pointer;text-align:center;transition:all .2s" onclick="closeModalDirect();modalAddTask()" onmouseover="this.style.borderColor='var(--primary)';this.style.background='#f8f9ff'" onmouseout="this.style.borderColor='var(--border)';this.style.background=''">
+        <div style="font-size:2rem;margin-bottom:8px">📋</div>
+        <div class="fw-700">Daily Task</div>
+        <div class="text-xs" style="color:#666;margin-top:4px">Tugas harian, reminder, deadline</div>
+      </div>
+      <div style="flex:1;min-width:200px;padding:20px;border:2px solid var(--border);border-radius:12px;cursor:pointer;text-align:center;transition:all .2s" onclick="closeModalDirect();modalAddDailyReport()" onmouseover="this.style.borderColor='var(--accent)';this.style.background='#fff8f8'" onmouseout="this.style.borderColor='var(--border)';this.style.background=''">
+        <div style="font-size:2rem;margin-bottom:8px">📝</div>
+        <div class="fw-700">Daily Report</div>
+        <div class="text-xs" style="color:#666;margin-top:4px">Laporan aktivitas harian</div>
+      </div>
+    </div>`);
 }
 
 let _dailyTaskFilter = 'all';
@@ -1124,20 +1146,29 @@ async function loadDailyTasks(filter) {
       done: 'Selesai',
       overdue: 'Terlambat',
       assigned: 'Ditugaskan',
+      report: '📝 Daily Report',
+      team: '👥 Tim Saya',
     };
     if (t.textContent.trim() === map[filter]) t.classList.add('active');
   });
   try {
     const snap = await db.collection('hrd_daily_tasks').get();
     _dailyTaskData = [];
-    const isAdmin = hasAccess(3);
+    const myDept = (currentUser.departemen || '').toLowerCase().trim();
     snap.forEach((d) => {
       const t = d.data();
-      if (isAdmin) {
-        if (t.userId === currentUser.id || t.assignedBy === currentUser.id)
-          _dailyTaskData.push({ id: d.id, ...t });
-      } else {
-        if (t.userId === currentUser.id) _dailyTaskData.push({ id: d.id, ...t });
+      // Visibility rules:
+      // - Own tasks always visible
+      // - Leader/Manager/Head (level 2+): can see tasks from own department members
+      // - Admin: sees all
+      if (t.userId === currentUser.id || t.assignedBy === currentUser.id) {
+        _dailyTaskData.push({ id: d.id, ...t });
+      } else if (hasAccess(2) && !hasAccess(6)) {
+        // Leader/Manager/Head: see own department only
+        const taskDept = (t.departemen || '').toLowerCase().trim();
+        if (taskDept === myDept) _dailyTaskData.push({ id: d.id, ...t });
+      } else if (hasAccess(6)) {
+        _dailyTaskData.push({ id: d.id, ...t });
       }
     });
   } catch (e) {
@@ -1145,16 +1176,20 @@ async function loadDailyTasks(filter) {
   }
   const today = todayStr();
   let filtered = _dailyTaskData;
-  if (filter === 'today') filtered = _dailyTaskData.filter((t) => t.tanggal === today && !t.done);
+  if (filter === 'today')
+    filtered = _dailyTaskData.filter((t) => t.tanggal === today && !t.done && t.type !== 'report');
   else if (filter === 'upcoming')
-    filtered = _dailyTaskData.filter((t) => t.tanggal > today && !t.done);
-  else if (filter === 'done') filtered = _dailyTaskData.filter((t) => t.done);
+    filtered = _dailyTaskData.filter((t) => t.tanggal > today && !t.done && t.type !== 'report');
+  else if (filter === 'done')
+    filtered = _dailyTaskData.filter((t) => t.done && t.type !== 'report');
   else if (filter === 'overdue')
-    filtered = _dailyTaskData.filter((t) => t.tanggal < today && !t.done);
+    filtered = _dailyTaskData.filter((t) => t.tanggal < today && !t.done && t.type !== 'report');
   else if (filter === 'assigned')
     filtered = _dailyTaskData.filter(
       (t) => t.assignedBy === currentUser.id && t.userId !== currentUser.id
     );
+  else if (filter === 'report') filtered = _dailyTaskData.filter((t) => t.type === 'report');
+  else if (filter === 'team') filtered = _dailyTaskData.filter((t) => t.userId !== currentUser.id);
   const priorityOrder = { high: 0, medium: 1, low: 2 };
   filtered.sort((a, b) => {
     if (!a.done && !b.done) {
@@ -1181,6 +1216,21 @@ async function loadDailyTasks(filter) {
   const isAdmin = hasAccess(3);
   let html = '';
   filtered.forEach((t) => {
+    // Daily Report display
+    if (t.type === 'report') {
+      const moodIcon = t.mood === 'baik' ? '😊' : t.mood === 'kurang' ? '😞' : '😐';
+      const progressColor =
+        (t.progress || 0) >= 80 ? '#2e7d32' : (t.progress || 0) >= 50 ? '#f57f17' : '#c62828';
+      html += `<div style="display:flex;align-items:flex-start;gap:12px;padding:12px;border-left:4px solid #7b1fa2;margin-bottom:8px;background:#faf5ff;border-radius:0 8px 8px 0;cursor:pointer" onclick="viewDailyReport('${t.id}')">`;
+      html += `<div style="font-size:1.5rem">📝</div>`;
+      html += `<div style="flex:1"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-weight:700;font-size:.9rem">${escHtml(t.title || 'Daily Report')}</span><span style="font-size:.65rem;padding:2px 6px;border-radius:4px;background:#7b1fa220;color:#7b1fa2;font-weight:600">Report</span>${moodIcon ? `<span>${moodIcon}</span>` : ''}</div>`;
+      html += `<div style="font-size:.8rem;color:var(--text-light);margin-top:4px">${escHtml((t.aktivitas || '').substring(0, 100))}${(t.aktivitas || '').length > 100 ? '...' : ''}</div>`;
+      html += `<div style="font-size:.7rem;color:#999;margin-top:4px">👤 ${escHtml(t.targetUserName || '')} | 📅 ${formatDate(t.tanggal)} | Progress: <span style="color:${progressColor};font-weight:600">${t.progress || 0}%</span></div>`;
+      html += `</div>`;
+      html += `<div style="display:flex;gap:4px"><button class="btn btn-xs btn-info" onclick="event.stopPropagation();viewDailyReport('${t.id}')">👁️</button>${t.userId === currentUser.id || hasAccess(6) ? `<button class="btn btn-xs btn-danger" onclick="event.stopPropagation();hapusDailyTask('${t.id}')">🗑️</button>` : ''}</div></div>`;
+      return;
+    }
+    // Regular task display
     const isOverdue = t.tanggal < today && !t.done;
     const isToday2 = t.tanggal === today;
     const priorityColor =
@@ -1305,8 +1355,10 @@ async function simpanDailyTask() {
       reminder: document.getElementById('dtReminder').value,
       repeat: document.getElementById('dtRepeat').value || '',
       done: false,
+      type: 'task',
       userId: targetUserId,
       targetUserName,
+      departemen: currentUser.departemen || '',
       assignedBy,
       assignedByName,
       createdAt: new Date().toISOString(),
@@ -1513,4 +1565,83 @@ function startTaskReminderCheck() {
   // Check immediately then every 2 minutes
   checkTaskReminders();
   _reminderCheckInterval = setInterval(checkTaskReminders, 2 * 60 * 1000);
+}
+
+// ── DAILY REPORT ──────────────────────────────────────────────
+async function modalAddDailyReport() {
+  openModal(
+    `<div class="modal-title">📝 Daily Report</div>
+    <p class="text-sm mb-16" style="color:#666">Isi laporan aktivitas harian Anda.</p>
+    <div class="grid-2">
+      <div class="form-group"><label>Tanggal Laporan *</label><input class="form-control" type="date" id="drTanggal" value="${todayStr()}"></div>
+      <div class="form-group"><label>Jam Kerja</label><div class="grid-2"><input class="form-control" type="time" id="drJamMasuk" placeholder="Masuk" value="08:00"><input class="form-control" type="time" id="drJamKeluar" placeholder="Keluar" value="17:00"></div></div>
+    </div>
+    <div class="form-group"><label>Aktivitas Hari Ini *</label><textarea class="form-control" id="drAktivitas" rows="4" placeholder="1. Meeting dengan tim marketing\n2. Follow up client ABC\n3. Buat proposal project X\n..."></textarea></div>
+    <div class="form-group"><label>Hasil / Output</label><textarea class="form-control" id="drHasil" rows="2" placeholder="Proposal selesai 80%, meeting berhasil dapat approval..."></textarea></div>
+    <div class="form-group"><label>Kendala / Hambatan</label><textarea class="form-control" id="drKendala" rows="2" placeholder="Tidak ada / Menunggu data dari divisi lain..."></textarea></div>
+    <div class="form-group"><label>Rencana Besok</label><textarea class="form-control" id="drRencana" rows="2" placeholder="1. Finalisasi proposal\n2. Kirim ke client..."></textarea></div>
+    <div class="grid-2">
+      <div class="form-group"><label>Progress Keseluruhan (%)</label><input class="form-control" type="number" id="drProgress" min="0" max="100" value="100" placeholder="0-100"></div>
+      <div class="form-group"><label>Mood Hari Ini</label><select class="form-control" id="drMood"><option value="baik">😊 Baik / Produktif</option><option value="cukup">😐 Cukup / Biasa</option><option value="kurang">😞 Kurang / Banyak Hambatan</option></select></div>
+    </div>
+    <button class="btn btn-primary" onclick="simpanDailyReport()">📤 Kirim Daily Report</button>`,
+    true
+  );
+}
+
+async function simpanDailyReport() {
+  const tanggal = document.getElementById('drTanggal').value;
+  const aktivitas = document.getElementById('drAktivitas').value.trim();
+  if (!tanggal || !aktivitas) return toast('Tanggal dan aktivitas wajib diisi', 'warning');
+  const data = {
+    type: 'report',
+    title: '📝 Daily Report — ' + formatDate(tanggal),
+    tanggal,
+    jamMasuk: document.getElementById('drJamMasuk').value || '',
+    jamKeluar: document.getElementById('drJamKeluar').value || '',
+    aktivitas,
+    hasil: document.getElementById('drHasil').value.trim(),
+    kendala: document.getElementById('drKendala').value.trim(),
+    rencana: document.getElementById('drRencana').value.trim(),
+    progress: parseInt(document.getElementById('drProgress').value) || 0,
+    mood: document.getElementById('drMood').value,
+    description: aktivitas,
+    done: true,
+    doneAt: new Date().toISOString(),
+    priority: 'medium',
+    userId: currentUser.id,
+    targetUserName: currentUser.nama,
+    departemen: currentUser.departemen || '',
+    createdAt: new Date().toISOString(),
+  };
+  try {
+    await db.collection('hrd_daily_tasks').add(data);
+    toast('Daily Report berhasil dikirim', 'success');
+  } catch (e) {
+    toast('Gagal: ' + e.message, 'error');
+  }
+  closeModalDirect();
+  await loadDailyTasks('report');
+}
+
+function viewDailyReport(id) {
+  const task = _dailyTaskData.find((t) => t.id === id);
+  if (!task) return;
+  const moodIcon = task.mood === 'baik' ? '😊' : task.mood === 'kurang' ? '😞' : '😐';
+  const progressColor =
+    task.progress >= 80 ? '#2e7d32' : task.progress >= 50 ? '#f57f17' : '#c62828';
+  openModal(
+    `<div class="modal-title">📝 Daily Report</div>
+    <div style="background:#f8f9ff;padding:16px;border-radius:8px;margin-bottom:16px;border-left:4px solid var(--primary)">
+      <div class="fw-700">${escHtml(task.targetUserName || currentUser.nama)}</div>
+      <div class="text-sm" style="color:#666">📅 ${formatDate(task.tanggal)} | ⏰ ${task.jamMasuk || '-'} - ${task.jamKeluar || '-'} | ${moodIcon} ${task.mood || '-'}</div>
+      <div class="text-sm mt-4">Progress: <span style="color:${progressColor};font-weight:700">${task.progress || 0}%</span></div>
+    </div>
+    <div class="mb-16"><div class="fw-700 mb-4" style="color:var(--primary)">📋 Aktivitas</div><div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:12px;font-size:.85rem;white-space:pre-wrap;line-height:1.7">${escHtml(task.aktivitas || task.description || '-')}</div></div>
+    ${task.hasil ? `<div class="mb-16"><div class="fw-700 mb-4" style="color:#2e7d32">✅ Hasil / Output</div><div style="background:#f1f8e9;border-radius:8px;padding:12px;font-size:.85rem;white-space:pre-wrap">${escHtml(task.hasil)}</div></div>` : ''}
+    ${task.kendala ? `<div class="mb-16"><div class="fw-700 mb-4" style="color:#c62828">⚠️ Kendala</div><div style="background:#fff8f8;border-radius:8px;padding:12px;font-size:.85rem;white-space:pre-wrap">${escHtml(task.kendala)}</div></div>` : ''}
+    ${task.rencana ? `<div class="mb-16"><div class="fw-700 mb-4" style="color:#1565c0">📌 Rencana Besok</div><div style="background:#e3f2fd;border-radius:8px;padding:12px;font-size:.85rem;white-space:pre-wrap">${escHtml(task.rencana)}</div></div>` : ''}
+    <div class="text-xs" style="color:#999">Dikirim: ${formatDateTime(task.createdAt)}</div>`,
+    true
+  );
 }
