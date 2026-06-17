@@ -743,6 +743,8 @@ async function renderApprovalCenter() {
     'hrd_reimbursement',
     'hrd_kasbon',
     'hrd_dinas_luar',
+    'hrd_perjalanan_dinas',
+    'hrd_reimburse_dinas',
   ];
   let items = [];
   for (const col of collections) {
@@ -1374,6 +1376,7 @@ async function generateAllApprovalFlows() {
     'WFH',
     'Dinas Luar',
     'Overtime',
+    'SPPD',
     'Reimbursement',
     'Kasbon',
     'Insentif',
