@@ -85,7 +85,10 @@ async function renderPortal() {
     if (data.read === false) inboxCount++;
   });
   document.getElementById('pAbsen').textContent = absenCount + ' hari';
-  const kDataPortal = kSnapPortal && !kSnapPortal.empty ? kSnapPortal.docs[0].data() : { tanggalMasuk: '', status: 'aktif' };
+  const kDataPortal =
+    kSnapPortal && !kSnapPortal.empty
+      ? kSnapPortal.docs[0].data()
+      : { tanggalMasuk: '', status: 'aktif' };
   const jatahCuti = hitungJatahCuti(kDataPortal);
   document.getElementById('pCuti').textContent = Math.max(0, jatahCuti - cutiUsed) + ' hari';
   document.getElementById('pInbox').textContent = inboxCount;
@@ -631,29 +634,80 @@ function viewOvertimeDetail(id) {
     .get()
     .then((d) => {
       const p = d.data();
+      // Attachments
       let attachHtml = '';
       if (p.attachments && p.attachments.length) {
         attachHtml =
-          '<div class="mb-16"><b>📎 Lampiran:</b><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">';
+          '<div style="margin-top:16px;padding:14px;background:#f8f9ff;border-radius:10px;border:1px solid #e0e0e0"><div class="fw-700 mb-8">📎 Lampiran (' +
+          p.attachments.length +
+          ' file)</div><div style="display:flex;gap:10px;flex-wrap:wrap">';
         p.attachments.forEach(function (a) {
           if (a.data && a.data.startsWith('data:image')) {
             attachHtml +=
               '<img src="' +
               a.data +
-              '" style="max-width:120px;max-height:120px;border-radius:6px;border:1px solid #ddd;cursor:pointer" onclick="window.open(this.src)">';
+              '" style="max-width:140px;max-height:140px;border-radius:8px;border:2px solid #ddd;cursor:pointer;object-fit:cover" onclick="window.open(this.src)">';
           } else if (a.name) {
             attachHtml +=
-              '<div style="padding:8px 12px;background:#f0f4ff;border-radius:6px;font-size:.8rem">📄 ' +
+              '<div style="padding:10px 14px;background:#fff;border-radius:8px;border:1px solid #ddd;font-size:.82rem">📄 ' +
               escHtml(a.name) +
               '</div>';
           }
         });
         attachHtml += '</div></div>';
       }
+      // Approval layer
+      let approvalHtml =
+        '<div style="margin-top:16px;padding:14px;border-radius:10px;border:1px solid #e0e0e0;background:' +
+        (p.status === 'approved' ? '#e8f5e9' : p.status === 'rejected' ? '#fce4ec' : '#fff8e1') +
+        '">';
+      approvalHtml +=
+        '<div class="fw-700 mb-8" style="color:' +
+        (p.status === 'approved' ? '#2e7d32' : p.status === 'rejected' ? '#c62828' : '#f57f17') +
+        '">📋 Status Approval</div>';
+      approvalHtml +=
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.85rem">';
+      approvalHtml +=
+        '<div><b>Status:</b> <span class="badge badge-' +
+        (p.status === 'approved' ? 'success' : p.status === 'rejected' ? 'danger' : 'warning') +
+        '">' +
+        (p.status || 'pending').toUpperCase() +
+        '</span></div>';
+      approvalHtml += '<div><b>Diproses oleh:</b> ' + escHtml(p.approvedBy || '-') + '</div>';
+      if (p.approvedAt)
+        approvalHtml +=
+          '<div><b>Tanggal proses:</b> ' + formatDate(p.approvedAt.split('T')[0]) + '</div>';
+      if (p.rejectedBy)
+        approvalHtml += '<div><b>Ditolak oleh:</b> ' + escHtml(p.rejectedBy) + '</div>';
+      if (p.rejectedAt)
+        approvalHtml +=
+          '<div><b>Tanggal tolak:</b> ' + formatDate(p.rejectedAt.split('T')[0]) + '</div>';
+      approvalHtml += '</div>';
+      if (p.approvalComment || p.alasanTolak || p.komentar) {
+        approvalHtml +=
+          '<div style="margin-top:10px;padding:10px;background:#fff;border-radius:6px;border-left:3px solid ' +
+          (p.status === 'approved' ? '#2e7d32' : '#c62828') +
+          '"><div class="text-xs fw-700 mb-4">💬 Komentar Approval:</div><div class="text-sm">' +
+          escHtml(p.approvalComment || p.alasanTolak || p.komentar || '') +
+          '</div></div>';
+      }
+      approvalHtml += '</div>';
+      // Main modal
       openModal(`<div class="modal-title">⏰ Detail Overtime</div>
-      <div class="grid-2 mb-16"><div><b>Nama:</b> ${escHtml(p.nama)}</div><div><b>Status:</b> <span class="badge badge-${p.status === 'approved' ? 'success' : p.status === 'rejected' ? 'danger' : 'warning'}">${p.status}</span></div><div><b>Tanggal:</b> ${formatDate(p.tanggal)}</div><div><b>Jam:</b> ${p.jamMulai || '-'} - ${p.jamSelesai || '-'}</div><div><b>Durasi:</b> ${p.durasi || 0} jam</div>${p.approvedBy ? `<div><b>Diproses:</b> ${escHtml(p.approvedBy)}</div>` : ''}</div>
-      ${p.alasan ? `<div class="mb-16"><b>Alasan:</b><div class="text-sm mt-8" style="background:#f8f9ff;padding:10px;border-radius:6px">${escHtml(p.alasan)}</div></div>` : ''}
-      ${attachHtml}`);
+      <div style="padding:16px;background:#f8f9ff;border-radius:10px;border:1px solid #e0e0e0;margin-bottom:16px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:.88rem">
+          <div><b>👤 Nama:</b> ${escHtml(p.nama)}</div>
+          <div><b>🏢 Departemen:</b> ${escHtml(p.departemen || '-')}</div>
+          <div><b>📅 Tanggal:</b> ${formatDate(p.tanggal)}</div>
+          <div><b>⏰ Jam:</b> ${p.jamMulai || '-'} — ${p.jamSelesai || '-'}</div>
+          <div><b>⏱️ Durasi:</b> ${p.durasi || 0} jam</div>
+          <div><b>📆 Diajukan:</b> ${p.createdAt ? formatDate(p.createdAt.split('T')[0]) : '-'}</div>
+        </div>
+      </div>
+      ${p.alasan ? `<div style="margin-bottom:16px"><div class="fw-700 mb-6">📝 Alasan Overtime:</div><div style="padding:12px;background:#fff;border-radius:8px;border:1px solid #e0e0e0;font-size:.88rem;line-height:1.6">${escHtml(p.alasan)}</div></div>` : ''}
+      ${attachHtml}
+      ${approvalHtml}
+      <div style="margin-top:16px;text-align:right"><button class="btn btn-outline" onclick="closeModalDirect()">Tutup</button></div>`);
     });
 }
 async function editOvertimePortal(id) {

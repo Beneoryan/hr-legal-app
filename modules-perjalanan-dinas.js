@@ -1088,8 +1088,18 @@ async function viewSPPD(id) {
       <div class="fw-700" style="grid-column:span 2;border-top:1px solid var(--border);padding-top:8px;margin-top:4px">Total: ${formatCurrency(p.totalEstimasi)}</div>
     </div>
     ${p.catatan ? `<div class="mb-16"><b>Catatan:</b><div class="text-sm mt-4">${escHtml(p.catatan)}</div></div>` : ''}
-    ${p.approvedBy ? `<div class="text-sm" style="color:var(--success)">✅ Disetujui oleh: ${escHtml(p.approvedBy)} (${formatDate(p.approvedAt)})</div>` : ''}
-    ${p.rejectedBy ? `<div class="text-sm" style="color:var(--danger)">❌ Ditolak oleh: ${escHtml(p.rejectedBy)} — ${escHtml(p.alasanTolak || '')}</div>` : ''}
+    <div style="margin-top:16px;padding:14px;border-radius:10px;border:1px solid #e0e0e0;background:${p.status === 'approved' || p.status === 'selesai' ? '#e8f5e9' : p.status === 'rejected' ? '#fce4ec' : '#fff8e1'}">
+      <div class="fw-700 mb-8" style="color:${p.status === 'approved' || p.status === 'selesai' ? '#2e7d32' : p.status === 'rejected' ? '#c62828' : '#f57f17'}">📋 Status Approval</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.85rem">
+        <div><b>Status:</b> <span class="badge ${badge}">${(p.status || 'pending').toUpperCase()}</span></div>
+        <div><b>Diajukan:</b> ${formatDate(p.createdAt)}</div>
+        ${p.approvedBy ? `<div><b>Disetujui oleh:</b> ${escHtml(p.approvedBy)}</div>` : ''}
+        ${p.approvedAt ? `<div><b>Tgl Approve:</b> ${formatDate(p.approvedAt)}</div>` : ''}
+        ${p.rejectedBy ? `<div><b>Ditolak oleh:</b> ${escHtml(p.rejectedBy)}</div>` : ''}
+        ${p.rejectedAt ? `<div><b>Tgl Tolak:</b> ${formatDate(p.rejectedAt)}</div>` : ''}
+      </div>
+      ${p.alasanTolak || p.approvalComment || p.komentar ? `<div style="margin-top:10px;padding:10px;background:#fff;border-radius:6px;border-left:3px solid ${p.status === 'approved' ? '#2e7d32' : '#c62828'}"><div class="text-xs fw-700 mb-4">💬 Komentar Approval:</div><div class="text-sm">${escHtml(p.alasanTolak || p.approvalComment || p.komentar || '')}</div></div>` : ''}
+    </div>
     ${p.status === 'approved' ? `<div class="flex gap-8 mt-16"><button class="btn btn-primary btn-sm" onclick="closeModalDirect();modalUangMukaDinas('${id}')">💰 Ajukan Uang Muka</button><button class="btn btn-info btn-sm" onclick="closeModalDirect();modalLaporanDinas('${id}')">📝 Buat Laporan</button></div>` : ''}`,
     true
   );
@@ -1131,7 +1141,11 @@ async function loadSPPDUangMuka(el) {
     if (isPortal && p.userId !== currentUser.id) return;
     // Manager (level 3) only sees own department; Head/BOD/Admin (level 4+) sees all
     if (!isPortal && hasAccess(3) && !hasAccess(4)) {
-      if (p.userId !== currentUser.id && (p.departemen || '').toLowerCase() !== (currentUser.departemen || '').toLowerCase()) return;
+      if (
+        p.userId !== currentUser.id &&
+        (p.departemen || '').toLowerCase() !== (currentUser.departemen || '').toLowerCase()
+      )
+        return;
     }
     hasData = true;
     const badge =
@@ -1267,7 +1281,11 @@ async function loadSPPDLaporan(el) {
     if (isPortal && p.userId !== currentUser.id) return;
     // Manager (level 3) only sees own department; Head/BOD/Admin (level 4+) sees all
     if (!isPortal && hasAccess(3) && !hasAccess(4)) {
-      if (p.userId !== currentUser.id && (p.departemen || '').toLowerCase() !== (currentUser.departemen || '').toLowerCase()) return;
+      if (
+        p.userId !== currentUser.id &&
+        (p.departemen || '').toLowerCase() !== (currentUser.departemen || '').toLowerCase()
+      )
+        return;
     }
     hasData = true;
     h += `<tr><td class="fw-700">${escHtml(p.noSPPD || '-')}</td><td>${escHtml(p.nama)}</td><td>${escHtml(p.tujuan || '-')}</td><td class="text-sm">${escHtml((p.hasil || '').substring(0, 50))}${(p.hasil || '').length > 50 ? '...' : ''}</td><td>${formatDate(p.createdAt)}</td><td><button class="btn btn-xs btn-info" onclick="viewLaporanDinas('${d.id}')">👁️</button></td></tr>`;
@@ -1386,7 +1404,11 @@ async function loadSPPDReimbursement(el) {
     if (isPortal && p.userId !== currentUser.id) return;
     // Manager (level 3) only sees own department; Head/BOD/Admin (level 4+) sees all
     if (!isPortal && hasAccess(3) && !hasAccess(4)) {
-      if (p.userId !== currentUser.id && (p.departemen || '').toLowerCase() !== (currentUser.departemen || '').toLowerCase()) return;
+      if (
+        p.userId !== currentUser.id &&
+        (p.departemen || '').toLowerCase() !== (currentUser.departemen || '').toLowerCase()
+      )
+        return;
     }
     hasData = true;
     const selisih = (p.totalAktual || 0) - (p.uangMuka || 0);
