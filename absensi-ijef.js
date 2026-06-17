@@ -1174,6 +1174,9 @@ async function approveDinas(id,status){
   // Propagate status to linked SPPD record
   const linkSnap=await db.collection('hrd_perjalanan_dinas').where('dinasLuarId','==',id).get();
   linkSnap.forEach(d=>d.ref.update({status,approvedBy:currentUser.nama,approvedAt:new Date().toISOString()}));
+  const doc=await db.collection('hrd_dinas_luar').doc(id).get();
+  const p=doc.data();
+  await sendNotification(p.userId,status==='approved'?'✅ Dinas Luar Disetujui':'❌ Dinas Luar Ditolak',`Pengajuan dinas luar ke ${p.tujuan} telah ${status==='approved'?'disetujui':'ditolak'}`,'portal-dinas');
   toast('Updated','success');loadDinasTab('pengajuan');
 }
 
