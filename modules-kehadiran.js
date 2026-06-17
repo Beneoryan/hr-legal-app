@@ -1115,6 +1115,11 @@ async function renderDailyTask() {
     // Leader/Manager/Head can assign tasks
     tabs += '<div class="tab" onclick="filterDailyTasks(\'assigned\')">📋 Ditugaskan</div>';
   }
+  if (hasAccess(4) && !hasAccess(5)) {
+    // Head can monitor assigned task history
+    tabs +=
+      '<div class="tab" onclick="filterDailyTasks(\'history-assigned\')">📊 History Tugas</div>';
+  }
 
   // Button: Staff only sees report, Leader+ sees both
   let addBtn = '';
@@ -1172,6 +1177,7 @@ async function loadDailyTasks(filter) {
       done: 'Selesai',
       overdue: 'Terlambat',
       assigned: '📋 Ditugaskan',
+      'history-assigned': '📊 History Tugas',
       report: '📝 Daily Report',
       'team-report': '📊 Report Tim',
       'all-report': '🏢 Semua Divisi',
@@ -1233,7 +1239,22 @@ async function loadDailyTasks(filter) {
     filtered = _dailyTaskData.filter(
       (t) => t.assignedBy === currentUser.id && t.userId !== currentUser.id
     );
-  else if (filter === 'report')
+  else if (filter === 'history-assigned') {
+    filtered = _dailyTaskData.filter(
+      (t) => t.assignedBy === currentUser.id && t.userId !== currentUser.id
+    );
+    // Apply date range filter if present
+    const haFrom = document.getElementById('historyAssignedFrom')?.value || '';
+    const haTo = document.getElementById('historyAssignedTo')?.value || '';
+    if (haFrom) filtered = filtered.filter((t) => (t.tanggal || '') >= haFrom);
+    if (haTo) filtered = filtered.filter((t) => (t.tanggal || '') <= haTo);
+    // Sort by date descending (newest first)
+    filtered.sort(
+      (a, b) =>
+        (b.tanggal || '').localeCompare(a.tanggal || '') ||
+        (b.createdAt || '').localeCompare(a.createdAt || '')
+    );
+  } else if (filter === 'report')
     filtered = _dailyTaskData.filter(
       (t) =>
         (t.type === 'report' || (t.title && t.title.includes('Daily Report'))) &&
@@ -1307,6 +1328,100 @@ async function loadDailyTasks(filter) {
       <input type="date" class="form-control" id="reportDateTo" value="${curTo}" style="max-width:160px;padding:6px 10px" onchange="loadDailyTasks('${filter}')">
       <button class="btn btn-xs btn-outline" onclick="document.getElementById('reportDateFrom').value='';document.getElementById('reportDateTo').value='';loadDailyTasks('${filter}')">Reset</button>
     </div>`;
+  }
+  if (filter === 'history-assigned') {
+    const curFrom = document.getElementById('historyAssignedFrom')?.value || '';
+    const curTo = document.getElementById('historyAssignedTo')?.value || '';
+    const totalAssigned = filtered.length;
+    const doneCount = filtered.filter(function (t) {
+      return t.done;
+    }).length;
+    const pendingCount = filtered.filter(function (t) {
+      return !t.done && t.tanggal >= today;
+    }).length;
+    const overdueCount = filtered.filter(function (t) {
+      return !t.done && t.tanggal < today;
+    }).length;
+    dateFilterHtml = '<div style="margin-bottom:16px">';
+    dateFilterHtml +=
+      '<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;padding:10px;background:#f8f9ff;border-radius:8px">';
+    dateFilterHtml += '<span class="text-sm fw-700">📅 Filter Periode:</span>';
+    dateFilterHtml +=
+      '<input type="date" class="form-control" id="historyAssignedFrom" value="' +
+      curFrom +
+      '" style="max-width:160px;padding:6px 10px" onchange="loadDailyTasks(\'history-assigned\')">';
+    dateFilterHtml += '<span class="text-sm">s/d</span>';
+    dateFilterHtml +=
+      '<input type="date" class="form-control" id="historyAssignedTo" value="' +
+      curTo +
+      '" style="max-width:160px;padding:6px 10px" onchange="loadDailyTasks(\'history-assigned\')">';
+    dateFilterHtml +=
+      "<button class=\"btn btn-xs btn-outline\" onclick=\"document.getElementById('historyAssignedFrom').value='';document.getElementById('historyAssignedTo').value='';loadDailyTasks('history-assigned')\">Reset</button>";
+    dateFilterHtml += '</div>';
+    dateFilterHtml +=
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:12px">';
+    dateFilterHtml +=
+      '<div style="padding:10px;background:#e3f2fd;border-radius:8px;text-align:center;border-left:3px solid #1565c0"><div class="fw-700" style="font-size:1.1rem;color:#1565c0">' +
+      totalAssigned +
+      '</div><div class="text-xs">Total Tugas</div></div>';
+    dateFilterHtml +=
+      '<div style="padding:10px;background:#e8f5e9;border-radius:8px;text-align:center;border-left:3px solid #2e7d32"><div class="fw-700" style="font-size:1.1rem;color:#2e7d32">' +
+      doneCount +
+      '</div><div class="text-xs">Selesai</div></div>';
+    dateFilterHtml +=
+      '<div style="padding:10px;background:#fff3e0;border-radius:8px;text-align:center;border-left:3px solid #f57f17"><div class="fw-700" style="font-size:1.1rem;color:#f57f17">' +
+      pendingCount +
+      '</div><div class="text-xs">Proses</div></div>';
+    dateFilterHtml +=
+      '<div style="padding:10px;background:#fce4ec;border-radius:8px;text-align:center;border-left:3px solid #c62828"><div class="fw-700" style="font-size:1.1rem;color:#c62828">' +
+      overdueCount +
+      '</div><div class="text-xs">Terlambat</div></div>';
+    dateFilterHtml += '</div></div>';
+    // Render table format for history
+    var historyHtml = dateFilterHtml;
+    historyHtml +=
+      '<div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Judul Task</th><th>Tanggal</th><th>Prioritas</th><th>Status</th><th>Selesai</th></tr></thead><tbody>';
+    if (!filtered.length) {
+      historyHtml +=
+        '<tr><td colspan="6" class="text-center">Belum ada tugas yang ditugaskan</td></tr>';
+    } else {
+      filtered.forEach(function (t) {
+        var statusBadge = '';
+        if (t.done) {
+          statusBadge = '<span class="badge badge-success">Selesai</span>';
+        } else if (t.tanggal < today) {
+          statusBadge = '<span class="badge badge-danger">Terlambat</span>';
+        } else if (t.tanggal === today) {
+          statusBadge = '<span class="badge badge-warning">Hari Ini</span>';
+        } else {
+          statusBadge = '<span class="badge badge-info">Mendatang</span>';
+        }
+        var prioColor =
+          t.priority === 'high' ? '#c62828' : t.priority === 'low' ? '#666' : '#f57f17';
+        var prioLabel =
+          t.priority === 'high' ? 'Tinggi' : t.priority === 'low' ? 'Rendah' : 'Sedang';
+        var doneAt = t.doneAt ? formatDate(t.doneAt) : '-';
+        historyHtml += '<tr>';
+        historyHtml +=
+          '<td class="fw-700">' + escHtml(t.targetUserName || t.userId || '-') + '</td>';
+        historyHtml += '<td>' + escHtml(t.title) + '</td>';
+        historyHtml += '<td>' + formatDate(t.tanggal) + '</td>';
+        historyHtml +=
+          '<td><span style="padding:2px 8px;border-radius:4px;font-size:.75rem;background:' +
+          prioColor +
+          '20;color:' +
+          prioColor +
+          '">' +
+          prioLabel +
+          '</span></td>';
+        historyHtml += '<td>' + statusBadge + '</td>';
+        historyHtml += '<td>' + doneAt + '</td>';
+        historyHtml += '</tr>';
+      });
+    }
+    historyHtml += '</tbody></table></div>';
+    listEl.innerHTML = historyHtml;
+    return;
   }
   if (!filtered.length) {
     listEl.innerHTML =
