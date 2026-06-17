@@ -231,7 +231,7 @@ async function renderOvertime() {
           : p.status === 'rejected'
             ? 'badge-danger'
             : 'badge-warning';
-      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggal)}</td><td>${p.jamMulai || '-'}-${p.jamSelesai || '-'}</td><td>${p.durasi || 0}j</td><td><span class="badge ${badge}">${p.status}</span></td><td>${p.status === 'pending' && hasAccess(3) ? `<button class="btn btn-xs btn-success" onclick="approveOT('${d.id}','approved')">✅</button> <button class="btn btn-xs btn-danger" onclick="approveOT('${d.id}','rejected')">❌</button>` : ''} ${hasAccess(6) ? `<button class="btn btn-xs btn-warning" onclick="editOTDoc('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_overtime','${d.id}','overtime')">🗑️</button>` : ''}</td></tr>`;
+      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggal)}</td><td>${p.jamMulai || '-'}-${p.jamSelesai || '-'}</td><td>${p.durasi || 0}j</td><td><span class="badge ${badge}">${p.status}</span></td><td><button class="btn btn-xs btn-info" onclick="viewOvertimeDetail('${d.id}')">👁️</button> ${p.status === 'pending' && hasAccess(3) ? `<button class="btn btn-xs btn-success" onclick="approveOT('${d.id}','approved')">✅</button> <button class="btn btn-xs btn-danger" onclick="approveOT('${d.id}','rejected')">❌</button>` : ''} ${hasAccess(6) ? `<button class="btn btn-xs btn-warning" onclick="editOTDoc('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_overtime','${d.id}','overtime')">🗑️</button>` : ''}</td></tr>`;
     });
   document.getElementById('tblOT').innerHTML = h;
 }
