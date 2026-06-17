@@ -1115,8 +1115,8 @@ async function renderDailyTask() {
     // Leader/Manager/Head can assign tasks
     tabs += '<div class="tab" onclick="filterDailyTasks(\'assigned\')">📋 Ditugaskan</div>';
   }
-  if (hasAccess(4) && !hasAccess(5)) {
-    // Head can monitor assigned task history
+  if (hasAccess(2)) {
+    // Leader+ can monitor assigned task history
     tabs +=
       '<div class="tab" onclick="filterDailyTasks(\'history-assigned\')">📊 History Tugas</div>';
   }
@@ -1342,43 +1342,45 @@ async function loadDailyTasks(filter) {
     const overdueCount = filtered.filter(function (t) {
       return !t.done && t.tanggal < today;
     }).length;
-    dateFilterHtml = '<div style="margin-bottom:16px">';
-    dateFilterHtml +=
-      '<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;padding:10px;background:#f8f9ff;border-radius:8px">';
-    dateFilterHtml += '<span class="text-sm fw-700">📅 Filter Periode:</span>';
-    dateFilterHtml +=
-      '<input type="date" class="form-control" id="historyAssignedFrom" value="' +
-      curFrom +
-      '" style="max-width:160px;padding:6px 10px" onchange="loadDailyTasks(\'history-assigned\')">';
-    dateFilterHtml += '<span class="text-sm">s/d</span>';
-    dateFilterHtml +=
-      '<input type="date" class="form-control" id="historyAssignedTo" value="' +
-      curTo +
-      '" style="max-width:160px;padding:6px 10px" onchange="loadDailyTasks(\'history-assigned\')">';
-    dateFilterHtml +=
-      "<button class=\"btn btn-xs btn-outline\" onclick=\"document.getElementById('historyAssignedFrom').value='';document.getElementById('historyAssignedTo').value='';loadDailyTasks('history-assigned')\">Reset</button>";
-    dateFilterHtml += '</div>';
-    dateFilterHtml +=
-      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:12px">';
-    dateFilterHtml +=
+    // Stats cards
+    var historyHtml =
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:16px">';
+    historyHtml +=
       '<div style="padding:10px;background:#e3f2fd;border-radius:8px;text-align:center;border-left:3px solid #1565c0"><div class="fw-700" style="font-size:1.1rem;color:#1565c0">' +
       totalAssigned +
       '</div><div class="text-xs">Total Tugas</div></div>';
-    dateFilterHtml +=
+    historyHtml +=
       '<div style="padding:10px;background:#e8f5e9;border-radius:8px;text-align:center;border-left:3px solid #2e7d32"><div class="fw-700" style="font-size:1.1rem;color:#2e7d32">' +
       doneCount +
       '</div><div class="text-xs">Selesai</div></div>';
-    dateFilterHtml +=
+    historyHtml +=
       '<div style="padding:10px;background:#fff3e0;border-radius:8px;text-align:center;border-left:3px solid #f57f17"><div class="fw-700" style="font-size:1.1rem;color:#f57f17">' +
       pendingCount +
       '</div><div class="text-xs">Proses</div></div>';
-    dateFilterHtml +=
+    historyHtml +=
       '<div style="padding:10px;background:#fce4ec;border-radius:8px;text-align:center;border-left:3px solid #c62828"><div class="fw-700" style="font-size:1.1rem;color:#c62828">' +
       overdueCount +
       '</div><div class="text-xs">Terlambat</div></div>';
-    dateFilterHtml += '</div></div>';
-    // Render table format for history
-    var historyHtml = dateFilterHtml;
+    historyHtml += '</div>';
+    // Single-line date range filter
+    historyHtml +=
+      '<div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap;padding:10px;background:#f8f9ff;border-radius:8px">';
+    historyHtml += '<span class="text-sm fw-700">📅 Periode:</span>';
+    historyHtml +=
+      '<input type="date" class="form-control" id="historyAssignedFrom" value="' +
+      curFrom +
+      '" style="max-width:145px;padding:5px 8px;font-size:.82rem" onchange="loadDailyTasks(\'history-assigned\')">';
+    historyHtml += '<span class="text-sm">—</span>';
+    historyHtml +=
+      '<input type="date" class="form-control" id="historyAssignedTo" value="' +
+      curTo +
+      '" style="max-width:145px;padding:5px 8px;font-size:.82rem" onchange="loadDailyTasks(\'history-assigned\')">';
+    if (curFrom || curTo) {
+      historyHtml +=
+        "<button class=\"btn btn-xs btn-outline\" onclick=\"document.getElementById('historyAssignedFrom').value='';document.getElementById('historyAssignedTo').value='';loadDailyTasks('history-assigned')\">✕ Reset</button>";
+    }
+    historyHtml += '</div>';
+    // Table
     historyHtml +=
       '<div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Judul Task</th><th>Tanggal</th><th>Prioritas</th><th>Status</th><th>Selesai</th></tr></thead><tbody>';
     if (!filtered.length) {
