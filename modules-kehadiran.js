@@ -1459,7 +1459,7 @@ async function loadDailyTasks(filter) {
           tasks.length +
           ' tugas)</span></div>';
         historyHtml +=
-          '<div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Judul Task</th><th>Tanggal</th><th>Prioritas</th><th>Status</th><th>Ditugaskan oleh</th><th>Selesai</th></tr></thead><tbody>';
+          '<div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Judul Task</th><th>Tanggal</th><th>Prioritas</th><th>Status</th><th>Ditugaskan oleh</th><th>Selesai</th><th>Aksi</th></tr></thead><tbody>';
         tasks.forEach(function (t) {
           var statusBadge = '';
           if (t.done) statusBadge = '<span class="badge badge-success">Selesai</span>';
@@ -1489,6 +1489,10 @@ async function loadDailyTasks(filter) {
           historyHtml += '<td>' + statusBadge + '</td>';
           historyHtml += '<td class="text-sm">' + escHtml(t.assignedByName || '-') + '</td>';
           historyHtml += '<td>' + doneAt + '</td>';
+          historyHtml +=
+            '<td><button class="btn btn-xs btn-info" onclick="viewDailyTask(\'' +
+            t.id +
+            '\')">👁️</button></td>';
           historyHtml += '</tr>';
         });
         historyHtml += '</tbody></table></div></div>';
@@ -1613,8 +1617,23 @@ function filterDailyTasks(f) {
 }
 
 function viewDailyTask(id) {
-  const task = _dailyTaskData.find((t) => t.id === id);
-  if (!task) return;
+  var task = _dailyTaskData.find((t) => t.id === id);
+  if (!task) {
+    // Fallback: fetch from Firestore if not in local cache
+    db.collection('hrd_daily_tasks')
+      .doc(id)
+      .get()
+      .then(function (doc) {
+        if (!doc.exists) return toast('Data tidak ditemukan', 'warning');
+        var t = { id: doc.id, ...doc.data() };
+        _showDailyTaskDetail(t);
+      });
+    return;
+  }
+  _showDailyTaskDetail(task);
+}
+
+function _showDailyTaskDetail(task) {
   const priorityLabel =
     task.priority === 'high' ? 'Tinggi' : task.priority === 'low' ? 'Rendah' : 'Sedang';
   const priorityColor =
