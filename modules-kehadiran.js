@@ -1639,40 +1639,80 @@ function viewDailyTask(id) {
 }
 
 async function modalAddTask() {
-  // Leader/Manager/Head can assign tasks to subordinates in SAME department only
+  // Leader/Manager/Head can assign tasks to subordinates
   let assignHtml = '';
   if (hasAccess(2) && !hasAccess(5)) {
-    // Leader to Head (not BOD)
     try {
       const usersSnap = await db.collection('hrd_users').get();
       const myDept = (currentUser.departemen || '').toLowerCase().trim();
-      let opts =
-        '<option value="self">\u{1F4DD} Untuk Diri Sendiri</option><option disabled>\u2500\u2500 Tugaskan ke Anggota Tim \u2500\u2500</option>';
-      usersSnap.forEach((d) => {
-        const u = d.data();
+      let checkboxes = '';
+      usersSnap.forEach(function (d) {
+        var u = d.data();
         if (u.status !== 'nonaktif' && d.id !== currentUser.id) {
-          // HEAD+ sees all users; Leader/Manager only same department
           if (!hasAccess(4) && myDept && (u.departemen || '').toLowerCase().trim() !== myDept)
             return;
-          opts += `<option value="${d.id}" data-nama="${escHtml(u.nama)}">${escHtml(u.nama)} (${escHtml(u.departemen || '-')})</option>`;
+          checkboxes +=
+            '<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;transition:background .15s" onmouseover="this.style.background=\'#f0f4ff\'" onmouseout="this.style.background=\'\'">';
+          checkboxes +=
+            '<input type="checkbox" class="dt-assign-cb" value="' +
+            d.id +
+            '" data-nama="' +
+            escHtml(u.nama) +
+            '"> ';
+          checkboxes +=
+            '<span>' +
+            escHtml(u.nama) +
+            ' <span style="color:#999;font-size:.75rem">(' +
+            escHtml(u.departemen || '-') +
+            ')</span></span></label>';
         }
       });
-      assignHtml = `<div class="form-group"><label>Tugaskan Ke</label><select class="form-control" id="dtAssignUser">${opts}</select></div>`;
+      assignHtml = '<div class="form-group"><label>Tugaskan Ke</label>';
+      assignHtml +=
+        '<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;margin-bottom:4px;background:#f8f9ff;border-radius:6px;cursor:pointer"><input type="checkbox" id="dtAssignSelf" checked> <span class="fw-700">📝 Untuk Diri Sendiri</span></label>';
+      assignHtml +=
+        '<div style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:4px">';
+      assignHtml +=
+        '<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #eee;cursor:pointer"><input type="checkbox" id="dtAssignAll" onchange="document.querySelectorAll(\'.dt-assign-cb\').forEach(function(c){c.checked=this.checked}.bind(this))"> <span class="fw-700 text-sm">Pilih Semua</span></label>';
+      assignHtml += checkboxes;
+      assignHtml +=
+        '</div><div class="text-xs" style="color:#999;margin-top:4px">Centang satu atau lebih anggota tim</div></div>';
     } catch (_e) {
       assignHtml = '';
     }
   } else if (hasAccess(6)) {
-    // Admin: all users
     try {
       const usersSnap = await db.collection('hrd_users').get();
-      let opts =
-        '<option value="self">\u{1F4DD} Untuk Diri Sendiri</option><option disabled>\u2500\u2500 Tugaskan ke Karyawan \u2500\u2500</option>';
-      usersSnap.forEach((d) => {
-        const u = d.data();
-        if (u.status !== 'nonaktif' && d.id !== currentUser.id)
-          opts += `<option value="${d.id}" data-nama="${escHtml(u.nama)}">${escHtml(u.nama)} (${escHtml(u.departemen || '-')})</option>`;
+      let checkboxes = '';
+      usersSnap.forEach(function (d) {
+        var u = d.data();
+        if (u.status !== 'nonaktif' && d.id !== currentUser.id) {
+          checkboxes +=
+            '<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;transition:background .15s" onmouseover="this.style.background=\'#f0f4ff\'" onmouseout="this.style.background=\'\'">';
+          checkboxes +=
+            '<input type="checkbox" class="dt-assign-cb" value="' +
+            d.id +
+            '" data-nama="' +
+            escHtml(u.nama) +
+            '"> ';
+          checkboxes +=
+            '<span>' +
+            escHtml(u.nama) +
+            ' <span style="color:#999;font-size:.75rem">(' +
+            escHtml(u.departemen || '-') +
+            ')</span></span></label>';
+        }
       });
-      assignHtml = `<div class="form-group"><label>Tugaskan Ke</label><select class="form-control" id="dtAssignUser">${opts}</select></div>`;
+      assignHtml = '<div class="form-group"><label>Tugaskan Ke</label>';
+      assignHtml +=
+        '<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;margin-bottom:4px;background:#f8f9ff;border-radius:6px;cursor:pointer"><input type="checkbox" id="dtAssignSelf" checked> <span class="fw-700">📝 Untuk Diri Sendiri</span></label>';
+      assignHtml +=
+        '<div style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:4px">';
+      assignHtml +=
+        '<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #eee;cursor:pointer"><input type="checkbox" id="dtAssignAll" onchange="document.querySelectorAll(\'.dt-assign-cb\').forEach(function(c){c.checked=this.checked}.bind(this))"> <span class="fw-700 text-sm">Pilih Semua</span></label>';
+      assignHtml += checkboxes;
+      assignHtml +=
+        '</div><div class="text-xs" style="color:#999;margin-top:4px">Centang satu atau lebih karyawan</div></div>';
     } catch (_e) {
       assignHtml = '';
     }
@@ -1697,51 +1737,67 @@ async function simpanDailyTask() {
   const title = document.getElementById('dtTitle').value.trim();
   const tanggal = document.getElementById('dtDate').value;
   if (!title || !tanggal) return toast('Judul dan tanggal wajib', 'warning');
-  const assignEl = document.getElementById('dtAssignUser');
-  // Determine target user: self if no dropdown, value is 'self', or empty
-  const isSelf = !assignEl || assignEl.value === 'self';
-  const targetUserId = isSelf ? currentUser.id : assignEl.value;
-  const targetUserName = isSelf
-    ? currentUser.nama
-    : assignEl.options[assignEl.selectedIndex].getAttribute('data-nama') ||
-      assignEl.options[assignEl.selectedIndex].text;
-  const assignedBy = targetUserId !== currentUser.id ? currentUser.id : '';
-  const assignedByName = targetUserId !== currentUser.id ? currentUser.nama : '';
+  // Collect selected users from checkboxes
+  var targets = [];
+  var selfCb = document.getElementById('dtAssignSelf');
+  if (selfCb && selfCb.checked) {
+    targets.push({ id: currentUser.id, nama: currentUser.nama });
+  }
+  var assignCbs = document.querySelectorAll('.dt-assign-cb:checked');
+  assignCbs.forEach(function (cb) {
+    targets.push({ id: cb.value, nama: cb.getAttribute('data-nama') || '' });
+  });
+  // Fallback: if nothing selected, assign to self (old dropdown compatibility)
+  var oldSelect = document.getElementById('dtAssignUser');
+  if (!targets.length && oldSelect) {
+    if (oldSelect.value === 'self') {
+      targets.push({ id: currentUser.id, nama: currentUser.nama });
+    } else {
+      var opt = oldSelect.options[oldSelect.selectedIndex];
+      targets.push({ id: oldSelect.value, nama: opt.getAttribute('data-nama') || opt.text });
+    }
+  }
+  if (!targets.length) targets.push({ id: currentUser.id, nama: currentUser.nama });
   try {
     const kategoriEl = document.getElementById('dtKategori');
     const attachments = await getFilesAsBase64('dtFiles');
-    await db.collection('hrd_daily_tasks').add({
-      title,
-      description: document.getElementById('dtDesc').value.trim(),
-      tanggal,
-      waktu: document.getElementById('dtTime').value || '',
-      priority: document.getElementById('dtPriority').value,
-      reminder: document.getElementById('dtReminder').value,
-      repeat: document.getElementById('dtRepeat').value || '',
-      kategori: kategoriEl ? kategoriEl.value : '',
-      attachments,
-      done: false,
-      type: 'task',
-      userId: targetUserId,
-      targetUserName,
-      departemen: currentUser.departemen || '',
-      ownerLevel: ROLES[currentUser.role] || 0,
-      assignedBy,
-      assignedByName,
-      createdAt: new Date().toISOString(),
-    });
-    toast('Task ditambahkan', 'success');
-    // Notify target user if assigned to someone else
-    if (targetUserId !== currentUser.id) {
-      await db.collection('hrd_notifikasi').add({
-        targetUser: targetUserId,
-        title: '📋 Task Baru Ditugaskan',
-        message: `${currentUser.nama} menugaskan: ${title}`,
-        read: false,
-        type: 'daily-task',
+    for (var i = 0; i < targets.length; i++) {
+      var t = targets[i];
+      var assignedBy = t.id !== currentUser.id ? currentUser.id : '';
+      var assignedByName = t.id !== currentUser.id ? currentUser.nama : '';
+      await db.collection('hrd_daily_tasks').add({
+        title: title,
+        description: document.getElementById('dtDesc').value.trim(),
+        tanggal: tanggal,
+        waktu: document.getElementById('dtTime').value || '',
+        priority: document.getElementById('dtPriority').value,
+        reminder: document.getElementById('dtReminder').value,
+        repeat: document.getElementById('dtRepeat').value || '',
+        kategori: kategoriEl ? kategoriEl.value : '',
+        attachments: attachments,
+        done: false,
+        type: 'task',
+        userId: t.id,
+        targetUserName: t.nama,
+        departemen: currentUser.departemen || '',
+        ownerLevel: ROLES[currentUser.role] || 0,
+        assignedBy: assignedBy,
+        assignedByName: assignedByName,
         createdAt: new Date().toISOString(),
       });
+      // Notify target user if assigned to someone else
+      if (t.id !== currentUser.id) {
+        await db.collection('hrd_notifikasi').add({
+          targetUser: t.id,
+          title: '📋 Task Baru Ditugaskan',
+          message: currentUser.nama + ' menugaskan: ' + title,
+          read: false,
+          type: 'daily-task',
+          createdAt: new Date().toISOString(),
+        });
+      }
     }
+    toast('Task ditambahkan untuk ' + targets.length + ' orang', 'success');
   } catch (e) {
     toast('Gagal: ' + e.message, 'error');
   }
