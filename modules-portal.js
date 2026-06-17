@@ -5,6 +5,7 @@ async function renderPortal() {
   const u = currentUser;
   // Refresh user data from Firestore to get latest profilePic/foto
   let avatarUrl = '';
+  let kSnapPortal = null;
   try {
     const freshDoc = await db.collection('hrd_users').doc(u.id).get();
     if (freshDoc.exists) {
@@ -15,9 +16,9 @@ async function renderPortal() {
       localStorage.setItem('hrd_session', JSON.stringify(currentUser));
     }
     // Get foto from hrd_karyawan (priority over profilePic)
-    const kSnap = await db.collection('hrd_karyawan').where('nama', '==', u.nama).limit(1).get();
-    if (!kSnap.empty) {
-      const kData = kSnap.docs[0].data();
+    kSnapPortal = await db.collection('hrd_karyawan').where('nama', '==', u.nama).limit(1).get();
+    if (!kSnapPortal.empty) {
+      const kData = kSnapPortal.docs[0].data();
       if (kData.foto) avatarUrl = kData.foto;
     }
     if (!avatarUrl) avatarUrl = currentUser.profilePic || '';
@@ -62,7 +63,7 @@ async function renderPortal() {
   <div class="card"><div class="card-title">📲 Download / Install Aplikasi</div><p class="text-sm mb-8" style="color:#666">Install aplikasi ini di perangkat Anda untuk akses lebih cepat.</p>${renderDownloadAppSection()}</div>`;
   // Load data (using .where() queries to only fetch current user's data for privacy)
   let absenCount = 0,
-    cutiCount = 0,
+    cutiUsed = 0,
     inboxCount = 0;
   const monthStart = monthStr() + '-01';
   const [absenSnap, cutiSnap, inboxSnap, taskSnap] = await Promise.all([
@@ -77,14 +78,16 @@ async function renderPortal() {
   });
   cutiSnap.forEach((d) => {
     const data = d.data();
-    if (data.status === 'approved') cutiCount++;
+    if (data.status === 'approved' && data.jenis === 'Cuti Tahunan') cutiUsed += data.durasi || 1;
   });
   inboxSnap.forEach((d) => {
     const data = d.data();
     if (data.read === false) inboxCount++;
   });
   document.getElementById('pAbsen').textContent = absenCount + ' hari';
-  document.getElementById('pCuti').textContent = Math.max(0, 12 - cutiCount) + ' hari';
+  const kDataPortal = kSnapPortal && !kSnapPortal.empty ? kSnapPortal.docs[0].data() : { tanggalMasuk: '', status: 'aktif' };
+  const jatahCuti = hitungJatahCuti(kDataPortal);
+  document.getElementById('pCuti').textContent = Math.max(0, jatahCuti - cutiUsed) + ' hari';
   document.getElementById('pInbox').textContent = inboxCount;
   // Daily task today
   const today = todayStr();
