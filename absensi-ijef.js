@@ -1267,7 +1267,7 @@ async function submitAbsenDinas() {
 // ── REKAP GRID ────────────────────────────────────────────────
 // ══════════════════════════════════════════════════════════════
 
-function renderRekapAbsensi(container){container.innerHTML=`<div class="card"><div class="card-header"><div class="card-title">📊 Rekap Absensi</div><div class="flex gap-8"><input class="form-control" type="month" id="rekapBulan" value="${monthStr()}" onchange="loadRekapGrid()"><button class="btn btn-sm btn-info" onclick="loadRekapGrid()">🔍</button><button class="btn btn-sm btn-success" onclick="modalGenerateAbsensi()">⚡ Generate Periode</button></div></div><div id="rekapGrid">Loading...</div><div class="mt-16" id="rekapSummary"></div></div>`;loadRekapGrid();}
+function renderRekapAbsensi(container){container.innerHTML=`<div class="card"><div class="card-header"><div class="card-title">📊 Rekap Absensi</div><div class="flex gap-8"><input class="form-control" type="month" id="rekapBulan" value="${monthStr()}" onchange="loadRekapGrid()"><button class="btn btn-sm btn-info" onclick="loadRekapGrid()">🔍</button>${hasAccess(6)?'<button class="btn btn-sm btn-success" onclick="modalGenerateAbsensi()">⚡ Generate Periode</button>':''}</div></div><div id="rekapGrid">Loading...</div><div class="mt-16" id="rekapSummary"></div></div>`;loadRekapGrid();}
 
 async function loadRekapGrid(){
   const bulan=document.getElementById('rekapBulan')?.value||monthStr();
@@ -1573,6 +1573,7 @@ function viewAbsenDinas(id){
 
 // ── GENERATE ABSENSI PERIODE ──────────────────────────────────
 function modalGenerateAbsensi(){
+  if(!hasAccess(6)) return toast('Akses ditolak','warning');
   openModal(`<div class="modal-title">⚡ Generate Absensi Periode</div>
     <p class="text-sm mb-16" style="color:#666">Generate kehadiran (Clock In + Clock Out) untuk semua karyawan aktif pada hari kerja (Senin-Jumat) dalam periode yang ditentukan.</p>
     <div class="grid-2">
