@@ -428,6 +428,14 @@ async function loadSPPDDaftar(el) {
       (p.nama || '').toLowerCase() !== currentUser.nama.toLowerCase()
     )
       return;
+    // Manager (level 3) only sees own department; Head/BOD/Admin (level 4+) sees all
+    if (!isPortal && hasAccess(3) && !hasAccess(4)) {
+      if (
+        p.userId !== currentUser.id &&
+        (p.departemen || '').toLowerCase() !== (currentUser.departemen || '').toLowerCase()
+      )
+        return;
+    }
     hasData = true;
     var durasi =
       p.tanggalMulai && p.tanggalSelesai
@@ -1121,6 +1129,10 @@ async function loadSPPDUangMuka(el) {
   snap.forEach((d) => {
     const p = d.data();
     if (isPortal && p.userId !== currentUser.id) return;
+    // Manager (level 3) only sees own department; Head/BOD/Admin (level 4+) sees all
+    if (!isPortal && hasAccess(3) && !hasAccess(4)) {
+      if (p.userId !== currentUser.id && (p.departemen || '').toLowerCase() !== (currentUser.departemen || '').toLowerCase()) return;
+    }
     hasData = true;
     const badge =
       p.status === 'dicairkan'
@@ -1253,6 +1265,10 @@ async function loadSPPDLaporan(el) {
   snap.forEach((d) => {
     const p = d.data();
     if (isPortal && p.userId !== currentUser.id) return;
+    // Manager (level 3) only sees own department; Head/BOD/Admin (level 4+) sees all
+    if (!isPortal && hasAccess(3) && !hasAccess(4)) {
+      if (p.userId !== currentUser.id && (p.departemen || '').toLowerCase() !== (currentUser.departemen || '').toLowerCase()) return;
+    }
     hasData = true;
     h += `<tr><td class="fw-700">${escHtml(p.noSPPD || '-')}</td><td>${escHtml(p.nama)}</td><td>${escHtml(p.tujuan || '-')}</td><td class="text-sm">${escHtml((p.hasil || '').substring(0, 50))}${(p.hasil || '').length > 50 ? '...' : ''}</td><td>${formatDate(p.createdAt)}</td><td><button class="btn btn-xs btn-info" onclick="viewLaporanDinas('${d.id}')">👁️</button></td></tr>`;
   });
@@ -1368,6 +1384,10 @@ async function loadSPPDReimbursement(el) {
   snap.forEach((d) => {
     const p = d.data();
     if (isPortal && p.userId !== currentUser.id) return;
+    // Manager (level 3) only sees own department; Head/BOD/Admin (level 4+) sees all
+    if (!isPortal && hasAccess(3) && !hasAccess(4)) {
+      if (p.userId !== currentUser.id && (p.departemen || '').toLowerCase() !== (currentUser.departemen || '').toLowerCase()) return;
+    }
     hasData = true;
     const selisih = (p.totalAktual || 0) - (p.uangMuka || 0);
     const selisihLabel =
