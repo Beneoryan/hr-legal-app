@@ -1202,13 +1202,16 @@ async function loadDailyTasks(filter) {
         // BOD: sees all reports (gabungan semua divisi), no tasks
         if (t.type === 'report') _dailyTaskData.push({ id: d.id, ...t });
       } else if (hasAccess(4)) {
-        // Head: own data + all divisions reports + own dept tasks
+        // Head: own data + all divisions reports + own dept tasks + all assigned tasks in dept
         if (t.userId === myId || t.assignedBy === myId) {
           _dailyTaskData.push({ id: d.id, ...t });
         } else if (t.type === 'report') {
           _dailyTaskData.push({ id: d.id, ...t }); // All divisions reports
         } else if (taskDept === myDept) {
           _dailyTaskData.push({ id: d.id, ...t }); // Own dept tasks
+        } else if (t.assignedBy && t.assignedBy !== t.userId) {
+          // Include all assigned tasks (from managers below) regardless of dept field
+          _dailyTaskData.push({ id: d.id, ...t });
         }
       } else if (hasAccess(2)) {
         // Leader/Manager: own data + own dept (but NOT reports from manager+ level — those are private)
@@ -1240,9 +1243,21 @@ async function loadDailyTasks(filter) {
       (t) => t.assignedBy === currentUser.id && t.userId !== currentUser.id
     );
   else if (filter === 'history-assigned') {
-    filtered = _dailyTaskData.filter(
-      (t) => t.assignedBy === currentUser.id && t.userId !== currentUser.id
-    );
+    // HEAD+ sees all assigned tasks in their department (from manager/leader below them)
+    // Manager/Leader sees only their own assigned tasks
+    if (hasAccess(4)) {
+      var myDeptHA = (currentUser.departemen || '').toLowerCase().trim();
+      filtered = _dailyTaskData.filter(function (t) {
+        if (!t.assignedBy || t.assignedBy === t.userId) return false;
+        // Show tasks from same department OR assigned by current user
+        var taskDept = (t.departemen || '').toLowerCase().trim();
+        return t.assignedBy === currentUser.id || taskDept === myDeptHA || hasAccess(6);
+      });
+    } else {
+      filtered = _dailyTaskData.filter(
+        (t) => t.assignedBy === currentUser.id && t.userId !== currentUser.id
+      );
+    }
     // Apply date range filter if present
     const haFrom = document.getElementById('historyAssignedFrom')?.value || '';
     const haTo = document.getElementById('historyAssignedTo')?.value || '';
@@ -1382,10 +1397,10 @@ async function loadDailyTasks(filter) {
     historyHtml += '</div>';
     // Table
     historyHtml +=
-      '<div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Judul Task</th><th>Tanggal</th><th>Prioritas</th><th>Status</th><th>Selesai</th></tr></thead><tbody>';
+      '<div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Judul Task</th><th>Tanggal</th><th>Prioritas</th><th>Status</th><th>Ditugaskan oleh</th><th>Selesai</th></tr></thead><tbody>';
     if (!filtered.length) {
       historyHtml +=
-        '<tr><td colspan="6" class="text-center">Belum ada tugas yang ditugaskan</td></tr>';
+        '<tr><td colspan="7" class="text-center">Belum ada tugas yang ditugaskan</td></tr>';
     } else {
       filtered.forEach(function (t) {
         var statusBadge = '';
@@ -1417,6 +1432,7 @@ async function loadDailyTasks(filter) {
           prioLabel +
           '</span></td>';
         historyHtml += '<td>' + statusBadge + '</td>';
+        historyHtml += '<td class="text-sm">' + escHtml(t.assignedByName || '-') + '</td>';
         historyHtml += '<td>' + doneAt + '</td>';
         historyHtml += '</tr>';
       });
