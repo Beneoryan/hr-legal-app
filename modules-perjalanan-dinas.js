@@ -392,21 +392,36 @@ async function loadSPPDDaftar(el) {
     .collection('hrd_perjalanan_dinas')
     .orderBy('createdAt', 'desc')
     .get()
-    .catch(() => db.collection('hrd_perjalanan_dinas').get());
-  // Bulk action toolbar
-  let h = `<div class="card"><div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-    <div class="card-title">📋 Daftar Surat Perintah Perjalanan Dinas (SPPD)</div>
-    <div id="sppdBulkActions" style="display:none;gap:8px;align-items:center;flex-wrap:wrap">
-      <span id="sppdSelectedCount" class="text-sm fw-700" style="color:var(--primary)">0 dipilih</span>
-      ${hasAccess(3) ? `<button class="btn btn-xs btn-success" onclick="bulkApproveSPPD()">✅ Approve Semua</button>` : ''}
-      <button class="btn btn-xs btn-danger" onclick="bulkDeleteSPPD()">🗑️ Hapus Semua</button>
-    </div>
-  </div>
-    <div class="table-wrap"><table><thead><tr><th style="width:40px"><input type="checkbox" id="sppdCheckAll" onchange="toggleAllSPPDCheckbox(this)"></th><th>No. SPPD</th><th>Nama</th><th>Tujuan</th><th>Tanggal</th><th>Durasi</th><th>Status</th><th>Aksi</th></tr></thead><tbody>`;
-  let hasData = false;
-  const docs = [];
-  snap.forEach((d) => docs.push({ id: d.id, ...d.data() }));
-  docs.forEach((p) => {
+    .catch(function () {
+      return db.collection('hrd_perjalanan_dinas').get();
+    });
+  var approveBtn = '';
+  if (hasAccess(3)) {
+    approveBtn =
+      '<button class="btn btn-xs btn-success" onclick="bulkApproveSPPD()">✅ Approve Semua</button>';
+  }
+  var h = '<div class="card">';
+  h +=
+    '<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">';
+  h += '<div class="card-title">📋 Daftar Surat Perintah Perjalanan Dinas (SPPD)</div>';
+  h += '<div id="sppdBulkActions" style="display:none;gap:8px;align-items:center;flex-wrap:wrap">';
+  h +=
+    '<span id="sppdSelectedCount" class="text-sm fw-700" style="color:var(--primary)">0 dipilih</span>';
+  h += approveBtn;
+  h += '<button class="btn btn-xs btn-danger" onclick="bulkDeleteSPPD()">🗑️ Hapus Semua</button>';
+  h += '</div></div>';
+  h += '<div class="table-wrap"><table><thead><tr>';
+  h +=
+    '<th style="width:40px;text-align:center"><input type="checkbox" id="sppdCheckAll" onchange="toggleAllSPPDCheckbox(this)"></th>';
+  h +=
+    '<th>No. SPPD</th><th>Nama</th><th>Tujuan</th><th>Tanggal</th><th>Durasi</th><th>Status</th><th>Aksi</th>';
+  h += '</tr></thead><tbody>';
+  var hasData = false;
+  var docs = [];
+  snap.forEach(function (d) {
+    docs.push({ id: d.id, ...d.data() });
+  });
+  docs.forEach(function (p) {
     if (
       isPortal &&
       p.userId !== currentUser.id &&
@@ -414,13 +429,13 @@ async function loadSPPDDaftar(el) {
     )
       return;
     hasData = true;
-    const durasi =
+    var durasi =
       p.tanggalMulai && p.tanggalSelesai
         ? Math.ceil(
             (new Date(p.tanggalSelesai) - new Date(p.tanggalMulai)) / (1000 * 60 * 60 * 24) + 1
           ) + ' hari'
         : '-';
-    const badge =
+    var badge =
       p.status === 'approved'
         ? 'badge-success'
         : p.status === 'rejected'
@@ -428,32 +443,55 @@ async function loadSPPDDaftar(el) {
           : p.status === 'selesai'
             ? 'badge-info'
             : 'badge-warning';
-    h += `<tr><td><input type="checkbox" class="sppd-check-item" value="${p.id}" data-status="${p.status || 'pending'}" onchange="updateSPPDBulkUI()"></td><td class="fw-700">${escHtml(p.noSPPD || '-')}</td><td>${escHtml(p.nama)}</td><td>${escHtml(p.tujuan || '-')}</td><td>${formatDate(p.tanggalMulai)}</td><td>${durasi}</td><td><span class="badge ${badge}">${p.status || 'pending'}</span></td><td>`;
-    h += `<button class="btn btn-xs btn-info" onclick="viewSPPD('${p.id}')">👁️</button> `;
-    if (hasAccess(3) && p.status === 'pending')
-      h += `<button class="btn btn-xs btn-success" onclick="approveSPPD('${p.id}')">✅</button> <button class="btn btn-xs btn-danger" onclick="rejectSPPD('${p.id}')">❌</button> `;
-    if (p.status === 'approved')
-      h += `<button class="btn btn-xs btn-primary" onclick="cetakSPPD('${p.id}')">🖨️</button> `;
-    h += `</td></tr>`;
+    h += '<tr>';
+    h +=
+      '<td style="text-align:center"><input type="checkbox" class="sppd-check-item" value="' +
+      p.id +
+      '" data-status="' +
+      (p.status || 'pending') +
+      '" onchange="updateSPPDBulkUI()"></td>';
+    h += '<td class="fw-700">' + escHtml(p.noSPPD || '-') + '</td>';
+    h += '<td>' + escHtml(p.nama) + '</td>';
+    h += '<td>' + escHtml(p.tujuan || '-') + '</td>';
+    h += '<td>' + formatDate(p.tanggalMulai) + '</td>';
+    h += '<td>' + durasi + '</td>';
+    h += '<td><span class="badge ' + badge + '">' + (p.status || 'pending') + '</span></td>';
+    h += '<td>';
+    h += '<button class="btn btn-xs btn-info" onclick="viewSPPD(\'' + p.id + '\')">👁️</button> ';
+    if (hasAccess(3) && p.status === 'pending') {
+      h +=
+        '<button class="btn btn-xs btn-success" onclick="approveSPPD(\'' +
+        p.id +
+        '\')">✅</button> ';
+      h +=
+        '<button class="btn btn-xs btn-danger" onclick="rejectSPPD(\'' + p.id + '\')">❌</button> ';
+    }
+    if (p.status === 'approved') {
+      h +=
+        '<button class="btn btn-xs btn-primary" onclick="cetakSPPD(\'' + p.id + '\')">🖨️</button> ';
+    }
+    h += '</td></tr>';
   });
-  if (!hasData) h += `<tr><td colspan="8" class="text-center">Belum ada data SPPD</td></tr>`;
+  if (!hasData) h += '<tr><td colspan="8" class="text-center">Belum ada data SPPD</td></tr>';
   h += '</tbody></table></div></div>';
   el.innerHTML = h;
 }
 
 // ── Bulk Selection & Actions for SPPD ──
 function toggleAllSPPDCheckbox(masterCheckbox) {
-  const items = document.querySelectorAll('.sppd-check-item');
-  items.forEach((cb) => (cb.checked = masterCheckbox.checked));
+  var items = document.querySelectorAll('.sppd-check-item');
+  for (var i = 0; i < items.length; i++) {
+    items[i].checked = masterCheckbox.checked;
+  }
   updateSPPDBulkUI();
 }
 
 function updateSPPDBulkUI() {
-  const items = document.querySelectorAll('.sppd-check-item');
-  const checked = document.querySelectorAll('.sppd-check-item:checked');
-  const bulkBar = document.getElementById('sppdBulkActions');
-  const countEl = document.getElementById('sppdSelectedCount');
-  const masterCb = document.getElementById('sppdCheckAll');
+  var items = document.querySelectorAll('.sppd-check-item');
+  var checked = document.querySelectorAll('.sppd-check-item:checked');
+  var bulkBar = document.getElementById('sppdBulkActions');
+  var countEl = document.getElementById('sppdSelectedCount');
+  var masterCb = document.getElementById('sppdCheckAll');
   if (checked.length > 0) {
     bulkBar.style.display = 'flex';
     countEl.textContent = checked.length + ' dipilih';
@@ -464,59 +502,59 @@ function updateSPPDBulkUI() {
 }
 
 async function bulkApproveSPPD() {
-  const checked = document.querySelectorAll('.sppd-check-item:checked');
-  const pendingIds = [];
-  checked.forEach((cb) => {
+  var checked = document.querySelectorAll('.sppd-check-item:checked');
+  var pendingIds = [];
+  checked.forEach(function (cb) {
     if (cb.dataset.status === 'pending') pendingIds.push(cb.value);
   });
   if (pendingIds.length === 0) {
     toast('Tidak ada SPPD berstatus pending yang dipilih', 'warning');
     return;
   }
-  if (!confirm(`Setujui ${pendingIds.length} SPPD yang dipilih?`)) return;
-  for (const id of pendingIds) {
-    const doc = await db.collection('hrd_perjalanan_dinas').doc(id).get();
-    const p = doc.data();
-    await db
-      .collection('hrd_perjalanan_dinas')
-      .doc(id)
-      .update({
-        status: 'approved',
-        approvedBy: currentUser.nama,
-        approvedAt: new Date().toISOString(),
-      });
-    const linkSnap = await db.collection('hrd_dinas_luar').where('noSPPD', '==', p.noSPPD).get();
-    linkSnap.forEach((d) =>
+  if (!confirm('Setujui ' + pendingIds.length + ' SPPD yang dipilih?')) return;
+  for (var i = 0; i < pendingIds.length; i++) {
+    var id = pendingIds[i];
+    var doc = await db.collection('hrd_perjalanan_dinas').doc(id).get();
+    var p = doc.data();
+    await db.collection('hrd_perjalanan_dinas').doc(id).update({
+      status: 'approved',
+      approvedBy: currentUser.nama,
+      approvedAt: new Date().toISOString(),
+    });
+    var linkSnap = await db.collection('hrd_dinas_luar').where('noSPPD', '==', p.noSPPD).get();
+    linkSnap.forEach(function (d) {
       d.ref.update({
         status: 'approved',
         approvedBy: currentUser.nama,
         approvedAt: new Date().toISOString(),
-      })
-    );
+      });
+    });
     await sendNotification(
       p.userId || p.nama,
       'SPPD Disetujui',
-      `SPPD ${p.noSPPD} ke ${p.tujuan} telah disetujui oleh ${currentUser.nama}`
+      'SPPD ' + p.noSPPD + ' ke ' + p.tujuan + ' telah disetujui oleh ' + currentUser.nama
     );
   }
-  toast(`✅ ${pendingIds.length} SPPD berhasil disetujui`, 'success');
+  toast('✅ ' + pendingIds.length + ' SPPD berhasil disetujui', 'success');
   showSPPDTab('daftar');
 }
 
 async function bulkDeleteSPPD() {
-  const checked = document.querySelectorAll('.sppd-check-item:checked');
-  const ids = [];
-  checked.forEach((cb) => ids.push(cb.value));
+  var checked = document.querySelectorAll('.sppd-check-item:checked');
+  var ids = [];
+  checked.forEach(function (cb) {
+    ids.push(cb.value);
+  });
   if (ids.length === 0) {
     toast('Tidak ada SPPD yang dipilih', 'warning');
     return;
   }
-  if (!confirm(`Hapus ${ids.length} SPPD yang dipilih? Tindakan ini tidak bisa dibatalkan.`))
+  if (!confirm('Hapus ' + ids.length + ' SPPD yang dipilih? Tindakan ini tidak bisa dibatalkan.'))
     return;
-  for (const id of ids) {
-    await db.collection('hrd_perjalanan_dinas').doc(id).delete();
+  for (var i = 0; i < ids.length; i++) {
+    await db.collection('hrd_perjalanan_dinas').doc(ids[i]).delete();
   }
-  toast(`🗑️ ${ids.length} SPPD berhasil dihapus`, 'success');
+  toast('🗑️ ' + ids.length + ' SPPD berhasil dihapus', 'success');
   showSPPDTab('daftar');
 }
 
@@ -928,14 +966,11 @@ async function approveSPPD(id) {
   if (!confirm('Setujui SPPD ini?')) return;
   const doc = await db.collection('hrd_perjalanan_dinas').doc(id).get();
   const p = doc.data();
-  await db
-    .collection('hrd_perjalanan_dinas')
-    .doc(id)
-    .update({
-      status: 'approved',
-      approvedBy: currentUser.nama,
-      approvedAt: new Date().toISOString(),
-    });
+  await db.collection('hrd_perjalanan_dinas').doc(id).update({
+    status: 'approved',
+    approvedBy: currentUser.nama,
+    approvedAt: new Date().toISOString(),
+  });
   // Update linked dinas_luar juga
   const linkSnap = await db.collection('hrd_dinas_luar').where('noSPPD', '==', p.noSPPD).get();
   linkSnap.forEach((d) =>
@@ -959,15 +994,12 @@ async function rejectSPPD(id) {
   if (!alasan) return;
   const doc = await db.collection('hrd_perjalanan_dinas').doc(id).get();
   const p = doc.data();
-  await db
-    .collection('hrd_perjalanan_dinas')
-    .doc(id)
-    .update({
-      status: 'rejected',
-      rejectedBy: currentUser.nama,
-      rejectedAt: new Date().toISOString(),
-      alasanTolak: alasan,
-    });
+  await db.collection('hrd_perjalanan_dinas').doc(id).update({
+    status: 'rejected',
+    rejectedBy: currentUser.nama,
+    rejectedAt: new Date().toISOString(),
+    alasanTolak: alasan,
+  });
   const linkSnap = await db.collection('hrd_dinas_luar').where('noSPPD', '==', p.noSPPD).get();
   linkSnap.forEach((d) => d.ref.update({ status: 'rejected' }));
   await sendNotification(p.userId || p.nama, 'SPPD Ditolak', `SPPD ${p.noSPPD} ditolak: ${alasan}`);
@@ -1181,14 +1213,11 @@ async function simpanUangMukaDinas(sppdId, noSPPD) {
 
 async function cairkanUangMuka(id) {
   if (!confirm('Cairkan uang muka ini?')) return;
-  await db
-    .collection('hrd_uang_muka_dinas')
-    .doc(id)
-    .update({
-      status: 'dicairkan',
-      dicairkanOleh: currentUser.nama,
-      dicairkanAt: new Date().toISOString(),
-    });
+  await db.collection('hrd_uang_muka_dinas').doc(id).update({
+    status: 'dicairkan',
+    dicairkanOleh: currentUser.nama,
+    dicairkanAt: new Date().toISOString(),
+  });
   const doc = await db.collection('hrd_uang_muka_dinas').doc(id).get();
   const p = doc.data();
   await sendNotification(
@@ -1443,14 +1472,11 @@ async function simpanReimburseDinas() {
 
 async function approveReimburseDinas(id) {
   if (!confirm('Setujui reimbursement ini?')) return;
-  await db
-    .collection('hrd_reimburse_dinas')
-    .doc(id)
-    .update({
-      status: 'approved',
-      approvedBy: currentUser.nama,
-      approvedAt: new Date().toISOString(),
-    });
+  await db.collection('hrd_reimburse_dinas').doc(id).update({
+    status: 'approved',
+    approvedBy: currentUser.nama,
+    approvedAt: new Date().toISOString(),
+  });
   const doc = await db.collection('hrd_reimburse_dinas').doc(id).get();
   const p = doc.data();
   await sendNotification(
