@@ -1140,7 +1140,7 @@ async function renderDailyTask() {
     <div class="page-title"><span>📋 Daily Task & Report</span>${addBtn}</div>
     <div class="stats-grid mb-16" id="taskStats"></div>
     <div class="card">
-      <div class="tabs mb-16" id="taskTabs">${tabs}</div>
+      <div class="tabs mb-16" id="taskTabs" style="flex-wrap:wrap">${tabs}</div>
       <div id="taskList">Loading...</div>
     </div>`;
   await loadDailyTasks('all');
