@@ -60,7 +60,10 @@ async function renderCuti() {
             : 'badge-warning';
       const uid = p.userId || p.nama;
       const kary = karyList.find(
-        (k) => k.id === uid || k.nama === p.nama || (k.nama && p.nama && k.nama.trim().toLowerCase() === p.nama.trim().toLowerCase())
+        (k) =>
+          k.id === uid ||
+          k.nama === p.nama ||
+          (k.nama && p.nama && k.nama.trim().toLowerCase() === p.nama.trim().toLowerCase())
       );
       const quota = kary ? hitungJatahCuti(kary) : 12;
       const used = cutiUsed[uid] || cutiUsed[(p.nama || '').trim().toLowerCase()] || 0;
@@ -1273,18 +1276,18 @@ async function loadDailyTasks(filter) {
     filtered = _dailyTaskData.filter((t) => t.tanggal < today && !t.done);
   else if (filter === 'assigned')
     filtered = _dailyTaskData.filter(
-      (t) => t.assignedBy === currentUser.id && t.userId !== currentUser.id
+      (t) =>
+        (t.assignedBy === currentUser.id ||
+          (hasAccess(4) && t.assignedBy && t.assignedBy !== t.userId)) &&
+        t.userId !== currentUser.id
     );
   else if (filter === 'history-assigned') {
-    // HEAD+ sees all assigned tasks in their department (from manager/leader below them)
+    // HEAD+ sees all assigned tasks (from manager/leader below them)
     // Manager/Leader sees only their own assigned tasks
     if (hasAccess(4)) {
-      var myDeptHA = (currentUser.departemen || '').toLowerCase().trim();
       filtered = _dailyTaskData.filter(function (t) {
         if (!t.assignedBy || t.assignedBy === t.userId) return false;
-        // Show tasks from same department OR assigned by current user
-        var taskDept = (t.departemen || '').toLowerCase().trim();
-        return t.assignedBy === currentUser.id || taskDept === myDeptHA || hasAccess(6);
+        return true; // HEAD sees all assigned tasks
       });
     } else {
       filtered = _dailyTaskData.filter(
