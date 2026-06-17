@@ -13,7 +13,7 @@ const APP_ICON = "https://hr-legal-app.netlify.app/icons/icon-192x192.png";
 /**
  * Helper: Get FCM token(s) for a specific user ID.
  * Reads from subcollection: hrd_fcm_tokens/{userId}/devices/*
- * Returns an array of token strings (supports multiple devices per user).
+ * Returns an array of {token, docPath} objects for stale token cleanup.
  */
 async function getTokensForUser(userId) {
   const devicesSnap = await db
@@ -25,7 +25,10 @@ async function getTokensForUser(userId) {
   devicesSnap.forEach((doc) => {
     const data = doc.data();
     if (data.token) {
-      tokens.push(data.token);
+      tokens.push({
+        token: data.token,
+        docPath: `hrd_fcm_tokens/${userId}/devices/${doc.id}`,
+      });
     }
   });
   return tokens;
@@ -33,26 +36,22 @@ async function getTokensForUser(userId) {
 
 /**
  * Helper: Get ALL FCM tokens from all users.
- * Reads from subcollection model: hrd_fcm_tokens/{userId}/devices/*
+ * Uses collectionGroup query on 'devices' to avoid N+1 sequential reads.
  * Returns an array of {token, userId, docPath} objects.
  */
 async function getAllTokens() {
-  const usersSnap = await db.collection("hrd_fcm_tokens").get();
+  const devicesSnap = await db.collectionGroup("devices").get();
   const tokens = [];
-  for (const userDoc of usersSnap.docs) {
-    const userId = userDoc.id;
-    const devicesSnap = await userDoc.ref.collection("devices").get();
-    devicesSnap.forEach((deviceDoc) => {
-      const data = deviceDoc.data();
-      if (data.token) {
-        tokens.push({
-          token: data.token,
-          userId: userId,
-          docPath: `hrd_fcm_tokens/${userId}/devices/${deviceDoc.id}`,
-        });
-      }
-    });
-  }
+  devicesSnap.forEach((deviceDoc) => {
+    const data = deviceDoc.data();
+    if (data.token) {
+      tokens.push({
+        token: data.token,
+        userId: data.userId || deviceDoc.ref.parent.parent.id,
+        docPath: deviceDoc.ref.path,
+      });
+    }
+  });
   return tokens;
 }
 
@@ -134,27 +133,23 @@ exports.onNotifikasiCreated = functions.firestore
     // Try to get tokens for a specific user ID first
     const userTokens = await getTokensForUser(targetUser);
     if (userTokens.length > 0) {
-      tokens = userTokens.map((t) => ({
-        token: t,
-        userId: targetUser,
-        docPath: null,
-      }));
+      tokens = userTokens;
     } else {
-      // targetUser might be a role - query devices subcollections for role match
-      const usersSnap = await db.collection("hrd_fcm_tokens").get();
-      for (const userDoc of usersSnap.docs) {
-        const devicesSnap = await userDoc.ref.collection("devices").get();
-        devicesSnap.forEach((deviceDoc) => {
-          const deviceData = deviceDoc.data();
-          if (deviceData.role === targetUser && deviceData.token) {
-            tokens.push({
-              token: deviceData.token,
-              userId: userDoc.id,
-              docPath: `hrd_fcm_tokens/${userDoc.id}/devices/${deviceDoc.id}`,
-            });
-          }
-        });
-      }
+      // targetUser might be a role - use collectionGroup query for efficiency
+      const devicesSnap = await db
+        .collectionGroup("devices")
+        .where("role", "==", targetUser)
+        .get();
+      devicesSnap.forEach((deviceDoc) => {
+        const deviceData = deviceDoc.data();
+        if (deviceData.token) {
+          tokens.push({
+            token: deviceData.token,
+            userId: deviceData.userId || deviceDoc.ref.parent.parent.id,
+            docPath: deviceDoc.ref.path,
+          });
+        }
+      });
     }
 
     await sendToTokens(
@@ -199,7 +194,7 @@ exports.onMeetingInviteCreated = functions.firestore
     const userTokens = await getTokensForUser(targetUser);
 
     await sendToTokens(
-      userTokens.map((t) => ({ token: t, userId: targetUser, docPath: null })),
+      userTokens,
       { title: "Undangan Meeting", body, icon: APP_ICON },
       { click_action: APP_URL, type: "meeting_invite" },
     );

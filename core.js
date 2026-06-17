@@ -94,16 +94,19 @@ async function initFCM() {
 async function cleanupFCMToken(userId) {
   try {
     if (!userId) return;
-    // Delete all device tokens for this user
-    const devicesSnap = await db
-      .collection("hrd_fcm_tokens")
-      .doc(userId)
-      .collection("devices")
-      .get();
-    const batch = db.batch();
-    devicesSnap.forEach((doc) => batch.delete(doc.ref));
-    await batch.commit();
+    // Only delete the current device's token, not all devices.
+    // Get the current token before deleting it, then remove its Firestore doc.
     if (messagingInstance) {
+      const currentToken = await messagingInstance.getToken();
+      if (currentToken) {
+        const tokenId = hashToken(currentToken);
+        await db
+          .collection("hrd_fcm_tokens")
+          .doc(userId)
+          .collection("devices")
+          .doc(tokenId)
+          .delete();
+      }
       await messagingInstance.deleteToken();
       messagingInstance = null;
     }
