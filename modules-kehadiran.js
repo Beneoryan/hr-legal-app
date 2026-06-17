@@ -1652,6 +1652,8 @@ async function modalAddTask() {
       usersSnap.forEach(function (d) {
         var u = d.data();
         if (u.status !== 'nonaktif' && d.id !== currentUser.id) {
+          // Only show same division members
+          if (myDept && (u.departemen || '').toLowerCase().trim() !== myDept) return;
           checkboxes +=
             '<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;transition:background .15s" onmouseover="this.style.background=\'#f0f4ff\'" onmouseout="this.style.background=\'\'">';
           checkboxes +=
