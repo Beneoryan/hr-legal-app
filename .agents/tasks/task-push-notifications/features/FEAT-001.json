@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Integrate Firebase Cloud Messaging (FCM) client-side for push notifications that work even when the app/browser is closed - like WhatsApp notifications on Android, iPhone, laptop, and PC.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Step 1 - Add Firebase Messaging SDK to index.html: Add the firebase-messaging-compat.js script tag (v10.12.2 from gstatic CDN) AFTER the existing firebase-firestore-compat.js script on line 893. The tag should be: <script src=\"https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js\"></script>",
     "Step 2 - Update manifest.json: Add \"gcm_sender_id\": \"103953800507\" to the manifest.json file. This is a required fixed value for FCM web push (it's always this value for all projects, not the project's sender ID).",
@@ -35,5 +35,5 @@
     "Verify manifest.json contains gcm_sender_id"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "Prettier reformatted all modified files (single quotes to double quotes in JS files and other style adjustments). The project .eslintrc.json has a pre-existing broken comma-dangle rule that prevents using it directly - must use --no-eslintrc with custom flags. Committed on existing branch feat/rekap-absensi-weekend-holiday-grey."
 }

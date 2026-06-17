@@ -1,0 +1,32 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Create Firebase Cloud Functions that trigger push notifications via FCM when Firestore documents are created in notification collections (hrd_notifikasi, hrd_broadcast, hrd_meeting_invites, hrd_pengumuman, hrd_meeting, hrd_chat). This is the server-side component needed to actually SEND push notifications to devices.",
+  "status": "in_progress",
+  "steps": [
+    "Step 1 - Create functions/ directory at the project root with proper structure: functions/package.json, functions/index.js, functions/.eslintrc.js",
+    "Step 2 - Create functions/package.json with: name 'ims-functions', firebase-admin and firebase-functions dependencies, node 18 engine, eslint devDep. Scripts should include lint and serve.",
+    "Step 3 - Create functions/index.js with Cloud Functions that: (a) Import firebase-functions and firebase-admin, initialize admin app, (b) Create an onCreate trigger for 'hrd_notifikasi/{docId}' that reads the targetUser field, looks up their FCM token(s) from 'hrd_fcm_tokens' collection, and sends a push notification with the title and message from the document, (c) Create an onCreate trigger for 'hrd_broadcast/{docId}' that sends to ALL registered FCM tokens, (d) Create an onCreate trigger for 'hrd_meeting_invites/{docId}' that sends to the target user's FCM token, (e) Create an onCreate trigger for 'hrd_pengumuman/{docId}' that sends to ALL registered tokens, (f) Create an onCreate trigger for 'hrd_chat/{docId}' that sends to all tokens except the sender's. Each notification payload should include: notification.title, notification.body, notification.icon (app icon URL), data.click_action (the app URL), data.type (the notification type). Use admin.messaging().sendEachForMulticast() for sending to multiple tokens. Handle expired/invalid tokens by deleting them from hrd_fcm_tokens.",
+    "Step 4 - Create functions/.eslintrc.js with standard Firebase Functions eslint config.",
+    "Step 5 - Add a firebase.json file at the project root (if not exists) that configures the functions deployment with the functions source directory.",
+    "Step 6 - Update .gitignore to include functions/node_modules/ if not already present."
+  ],
+  "acceptance_criteria": [
+    "functions/package.json exists with correct dependencies (firebase-admin, firebase-functions)",
+    "functions/index.js exports Cloud Functions for hrd_notifikasi, hrd_broadcast, hrd_meeting_invites, hrd_pengumuman, hrd_chat",
+    "Each function reads FCM tokens from hrd_fcm_tokens collection",
+    "Each function sends push notification with title, body, and click_action",
+    "Invalid/expired tokens are cleaned up in hrd_fcm_tokens",
+    "firebase.json exists with functions configuration",
+    "functions/.eslintrc.js exists",
+    ".gitignore includes functions/node_modules/"
+  ],
+  "verification": [
+    "Run: node -c functions/index.js (syntax check)",
+    "Run: node -e \"require('./functions/index.js')\" from the project root to verify exports",
+    "Verify functions/package.json is valid JSON",
+    "Verify firebase.json is valid JSON"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

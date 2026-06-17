@@ -1,0 +1,7 @@
+{
+  "task_id": "task-push-notifications",
+  "task_description": "Implement WhatsApp-like push notifications that work on Android, iPhone, laptop, and PC even when the app is closed. Uses Firebase Cloud Messaging (FCM) for real push delivery with notification sound and popup. Includes client-side FCM integration (service worker, token management, foreground handling) and server-side Cloud Functions that trigger push notifications on Firestore data changes.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null
+}
