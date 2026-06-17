@@ -628,9 +628,29 @@ function viewOvertimeDetail(id) {
     .get()
     .then((d) => {
       const p = d.data();
+      let attachHtml = '';
+      if (p.attachments && p.attachments.length) {
+        attachHtml =
+          '<div class="mb-16"><b>📎 Lampiran:</b><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">';
+        p.attachments.forEach(function (a) {
+          if (a.data && a.data.startsWith('data:image')) {
+            attachHtml +=
+              '<img src="' +
+              a.data +
+              '" style="max-width:120px;max-height:120px;border-radius:6px;border:1px solid #ddd;cursor:pointer" onclick="window.open(this.src)">';
+          } else if (a.name) {
+            attachHtml +=
+              '<div style="padding:8px 12px;background:#f0f4ff;border-radius:6px;font-size:.8rem">📄 ' +
+              escHtml(a.name) +
+              '</div>';
+          }
+        });
+        attachHtml += '</div></div>';
+      }
       openModal(`<div class="modal-title">⏰ Detail Overtime</div>
       <div class="grid-2 mb-16"><div><b>Nama:</b> ${escHtml(p.nama)}</div><div><b>Status:</b> <span class="badge badge-${p.status === 'approved' ? 'success' : p.status === 'rejected' ? 'danger' : 'warning'}">${p.status}</span></div><div><b>Tanggal:</b> ${formatDate(p.tanggal)}</div><div><b>Jam:</b> ${p.jamMulai || '-'} - ${p.jamSelesai || '-'}</div><div><b>Durasi:</b> ${p.durasi || 0} jam</div>${p.approvedBy ? `<div><b>Diproses:</b> ${escHtml(p.approvedBy)}</div>` : ''}</div>
-      ${p.alasan ? `<div class="mb-16"><b>Alasan:</b><div class="text-sm mt-8" style="background:#f8f9ff;padding:10px;border-radius:6px">${escHtml(p.alasan)}</div></div>` : ''}`);
+      ${p.alasan ? `<div class="mb-16"><b>Alasan:</b><div class="text-sm mt-8" style="background:#f8f9ff;padding:10px;border-radius:6px">${escHtml(p.alasan)}</div></div>` : ''}
+      ${attachHtml}`);
     });
 }
 async function editOvertimePortal(id) {

@@ -95,13 +95,14 @@ function hitungMasaKerja(tanggalMasuk) {
 }
 function modalCuti() {
   openModal(
-    `<div class="modal-title">Pengajuan Cuti/Izin/WFH</div><div class="grid-2"><div class="form-group"><label>Nama</label><input class="form-control" id="ctNama" value="${currentUser.nama}"></div><div class="form-group"><label>Jenis</label><select class="form-control" id="ctJenis"><option>Cuti Tahunan</option><option>Cuti Sakit</option><option>Izin Pribadi</option><option>WFH</option><option>Cuti Melahirkan</option></select></div></div><div class="grid-2"><div class="form-group"><label>Mulai</label><input class="form-control" type="date" id="ctMulai" value="${todayStr()}"></div><div class="form-group"><label>Selesai</label><input class="form-control" type="date" id="ctSelesai" value="${todayStr()}"></div></div><div class="form-group"><label>Keterangan</label><textarea class="form-control" id="ctKet"></textarea></div><button class="btn btn-primary" onclick="simpanCuti()">Ajukan</button>`
+    `<div class="modal-title">Pengajuan Cuti/Izin/WFH</div><div class="grid-2"><div class="form-group"><label>Nama</label><input class="form-control" id="ctNama" value="${currentUser.nama}"></div><div class="form-group"><label>Jenis</label><select class="form-control" id="ctJenis"><option>Cuti Tahunan</option><option>Cuti Sakit</option><option>Izin Pribadi</option><option>WFH</option><option>Cuti Melahirkan</option></select></div></div><div class="grid-2"><div class="form-group"><label>Mulai</label><input class="form-control" type="date" id="ctMulai" value="${todayStr()}"></div><div class="form-group"><label>Selesai</label><input class="form-control" type="date" id="ctSelesai" value="${todayStr()}"></div></div><div class="form-group"><label>Keterangan</label><textarea class="form-control" id="ctKet"></textarea></div><div class="form-group"><label>📎 Lampiran (Surat Dokter/Dokumen)</label><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('ctFiles').click()">📁 Pilih File</button><button type="button" class="btn btn-sm btn-info" onclick="openCamera('ctFilePreview','ctCameraData')">📷 Kamera</button></div><input type="file" id="ctFiles" multiple accept="image/*,.pdf,.doc,.docx" onchange="previewTaskFiles(this,'ctFilePreview')" style="display:none"><input type="hidden" id="ctCameraData"><div id="ctFilePreview" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"></div><div class="text-xs" style="color:#999;margin-top:4px">Maks 5 file. Format: Gambar, PDF, DOC</div></div><button class="btn btn-primary" onclick="simpanCuti()">Ajukan</button>`
   );
 }
 async function simpanCuti() {
   const mulai = document.getElementById('ctMulai').value,
     selesai = document.getElementById('ctSelesai').value;
   const durasi = Math.max(1, Math.ceil((new Date(selesai) - new Date(mulai)) / 86400000) + 1);
+  const attachments = await getFilesAsBase64('ctFiles');
   const data = {
     nama: document.getElementById('ctNama').value,
     jenis: document.getElementById('ctJenis').value,
@@ -109,6 +110,7 @@ async function simpanCuti() {
     selesai,
     durasi,
     keterangan: document.getElementById('ctKet').value,
+    attachments,
     status: 'pending',
     userId: currentUser.id,
     createdAt: new Date().toISOString(),
@@ -164,6 +166,25 @@ async function viewCutiDetail(id) {
   const doc = await db.collection('hrd_cuti').doc(id).get();
   if (!doc.exists) return toast('Data tidak ditemukan', 'warning');
   const p = doc.data();
+  let attachHtml = '';
+  if (p.attachments && p.attachments.length) {
+    attachHtml =
+      '<tr><td class="fw-700" style="padding:6px 8px">Lampiran</td><td style="padding:6px 8px"><div style="display:flex;gap:8px;flex-wrap:wrap">';
+    p.attachments.forEach(function (a) {
+      if (a.data && a.data.startsWith('data:image')) {
+        attachHtml +=
+          '<img src="' +
+          a.data +
+          '" style="max-width:100px;max-height:100px;border-radius:6px;border:1px solid #ddd;cursor:pointer" onclick="window.open(this.src)">';
+      } else if (a.name) {
+        attachHtml +=
+          '<div style="padding:6px 10px;background:#f0f4ff;border-radius:6px;font-size:.8rem">📄 ' +
+          escHtml(a.name) +
+          '</div>';
+      }
+    });
+    attachHtml += '</div></td></tr>';
+  }
   openModal(`<div class="modal-title">Detail Cuti/Izin</div>
     <table style="width:100%;border-collapse:collapse">
       <tr><td class="fw-700" style="padding:6px 8px;width:120px">Nama</td><td style="padding:6px 8px">${escHtml(p.nama || '-')}</td></tr>
@@ -172,6 +193,7 @@ async function viewCutiDetail(id) {
       <tr><td class="fw-700" style="padding:6px 8px">Selesai</td><td style="padding:6px 8px">${formatDate(p.selesai)}</td></tr>
       <tr><td class="fw-700" style="padding:6px 8px">Durasi</td><td style="padding:6px 8px">${p.durasi || 1} hari</td></tr>
       <tr><td class="fw-700" style="padding:6px 8px">Keterangan</td><td style="padding:6px 8px">${escHtml(p.keterangan || '-')}</td></tr>
+      ${attachHtml}
       <tr><td class="fw-700" style="padding:6px 8px">Status</td><td style="padding:6px 8px"><span class="badge badge-${p.status === 'approved' ? 'success' : p.status === 'rejected' ? 'danger' : 'warning'}">${p.status || 'pending'}</span></td></tr>
       <tr><td class="fw-700" style="padding:6px 8px">Approved By</td><td style="padding:6px 8px">${escHtml(p.approvedBy || '-')}</td></tr>
       <tr><td class="fw-700" style="padding:6px 8px">Created At</td><td style="padding:6px 8px">${p.createdAt ? formatDate(p.createdAt.split('T')[0]) : '-'}</td></tr>
@@ -203,7 +225,7 @@ async function renderOvertime() {
 }
 function modalOvertime() {
   openModal(
-    `<div class="modal-title">Pengajuan Overtime</div><div class="form-group"><label>Nama</label><input class="form-control" id="otNama" value="${currentUser.nama}"></div><div class="grid-3"><div class="form-group"><label>Tanggal</label><input class="form-control" type="date" id="otTgl" value="${todayStr()}"></div><div class="form-group"><label>Mulai</label><input class="form-control" type="time" id="otStart"></div><div class="form-group"><label>Selesai</label><input class="form-control" type="time" id="otEnd"></div></div><div class="form-group"><label>Alasan</label><textarea class="form-control" id="otAlasan"></textarea></div><button class="btn btn-primary" onclick="simpanOvertime()">Ajukan</button>`
+    `<div class="modal-title">Pengajuan Overtime</div><div class="form-group"><label>Nama</label><input class="form-control" id="otNama" value="${currentUser.nama}"></div><div class="grid-3"><div class="form-group"><label>Tanggal</label><input class="form-control" type="date" id="otTgl" value="${todayStr()}"></div><div class="form-group"><label>Mulai</label><input class="form-control" type="time" id="otStart"></div><div class="form-group"><label>Selesai</label><input class="form-control" type="time" id="otEnd"></div></div><div class="form-group"><label>Alasan</label><textarea class="form-control" id="otAlasan"></textarea></div><div class="form-group"><label>📎 Lampiran (Foto/Dokumen)</label><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('otFiles').click()">📁 Pilih File</button><button type="button" class="btn btn-sm btn-info" onclick="openCamera('otFilePreview','otCameraData')">📷 Kamera</button></div><input type="file" id="otFiles" multiple accept="image/*,.pdf,.doc,.docx" onchange="previewTaskFiles(this,'otFilePreview')" style="display:none"><input type="hidden" id="otCameraData"><div id="otFilePreview" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"></div><div class="text-xs" style="color:#999;margin-top:4px">Maks 5 file. Format: Gambar, PDF, DOC</div></div><button class="btn btn-primary" onclick="simpanOvertime()">Ajukan</button>`
   );
 }
 async function simpanOvertime() {
@@ -215,6 +237,7 @@ async function simpanOvertime() {
           1
         )
       : 0;
+  const attachments = await getFilesAsBase64('otFiles');
   await db.collection('hrd_overtime').add({
     nama: document.getElementById('otNama').value,
     tanggal: document.getElementById('otTgl').value,
@@ -222,6 +245,7 @@ async function simpanOvertime() {
     jamSelesai: e,
     durasi: parseFloat(durasi),
     alasan: document.getElementById('otAlasan').value,
+    attachments,
     status: 'pending',
     userId: currentUser.id,
     createdAt: new Date().toISOString(),
@@ -1357,7 +1381,7 @@ async function loadDailyTasks(filter) {
     const overdueCount = filtered.filter(function (t) {
       return !t.done && t.tanggal < today;
     }).length;
-    // Stats cards
+    // Stats
     var historyHtml =
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:16px">';
     historyHtml +=
@@ -1377,67 +1401,87 @@ async function loadDailyTasks(filter) {
       overdueCount +
       '</div><div class="text-xs">Terlambat</div></div>';
     historyHtml += '</div>';
-    // Single-line date range filter
+    // Collapsible filter - only shows when user clicks
+    var filterActive = curFrom || curTo;
+    historyHtml += '<div style="margin-bottom:14px">';
+    if (!filterActive) {
+      historyHtml +=
+        '<button class="btn btn-xs btn-outline" onclick="document.getElementById(\'historyFilterWrap\').style.display=\'flex\'">📅 Filter Periode</button>';
+    }
     historyHtml +=
-      '<div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap;padding:10px;background:#f8f9ff;border-radius:8px">';
-    historyHtml += '<span class="text-sm fw-700">📅 Periode:</span>';
+      '<div id="historyFilterWrap" style="display:' +
+      (filterActive ? 'flex' : 'none') +
+      ';gap:8px;align-items:center;flex-wrap:wrap;padding:10px;background:#f8f9ff;border-radius:8px;margin-top:8px">';
+    historyHtml += '<span class="text-sm fw-700">Dari:</span>';
     historyHtml +=
       '<input type="date" class="form-control" id="historyAssignedFrom" value="' +
       curFrom +
-      '" style="max-width:145px;padding:5px 8px;font-size:.82rem" onchange="loadDailyTasks(\'history-assigned\')">';
-    historyHtml += '<span class="text-sm">—</span>';
+      '" style="max-width:150px;padding:5px 8px;font-size:.82rem" onchange="loadDailyTasks(\'history-assigned\')">';
+    historyHtml += '<span class="text-sm fw-700">Sampai:</span>';
     historyHtml +=
       '<input type="date" class="form-control" id="historyAssignedTo" value="' +
       curTo +
-      '" style="max-width:145px;padding:5px 8px;font-size:.82rem" onchange="loadDailyTasks(\'history-assigned\')">';
-    if (curFrom || curTo) {
-      historyHtml +=
-        "<button class=\"btn btn-xs btn-outline\" onclick=\"document.getElementById('historyAssignedFrom').value='';document.getElementById('historyAssignedTo').value='';loadDailyTasks('history-assigned')\">✕ Reset</button>";
-    }
-    historyHtml += '</div>';
-    // Table
+      '" style="max-width:150px;padding:5px 8px;font-size:.82rem" onchange="loadDailyTasks(\'history-assigned\')">';
     historyHtml +=
-      '<div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Judul Task</th><th>Tanggal</th><th>Prioritas</th><th>Status</th><th>Ditugaskan oleh</th><th>Selesai</th></tr></thead><tbody>';
+      "<button class=\"btn btn-xs btn-outline\" onclick=\"document.getElementById('historyAssignedFrom').value='';document.getElementById('historyAssignedTo').value='';loadDailyTasks('history-assigned')\">✕ Reset</button>";
+    historyHtml += '</div></div>';
+    // Group by departemen
+    var deptGroups = {};
+    filtered.forEach(function (t) {
+      var dept = t.departemen || 'Tanpa Departemen';
+      if (!deptGroups[dept]) deptGroups[dept] = [];
+      deptGroups[dept].push(t);
+    });
+    var deptKeys = Object.keys(deptGroups).sort();
     if (!filtered.length) {
       historyHtml +=
-        '<tr><td colspan="7" class="text-center">Belum ada tugas yang ditugaskan</td></tr>';
+        '<div style="text-align:center;padding:32px;color:#999"><div style="font-size:2rem;margin-bottom:8px">📋</div><p>Belum ada tugas yang ditugaskan</p></div>';
     } else {
-      filtered.forEach(function (t) {
-        var statusBadge = '';
-        if (t.done) {
-          statusBadge = '<span class="badge badge-success">Selesai</span>';
-        } else if (t.tanggal < today) {
-          statusBadge = '<span class="badge badge-danger">Terlambat</span>';
-        } else if (t.tanggal === today) {
-          statusBadge = '<span class="badge badge-warning">Hari Ini</span>';
-        } else {
-          statusBadge = '<span class="badge badge-info">Mendatang</span>';
-        }
-        var prioColor =
-          t.priority === 'high' ? '#c62828' : t.priority === 'low' ? '#666' : '#f57f17';
-        var prioLabel =
-          t.priority === 'high' ? 'Tinggi' : t.priority === 'low' ? 'Rendah' : 'Sedang';
-        var doneAt = t.doneAt ? formatDate(t.doneAt) : '-';
-        historyHtml += '<tr>';
+      deptKeys.forEach(function (dept) {
+        var tasks = deptGroups[dept];
+        historyHtml += '<div style="margin-bottom:20px">';
         historyHtml +=
-          '<td class="fw-700">' + escHtml(t.targetUserName || t.userId || '-') + '</td>';
-        historyHtml += '<td>' + escHtml(t.title) + '</td>';
-        historyHtml += '<td>' + formatDate(t.tanggal) + '</td>';
+          '<div style="padding:8px 14px;background:#e8eaf6;border-radius:8px;font-weight:700;font-size:.88rem;color:#283593;border-left:4px solid #3f51b5;margin-bottom:8px">🏢 ' +
+          escHtml(dept) +
+          ' <span style="font-weight:400;color:#666;font-size:.75rem">(' +
+          tasks.length +
+          ' tugas)</span></div>';
         historyHtml +=
-          '<td><span style="padding:2px 8px;border-radius:4px;font-size:.75rem;background:' +
-          prioColor +
-          '20;color:' +
-          prioColor +
-          '">' +
-          prioLabel +
-          '</span></td>';
-        historyHtml += '<td>' + statusBadge + '</td>';
-        historyHtml += '<td class="text-sm">' + escHtml(t.assignedByName || '-') + '</td>';
-        historyHtml += '<td>' + doneAt + '</td>';
-        historyHtml += '</tr>';
+          '<div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Judul Task</th><th>Tanggal</th><th>Prioritas</th><th>Status</th><th>Ditugaskan oleh</th><th>Selesai</th></tr></thead><tbody>';
+        tasks.forEach(function (t) {
+          var statusBadge = '';
+          if (t.done) statusBadge = '<span class="badge badge-success">Selesai</span>';
+          else if (t.tanggal < today)
+            statusBadge = '<span class="badge badge-danger">Terlambat</span>';
+          else if (t.tanggal === today)
+            statusBadge = '<span class="badge badge-warning">Hari Ini</span>';
+          else statusBadge = '<span class="badge badge-info">Mendatang</span>';
+          var prioColor =
+            t.priority === 'high' ? '#c62828' : t.priority === 'low' ? '#666' : '#f57f17';
+          var prioLabel =
+            t.priority === 'high' ? 'Tinggi' : t.priority === 'low' ? 'Rendah' : 'Sedang';
+          var doneAt = t.doneAt ? formatDate(t.doneAt) : '-';
+          historyHtml += '<tr>';
+          historyHtml +=
+            '<td class="fw-700">' + escHtml(t.targetUserName || t.userId || '-') + '</td>';
+          historyHtml += '<td>' + escHtml(t.title) + '</td>';
+          historyHtml += '<td>' + formatDate(t.tanggal) + '</td>';
+          historyHtml +=
+            '<td><span style="padding:2px 8px;border-radius:4px;font-size:.75rem;background:' +
+            prioColor +
+            '20;color:' +
+            prioColor +
+            '">' +
+            prioLabel +
+            '</span></td>';
+          historyHtml += '<td>' + statusBadge + '</td>';
+          historyHtml += '<td class="text-sm">' + escHtml(t.assignedByName || '-') + '</td>';
+          historyHtml += '<td>' + doneAt + '</td>';
+          historyHtml += '</tr>';
+        });
+        historyHtml += '</tbody></table></div></div>';
       });
     }
-    historyHtml += '</tbody></table></div>';
     listEl.innerHTML = historyHtml;
     return;
   }
