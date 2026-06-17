@@ -1516,12 +1516,15 @@ async function simpanReimburseDinas() {
 }
 
 async function approveReimburseDinas(id) {
+  var komentar = prompt('Komentar approval (opsional):') || '';
   if (!confirm('Setujui reimbursement ini?')) return;
-  await db.collection('hrd_reimburse_dinas').doc(id).update({
+  var updateData = {
     status: 'approved',
     approvedBy: currentUser.nama,
     approvedAt: new Date().toISOString(),
-  });
+  };
+  if (komentar) updateData.approvalComment = komentar;
+  await db.collection('hrd_reimburse_dinas').doc(id).update(updateData);
   const doc = await db.collection('hrd_reimburse_dinas').doc(id).get();
   const p = doc.data();
   await sendNotification(
