@@ -1,0 +1,14 @@
+{
+  "task_id": "task-push-notifications",
+  "task_description": "Implement WhatsApp-like push notifications that work on Android, iPhone, laptop, and PC even when the app is closed. Uses Firebase Cloud Messaging (FCM) for real push delivery with notification sound and popup. Includes client-side FCM integration (service worker, token management, foreground handling) and server-side Cloud Functions that trigger push notifications on Firestore data changes.",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "All syntax checks pass (node -c for all JS files). Prettier formatting passes. Functions module exports 4 Cloud Functions correctly (onChatCreated removed). firebase.json and manifest.json are valid JSON. Review issues addressed: duplicate push handler fixed, multi-device token storage, chat blast removed, logout race fixed."
+  }
+}

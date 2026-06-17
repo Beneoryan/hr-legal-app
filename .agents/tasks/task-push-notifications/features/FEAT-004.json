@@ -1,0 +1,28 @@
+{
+  "id": "FEAT-004",
+  "type": "fix",
+  "description": "Fix v2 review issues: (1) getTokensForUser returns objects with docPath for stale token cleanup, (2) cleanupFCMToken only removes current device token, (3) Use collectionGroup queries to eliminate N+1 reads.",
+  "status": "in_progress",
+  "steps": [
+    "Step 1 - Fix getTokensForUser in functions/index.js: Return {token, docPath} objects instead of bare strings so sendToTokens can clean up stale tokens.",
+    "Step 2 - Update callers of getTokensForUser in functions/index.js: onNotifikasiCreated and onMeetingInviteCreated should use the returned objects directly instead of wrapping with docPath: null.",
+    "Step 3 - Fix cleanupFCMToken in core.js: Get the current FCM token, compute its hash, and delete only that device document instead of all devices.",
+    "Step 4 - Use collectionGroup queries in functions/index.js: Replace sequential reads in getAllTokens with db.collectionGroup('devices').get() and replace the role-based N+1 query with db.collectionGroup('devices').where('role', '==', targetRole).get()."
+  ],
+  "acceptance_criteria": [
+    "getTokensForUser returns array of {token, docPath} objects",
+    "onNotifikasiCreated and onMeetingInviteCreated pass getTokensForUser results directly to sendToTokens",
+    "cleanupFCMToken deletes only the current device's token document (hrd_fcm_tokens/{userId}/devices/{hash})",
+    "getAllTokens uses db.collectionGroup('devices') instead of sequential reads",
+    "Role-based targeting uses db.collectionGroup('devices').where('role', '==', role) query",
+    "All JS files pass syntax check",
+    "All files pass prettier check"
+  ],
+  "verification": [
+    "Run: node -c functions/index.js",
+    "Run: node -c core.js",
+    "Run: npx prettier --check core.js functions/index.js"
+  ],
+  "blocked_reason": null,
+  "findings": null
+}

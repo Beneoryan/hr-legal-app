@@ -1,0 +1,22 @@
+{
+  "project_type": "Vanilla JavaScript PWA with Firebase Firestore (client-side SDK), deployed on Netlify (static hosting)",
+  "language": "JavaScript (ES6, no bundler, no modules - global script loading)",
+  "build_system": "No build system. Static files served directly. ESLint + Prettier for linting/formatting.",
+  "test_framework": "No unit test framework. Validation via eslint only.",
+  "build_command": "npx eslint core.js sw.js --no-eslintrc --rule '{\"no-undef\": \"off\", \"no-unused-vars\": \"off\"}'",
+  "test_command": "npx prettier --check core.js sw.js index.html manifest.json",
+  "verification_instructions": "1. Run eslint on modified JS files. 2. Run prettier check. 3. Manually verify Firebase SDK script tags load correctly. 4. Verify service worker file is valid JS.",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "npm install (for eslint/prettier devDeps only)",
+  "environment_constraints": "No server-side runtime for the app itself. Firebase Cloud Functions code will be in a separate functions/ directory that gets deployed separately. The main app is purely client-side static files.",
+  "contribution_requirements": "Code must pass eslint and prettier checks. Use single quotes, semicolons, 2-space indent.",
+  "key_patterns": "Firebase compat SDK v10.12.2 loaded via CDN script tags. All JS files use global scope (no modules). Service worker at /sw.js with cache-first strategy. Firebase config in core.js line 7-14. Login via doLogin() stores session in localStorage. renderApp() calls listenNotifications() for real-time Firestore listeners. Notification sound uses programmatic WAV generation. currentUser object has id, nama, role, departemen fields.",
+  "relevant_files": [
+    "core.js - main app logic, notification system (lines 519-780), login (line 77), renderApp (line 133), SW registration (line 872-878)",
+    "sw.js - basic service worker, needs push event handler",
+    "index.html - loads Firebase SDK scripts (lines 892-893), loads all JS modules",
+    "manifest.json - PWA manifest, needs gcm_sender_id for FCM",
+    "netlify.toml - deployment config, may need headers for firebase-messaging-sw.js"
+  ],
+  "directory_structure": "Flat structure at root: index.html, core.js, sw.js, modules-*.js, manifest.json, netlify.toml. No src/ directory. Firebase Cloud Functions will go in functions/ subdirectory."
+}
