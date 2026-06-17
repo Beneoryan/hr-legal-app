@@ -1651,8 +1651,9 @@ async function modalAddTask() {
       usersSnap.forEach((d) => {
         const u = d.data();
         if (u.status !== 'nonaktif' && d.id !== currentUser.id) {
-          // Non-admin: only show same department
-          if (!hasAccess(6) && (u.departemen || '').toLowerCase().trim() !== myDept) return;
+          // HEAD+ sees all users; Leader/Manager only same department
+          if (!hasAccess(4) && myDept && (u.departemen || '').toLowerCase().trim() !== myDept)
+            return;
           opts += `<option value="${d.id}" data-nama="${escHtml(u.nama)}">${escHtml(u.nama)} (${escHtml(u.departemen || '-')})</option>`;
         }
       });
