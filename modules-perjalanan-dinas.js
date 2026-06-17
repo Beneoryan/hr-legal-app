@@ -971,14 +971,17 @@ async function simpanSPPD(noSPPD) {
 }
 
 async function approveSPPD(id) {
+  var komentar = prompt('Komentar approval (opsional):') || '';
   if (!confirm('Setujui SPPD ini?')) return;
   const doc = await db.collection('hrd_perjalanan_dinas').doc(id).get();
   const p = doc.data();
-  await db.collection('hrd_perjalanan_dinas').doc(id).update({
+  var updateData = {
     status: 'approved',
     approvedBy: currentUser.nama,
     approvedAt: new Date().toISOString(),
-  });
+  };
+  if (komentar) updateData.approvalComment = komentar;
+  await db.collection('hrd_perjalanan_dinas').doc(id).update(updateData);
   // Update linked dinas_luar juga
   const linkSnap = await db.collection('hrd_dinas_luar').where('noSPPD', '==', p.noSPPD).get();
   linkSnap.forEach((d) =>

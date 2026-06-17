@@ -166,11 +166,26 @@ async function simpanCuti() {
   renderCuti();
 }
 async function approveCuti(id, status) {
-  await db
-    .collection('hrd_cuti')
-    .doc(id)
-    .update({ status, approvedBy: currentUser.nama, approvedAt: new Date().toISOString() });
-  toast('Updated', 'success');
+  var komentar = '';
+  if (status === 'rejected') {
+    komentar = prompt('Alasan penolakan:');
+    if (!komentar) return;
+  } else {
+    komentar = prompt('Komentar approval (opsional):') || '';
+  }
+  var updateData = {
+    status: status,
+    approvedBy: currentUser.nama,
+    approvedAt: new Date().toISOString(),
+  };
+  if (komentar) updateData.approvalComment = komentar;
+  if (status === 'rejected') {
+    updateData.rejectedBy = currentUser.nama;
+    updateData.rejectedAt = new Date().toISOString();
+    updateData.alasanTolak = komentar;
+  }
+  await db.collection('hrd_cuti').doc(id).update(updateData);
+  toast(status === 'approved' ? '✅ Cuti disetujui' : '❌ Cuti ditolak', 'success');
   renderCuti();
 }
 
@@ -267,8 +282,26 @@ async function simpanOvertime() {
   renderOvertime();
 }
 async function approveOT(id, status) {
-  await db.collection('hrd_overtime').doc(id).update({ status, approvedBy: currentUser.nama });
-  toast('Updated', 'success');
+  var komentar = '';
+  if (status === 'rejected') {
+    komentar = prompt('Alasan penolakan:');
+    if (!komentar) return;
+  } else {
+    komentar = prompt('Komentar approval (opsional):') || '';
+  }
+  var updateData = {
+    status: status,
+    approvedBy: currentUser.nama,
+    approvedAt: new Date().toISOString(),
+  };
+  if (komentar) updateData.approvalComment = komentar;
+  if (status === 'rejected') {
+    updateData.rejectedBy = currentUser.nama;
+    updateData.rejectedAt = new Date().toISOString();
+    updateData.alasanTolak = komentar;
+  }
+  await db.collection('hrd_overtime').doc(id).update(updateData);
+  toast(status === 'approved' ? '✅ Overtime disetujui' : '❌ Overtime ditolak', 'success');
   renderOvertime();
 }
 
