@@ -185,6 +185,16 @@ async function approveCuti(id, status) {
     updateData.alasanTolak = komentar;
   }
   await db.collection('hrd_cuti').doc(id).update(updateData);
+  const cutiDoc = await db.collection('hrd_cuti').doc(id).get();
+  const cutiData = cutiDoc.data();
+  if (cutiData.userId) {
+    await sendNotification(
+      cutiData.userId,
+      status === 'approved' ? '✅ Cuti Disetujui' : '❌ Cuti Ditolak',
+      `Pengajuan ${cutiData.jenis || 'Cuti'} Anda telah ${status === 'approved' ? 'disetujui' : 'ditolak'}${komentar ? ': ' + komentar : ''}`,
+      'portal-cuti'
+    );
+  }
   toast(status === 'approved' ? '✅ Cuti disetujui' : '❌ Cuti ditolak', 'success');
   renderCuti();
 }
@@ -277,6 +287,12 @@ async function simpanOvertime() {
     userId: currentUser.id,
     createdAt: new Date().toISOString(),
   });
+  await sendNotification(
+    'hr',
+    '📋 Pengajuan Overtime',
+    `${currentUser.nama} mengajukan overtime ${document.getElementById('otTgl').value} (${durasi} jam)`,
+    'approval-center'
+  );
   closeModalDirect();
   toast('Diajukan', 'success');
   renderOvertime();
@@ -301,6 +317,16 @@ async function approveOT(id, status) {
     updateData.alasanTolak = komentar;
   }
   await db.collection('hrd_overtime').doc(id).update(updateData);
+  const otDoc = await db.collection('hrd_overtime').doc(id).get();
+  const otData = otDoc.data();
+  if (otData.userId) {
+    await sendNotification(
+      otData.userId,
+      status === 'approved' ? '✅ Overtime Disetujui' : '❌ Overtime Ditolak',
+      `Pengajuan overtime Anda telah ${status === 'approved' ? 'disetujui' : 'ditolak'}${komentar ? ': ' + komentar : ''}`,
+      'portal-overtime'
+    );
+  }
   toast(status === 'approved' ? '✅ Overtime disetujui' : '❌ Overtime ditolak', 'success');
   renderOvertime();
 }
