@@ -41,6 +41,12 @@ async function initFCM() {
   try {
     if (!("serviceWorker" in navigator) || !("Notification" in window)) return;
     if (!currentUser) return;
+    if (VAPID_KEY === "YOUR_VAPID_KEY_HERE") {
+      console.warn(
+        "[FCM] VAPID_KEY belum dikonfigurasi. Push notification background tidak aktif.",
+      );
+      return;
+    }
 
     const permission = await Notification.requestPermission();
     if (permission !== "granted") return;
@@ -265,6 +271,7 @@ function renderApp() {
   navigateTo(currentPage);
   listenNotifications();
   initFCM();
+  setTimeout(showNotifPermissionBanner, 2000);
   setupRealtimeSync();
   // Load company branding (logo)
   if (typeof loadCompanyBranding === "function") loadCompanyBranding();
@@ -656,8 +663,12 @@ function listenNotifications() {
         if (change.type === "added") {
           const d = change.doc.data();
           if (d.read === false) {
-            playNotificationSound();
-            showSystemNotification(d.title || "Notifikasi", d.message || "");
+            var created = d.createdAt ? new Date(d.createdAt) : null;
+            var now = new Date();
+            if (created && now - created < 10000) {
+              playNotificationSound();
+              showSystemNotification(d.title || "Notifikasi", d.message || "");
+            }
           }
         }
       });
@@ -672,7 +683,14 @@ function listenNotifications() {
       snap.docChanges().forEach((change) => {
         if (change.type === "added") {
           const d = change.doc.data();
-          if (d.read === false) playNotificationSound();
+          if (d.read === false) {
+            var created = d.createdAt ? new Date(d.createdAt) : null;
+            var now = new Date();
+            if (created && now - created < 10000) {
+              playNotificationSound();
+              showSystemNotification(d.title || "Notifikasi", d.message || "");
+            }
+          }
         }
       });
     });
@@ -680,10 +698,14 @@ function listenNotifications() {
   // Listen for broadcast messages
   const unsub3 = db.collection("hrd_broadcast").onSnapshot((snap) => {
     snap.docChanges().forEach((change) => {
-      if (change.type === "added" && change.doc.data().createdAt) {
-        const created = new Date(change.doc.data().createdAt);
-        const now = new Date();
-        if (now - created < 30000) playNotificationSound(); // Only play for recent (30s)
+      if (change.type === "added") {
+        const d = change.doc.data();
+        var created = d.createdAt ? new Date(d.createdAt) : null;
+        var now = new Date();
+        if (created && now - created < 10000) {
+          playNotificationSound();
+          showSystemNotification(d.title || "Broadcast", d.message || "");
+        }
       }
     });
   });
@@ -913,13 +935,70 @@ function requestNotifPermission() {
     });
   }
 }
+
+// Show a banner to prompt user to enable notifications (requires user gesture)
+function showNotifPermissionBanner() {
+  if (!("Notification" in window)) return;
+  if (Notification.permission !== "default") return;
+  if (window._notifBannerDismissed) return;
+
+  var banner = document.createElement("div");
+  banner.id = "notifPermissionBanner";
+  banner.style.cssText =
+    "position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:99999;background:#1a1a1a;color:#fff;padding:14px 20px;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,.3);display:flex;align-items:center;gap:12px;max-width:90vw;font-size:.85rem";
+  banner.innerHTML =
+    '<span>\uD83D\uDD14 Aktifkan notifikasi agar Anda menerima info penting</span><button onclick="grantNotifPermission()" style="background:#4caf50;color:#fff;border:none;padding:8px 16px;border-radius:6px;font-weight:700;cursor:pointer;white-space:nowrap">Aktifkan</button><button onclick="dismissNotifBanner()" style="background:none;border:none;color:#999;font-size:1.2rem;cursor:pointer">&times;</button>';
+  document.body.appendChild(banner);
+}
+
+function grantNotifPermission() {
+  Notification.requestPermission().then(function (p) {
+    if (p === "granted") {
+      toast("\uD83D\uDD14 Notifikasi diaktifkan!", "success");
+      if (typeof initFCM === "function") initFCM();
+    }
+    dismissNotifBanner();
+  });
+}
+
+function dismissNotifBanner() {
+  window._notifBannerDismissed = true;
+  var banner = document.getElementById("notifPermissionBanner");
+  if (banner) banner.remove();
+}
 // Show system notification (works even when tab is in background on mobile)
 function showSystemNotification(title, body) {
-  if ("Notification" in window && Notification.permission === "granted") {
+  if (!("Notification" in window) || Notification.permission !== "granted")
+    return;
+
+  if ("serviceWorker" in navigator && navigator.serviceWorker.ready) {
+    navigator.serviceWorker.ready
+      .then(function (reg) {
+        reg.showNotification(title, {
+          body: body,
+          icon: "https://ui-avatars.com/api/?name=IMS&background=1a1a1a&color=c62828&size=192&format=png",
+          badge:
+            "https://ui-avatars.com/api/?name=IMS&background=1a1a1a&color=c62828&size=96&format=png",
+          vibrate: [200, 100, 200, 100, 300],
+          tag: "ims-notif-" + Date.now(),
+          renotify: true,
+          data: { url: "/" },
+        });
+      })
+      .catch(function () {
+        try {
+          new Notification(title, {
+            body: body,
+            icon: "https://ui-avatars.com/api/?name=IMS&background=1a1a1a&color=c62828&size=192&format=png",
+            vibrate: [200, 100, 200],
+          });
+        } catch (e) {}
+      });
+  } else {
     try {
       new Notification(title, {
-        body,
-        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🏛️</text></svg>',
+        body: body,
+        icon: "https://ui-avatars.com/api/?name=IMS&background=1a1a1a&color=c62828&size=192&format=png",
         vibrate: [200, 100, 200],
       });
     } catch (e) {}
