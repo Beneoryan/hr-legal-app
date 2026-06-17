@@ -386,6 +386,45 @@ async function showSPPDTab(tab) {
   else if (tab === 'reimbursement') await loadSPPDReimbursement(el);
 }
 
+// ── USER DEPARTMENT MAP (for cross-division filtering) ────────
+// Build a map of userId -> departemen from the users collection.
+// This is more reliable than using the editable departemen field on SPPD records.
+let _userDeptMapCache = null;
+let _userDeptMapCacheTime = 0;
+const USER_DEPT_MAP_TTL = 5 * 60 * 1000; // 5 minutes
+
+async function _getUserDeptMap() {
+  const now = Date.now();
+  if (_userDeptMapCache && now - _userDeptMapCacheTime < USER_DEPT_MAP_TTL) {
+    return _userDeptMapCache;
+  }
+  try {
+    const users = await getAllUsers();
+    const map = {};
+    users.forEach(function (u) {
+      if (u.id && u.departemen) {
+        map[u.id] = u.departemen.toLowerCase();
+      }
+    });
+    _userDeptMapCache = map;
+    _userDeptMapCacheTime = now;
+    return map;
+  } catch (e) {
+    console.warn('_getUserDeptMap error:', e);
+    return _userDeptMapCache || {};
+  }
+}
+
+// Check if a record belongs to the current user's department
+// Uses the submitter's userId to look up their actual department from the users collection
+function _isOwnDepartment(record, userDeptMap) {
+  if (record.userId === currentUser.id) return true;
+  const submitterDept = userDeptMap[record.userId] || '';
+  const myDept = (currentUser.departemen || '').toLowerCase();
+  if (!myDept) return false;
+  return submitterDept === myDept;
+}
+
 async function loadSPPDDaftar(el) {
   const isPortal = window._portalDinasMode || !hasAccess(3);
   const snap = await db
@@ -421,6 +460,8 @@ async function loadSPPDDaftar(el) {
   snap.forEach(function (d) {
     docs.push({ id: d.id, ...d.data() });
   });
+  // Build user department map for reliable cross-division filtering
+  var userDeptMap = (!isPortal && hasAccess(3) && !hasAccess(4)) ? await _getUserDeptMap() : {};
   docs.forEach(function (p) {
     if (
       isPortal &&
@@ -430,11 +471,7 @@ async function loadSPPDDaftar(el) {
       return;
     // Manager (level 3) only sees own department; Head/BOD/Admin (level 4+) sees all
     if (!isPortal && hasAccess(3) && !hasAccess(4)) {
-      if (
-        p.userId !== currentUser.id &&
-        (p.departemen || '').toLowerCase() !== (currentUser.departemen || '').toLowerCase()
-      )
-        return;
+      if (!_isOwnDepartment(p, userDeptMap)) return;
     }
     hasData = true;
     var durasi =
@@ -1123,6 +1160,8 @@ function cetakSPPD(id) {
 async function loadSPPDUangMuka(el) {
   const isPortal = window._portalDinasMode || !hasAccess(3);
   const snap = await db.collection('hrd_uang_muka_dinas').get();
+  // Build user department map for reliable cross-division filtering
+  const userDeptMap = (!isPortal && hasAccess(3) && !hasAccess(4)) ? await _getUserDeptMap() : {};
   let h = `<div class="card"><div class="card-header"><div class="card-title">💰 Uang Muka Perjalanan Dinas</div><button class="btn btn-primary btn-sm" onclick="modalUangMukaDinasNew()">+ Ajukan Uang Muka</button></div>
     <div class="table-wrap"><table><thead><tr><th>No. SPPD</th><th>Nama</th><th>Jumlah</th><th>Status</th><th>Aksi</th></tr></thead><tbody>`;
   let hasData = false;
@@ -1131,7 +1170,7 @@ async function loadSPPDUangMuka(el) {
     if (isPortal && p.userId !== currentUser.id) return;
     // Manager (level 3) only sees own department; Head/BOD/Admin (level 4+) sees all
     if (!isPortal && hasAccess(3) && !hasAccess(4)) {
-      if (p.userId !== currentUser.id && (p.departemen || '').toLowerCase() !== (currentUser.departemen || '').toLowerCase()) return;
+      if (!_isOwnDepartment(p, userDeptMap)) return;
     }
     hasData = true;
     const badge =
@@ -1259,6 +1298,8 @@ function viewUangMukaDinas(id) {
 async function loadSPPDLaporan(el) {
   const isPortal = window._portalDinasMode || !hasAccess(3);
   const snap = await db.collection('hrd_laporan_dinas').get();
+  // Build user department map for reliable cross-division filtering
+  const userDeptMap = (!isPortal && hasAccess(3) && !hasAccess(4)) ? await _getUserDeptMap() : {};
   let h = `<div class="card"><div class="card-header"><div class="card-title">📝 Laporan Perjalanan Dinas</div><button class="btn btn-primary btn-sm" onclick="modalLaporanDinasNew()">+ Buat Laporan</button></div>
     <div class="table-wrap"><table><thead><tr><th>No. SPPD</th><th>Nama</th><th>Tujuan</th><th>Hasil</th><th>Tanggal Laporan</th><th>Aksi</th></tr></thead><tbody>`;
   let hasData = false;
@@ -1267,7 +1308,7 @@ async function loadSPPDLaporan(el) {
     if (isPortal && p.userId !== currentUser.id) return;
     // Manager (level 3) only sees own department; Head/BOD/Admin (level 4+) sees all
     if (!isPortal && hasAccess(3) && !hasAccess(4)) {
-      if (p.userId !== currentUser.id && (p.departemen || '').toLowerCase() !== (currentUser.departemen || '').toLowerCase()) return;
+      if (!_isOwnDepartment(p, userDeptMap)) return;
     }
     hasData = true;
     h += `<tr><td class="fw-700">${escHtml(p.noSPPD || '-')}</td><td>${escHtml(p.nama)}</td><td>${escHtml(p.tujuan || '-')}</td><td class="text-sm">${escHtml((p.hasil || '').substring(0, 50))}${(p.hasil || '').length > 50 ? '...' : ''}</td><td>${formatDate(p.createdAt)}</td><td><button class="btn btn-xs btn-info" onclick="viewLaporanDinas('${d.id}')">👁️</button></td></tr>`;
@@ -1377,6 +1418,8 @@ function viewLaporanDinas(id) {
 async function loadSPPDReimbursement(el) {
   const isPortal = window._portalDinasMode || !hasAccess(3);
   const snap = await db.collection('hrd_reimburse_dinas').get();
+  // Build user department map for reliable cross-division filtering
+  const userDeptMap = (!isPortal && hasAccess(3) && !hasAccess(4)) ? await _getUserDeptMap() : {};
   let h = `<div class="card"><div class="card-header"><div class="card-title">🧾 Reimbursement Perjalanan Dinas</div><button class="btn btn-primary btn-sm" onclick="modalReimburseDinasNew()">+ Ajukan Reimburse</button></div>
     <p class="text-sm mb-16" style="color:#666">Pertanggungjawaban biaya perjalanan dinas. Selisih uang muka vs pengeluaran aktual akan dikembalikan/dibayarkan.</p>
     <div class="table-wrap"><table><thead><tr><th>No. SPPD</th><th>Nama</th><th>Uang Muka</th><th>Aktual</th><th>Selisih</th><th>Status</th><th>Aksi</th></tr></thead><tbody>`;
@@ -1386,7 +1429,7 @@ async function loadSPPDReimbursement(el) {
     if (isPortal && p.userId !== currentUser.id) return;
     // Manager (level 3) only sees own department; Head/BOD/Admin (level 4+) sees all
     if (!isPortal && hasAccess(3) && !hasAccess(4)) {
-      if (p.userId !== currentUser.id && (p.departemen || '').toLowerCase() !== (currentUser.departemen || '').toLowerCase()) return;
+      if (!_isOwnDepartment(p, userDeptMap)) return;
     }
     hasData = true;
     const selisih = (p.totalAktual || 0) - (p.uangMuka || 0);
