@@ -13,12 +13,19 @@ async function renderCuti() {
     db.collection('hrd_karyawan').where('status', '==', 'aktif').get(),
   ]);
   // Calculate quota per karyawan
-  const cutiUsed = {}; // userId -> total hari cuti tahunan approved
+  // Index by both userId AND nama (lowercased) so admin table can match by name
+  const cutiUsed = {}; // key -> total hari cuti tahunan approved
   cutiSnap.forEach((d) => {
     const p = d.data();
     if (p.status === 'approved' && p.jenis === 'Cuti Tahunan') {
-      const uid = p.userId || p.nama;
-      cutiUsed[uid] = (cutiUsed[uid] || 0) + (p.durasi || 1);
+      const durasi = p.durasi || 1;
+      if (p.userId) {
+        cutiUsed[p.userId] = (cutiUsed[p.userId] || 0) + durasi;
+      }
+      if (p.nama) {
+        const namaKey = p.nama.trim().toLowerCase();
+        cutiUsed[namaKey] = (cutiUsed[namaKey] || 0) + durasi;
+      }
     }
   });
   // Build quota table
@@ -28,7 +35,7 @@ async function renderCuti() {
   karySnap.forEach((d) => karyList.push({ id: d.id, ...d.data() }));
   karyList.forEach((k) => {
     const quota = hitungJatahCuti(k);
-    const used = cutiUsed[k.id] || cutiUsed[k.nama] || 0;
+    const used = cutiUsed[k.id] || cutiUsed[(k.nama || '').trim().toLowerCase()] || 0;
     const sisa = Math.max(0, quota - used);
     const masaKerja = hitungMasaKerja(k.tanggalMasuk);
     const color = sisa <= 2 ? 'var(--danger)' : sisa <= 5 ? 'var(--warning)' : 'var(--success)';
@@ -52,9 +59,11 @@ async function renderCuti() {
             ? 'badge-danger'
             : 'badge-warning';
       const uid = p.userId || p.nama;
-      const kary = karyList.find((k) => k.id === uid || k.nama === p.nama);
+      const kary = karyList.find(
+        (k) => k.id === uid || k.nama === p.nama || (k.nama && p.nama && k.nama.trim().toLowerCase() === p.nama.trim().toLowerCase())
+      );
       const quota = kary ? hitungJatahCuti(kary) : 12;
-      const used = cutiUsed[uid] || 0;
+      const used = cutiUsed[uid] || cutiUsed[(p.nama || '').trim().toLowerCase()] || 0;
       const sisa = Math.max(0, quota - used);
       h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.jenis)}</td><td>${formatDate(p.mulai)}-${formatDate(p.selesai)}</td><td>${p.durasi || 1}h</td><td><span class="badge badge-${sisa <= 2 ? 'danger' : sisa <= 5 ? 'warning' : 'success'}">${sisa}/${quota}</span></td><td><span class="badge ${badge}">${p.status}</span></td><td><button class="btn btn-xs btn-info" onclick="viewCutiDetail('${p.id}')" title="Lihat Detail">👁️</button> ${p.status === 'pending' && hasAccess(3) ? `<button class="btn btn-xs btn-success" onclick="approveCuti('${p.id}','approved')">✅</button> <button class="btn btn-xs btn-danger" onclick="approveCuti('${p.id}','rejected')">❌</button>` : ''} ${hasAccess(6) || (p.userId === currentUser.id && p.status === 'pending') ? `<button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_cuti','${p.id}','cuti')">🗑️</button>` : ''}</td></tr>`;
     });
