@@ -1288,6 +1288,9 @@ async function loadRekapGrid(){
   sppdSnap.forEach(d=>{const sp=d.data();if(sp.status!=='approved'&&!sp.approvedAt)return;const uid=sp.userId||'';const spNamaRaw=(sp.nama||'').trim();const spNama=spNamaRaw.toLowerCase();if(!sp.tanggalMulai)return;const endDt=new Date((sp.tanggalSelesai||sp.tanggalMulai)+'T00:00:00');let maxIter=366;for(let dt=new Date(sp.tanggalMulai+'T00:00:00');dt<=endDt;dt.setDate(dt.getDate()+1)){if(--maxIter<0)break;const day=dt.getDate();const m=dt.getMonth()+1;const y=dt.getFullYear();const ds=y+'-'+String(m).padStart(2,'0')+'-'+String(day).padStart(2,'0');if(ds>=startDate&&ds<=endDate){if(uid){if(!dinasLuarMap[uid])dinasLuarMap[uid]={};dinasLuarMap[uid][day]=true;}if(spNama){if(!dinasLuarMap[spNama])dinasLuarMap[spNama]={};dinasLuarMap[spNama][day]=true;}if(spNamaRaw){if(!dinasLuarMap[spNamaRaw])dinasLuarMap[spNamaRaw]={};dinasLuarMap[spNamaRaw][day]=true;}}}});
   // Build hari libur set
   const liburSet=new Set();hariLiburSnap.forEach(d=>{const h=d.data();if(h.tanggal&&h.tanggal>=startDate&&h.tanggal<=endDate)liburSet.add(parseInt(h.tanggal.split('-')[2]));});
+  // Build weekend set (Saturday=6, Sunday=0)
+  const weekendDays=new Set();
+  for(let i=1;i<=days;i++){const d=new Date(bulan+'-'+String(i).padStart(2,'0')+'T00:00:00');if(d.getDay()===0||d.getDay()===6)weekendDays.add(i);}
   const users=[];usersSnap.forEach(d=>users.push({id:d.id,...d.data()}));
   // Portal mode: only show current user (unless GM/admin)
   const isPortalMode=!hasAccess(3);
@@ -1303,7 +1306,7 @@ async function loadRekapGrid(){
   });
 
   let h='<div class="table-wrap"><table><thead><tr><th style="min-width:120px">Nama</th>';
-  for(let i=1;i<=days;i++)h+=`<th style="width:28px;text-align:center;font-size:.65rem">${i}</th>`;
+  for(let i=1;i<=days;i++){const isWknd=weekendDays.has(i);const hdrStyle=isWknd||liburSet.has(i)?'background:#9e9e9e;color:#fff;':'';h+=`<th style="width:28px;text-align:center;font-size:.65rem;${hdrStyle}">${i}</th>`;}
   h+='<th>Total</th><th>Lembur</th><th>Aksi</th></tr></thead><tbody>';
   let totalH=0,totalT=0,totalD=0,totalK=0,totalL=0,totalLembur=0,totalLemburJam=0;
 
@@ -1325,8 +1328,13 @@ async function loadRekapGrid(){
       const isOT=otMap[u.id]?.[i]!==undefined||otMap[u.nama]?.[i]!==undefined||otMap[(u.nama||'').trim().toLowerCase()]?.[i]!==undefined;
       const otDurasi=otMap[u.id]?.[i]??otMap[u.nama]?.[i]??otMap[(u.nama||'').trim().toLowerCase()]?.[i]??0;
       const isLibur=liburSet.has(i);
+      const isWeekend=weekendDays.has(i);
       let color='#eee',text='-',title='';
-      if(isLibur&&!st){color='#9e9e9e';text='H';title=' title="Hari Libur"';}
+      if((isLibur||isWeekend)&&(st==='lembur'||isOT)){color='#7b1fa2';text='L';ut++;totalLembur++;const effectiveLemburJam=Math.max(otDurasi||0,lemburJam||0);if(effectiveLemburJam>0){userLemburJam+=effectiveLemburJam;totalLemburJam+=effectiveLemburJam;}}
+      else if(isLibur&&!st){color='#9e9e9e';text='H';title=' title="Hari Libur"';}
+      else if(isWeekend&&!st){color='#9e9e9e';text='-';title=' title="Weekend"';}
+      else if(isLibur&&st&&!(st==='lembur'||isOT)){color='#9e9e9e';text='H';title=' title="Hari Libur"';}
+      else if(isWeekend&&st&&!(st==='lembur'||isOT)){color='#9e9e9e';text='-';title=' title="Weekend"';}
       else if(cutiStatus){
         if(cutiStatus==='WFH'){color='#009688';text='W';title=' title="WFH"';ut++;}
         else if(cutiStatus==='Cuti Sakit'){color='#e91e63';text='S';title=' title="Cuti Sakit"';ut++;}
@@ -1368,7 +1376,7 @@ async function loadRekapGrid(){
       <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#ffc107;border-radius:2px"></span> Izin Pribadi (I)</span>
       <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#009688;border-radius:2px"></span> WFH (W)</span>
       <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#9c27b0;border-radius:2px"></span> Cuti Melahirkan (M)</span>
-      <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#9e9e9e;border-radius:2px"></span> Hari Libur</span>
+      <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#9e9e9e;border-radius:2px"></span> Weekend / Hari Libur</span>
       <span class="text-xs"><span style="display:inline-block;width:12px;height:12px;background:#eee;border-radius:2px"></span> Tidak Hadir</span>
     </div>`;
   document.getElementById('rekapSummary').innerHTML=summaryHtml;
