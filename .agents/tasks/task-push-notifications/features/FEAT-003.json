@@ -1,0 +1,30 @@
+{
+  "id": "FEAT-003",
+  "type": "fix",
+  "description": "Address review issues: fix duplicate background notification handler, fix single-token-per-user storage model, fix chat notification blast, fix logout cleanup race condition, and add clearer comments for VAPID key and gcm_sender_id configuration.",
+  "status": "completed",
+  "steps": [
+    "Step 1 - Fix duplicate background notifications in firebase-messaging-sw.js: Remove the manual push event listener and use firebase.messaging().onBackgroundMessage() instead to prevent double-display.",
+    "Step 2 - Fix single-token-per-user in core.js: Change token storage to use subcollection hrd_fcm_tokens/{userId}/devices/{tokenId} where tokenId is a hash of the token. Update initFCM and cleanupFCMToken accordingly.",
+    "Step 3 - Fix single-token-per-user in functions/index.js: Update getTokensForUser, getAllTokens, getAllTokensExcept, and token cleanup to use the new subcollection model.",
+    "Step 4 - Fix chat notification blast in functions/index.js: Remove onChatCreated since chat already sends notifications via hrd_notifikasi (which triggers onNotifikasiCreated).",
+    "Step 5 - Fix logout cleanup race in core.js: Save currentUser.id before calling cleanup, or make doLogout async and await cleanupFCMToken().",
+    "Step 6 - Add clearer comments for VAPID key and gcm_sender_id configuration."
+  ],
+  "acceptance_criteria": [
+    "firebase-messaging-sw.js uses onBackgroundMessage() instead of manual push event listener",
+    "Token storage uses subcollection model: hrd_fcm_tokens/{userId}/devices/{tokenId}",
+    "Cloud Functions helpers read from subcollection model",
+    "onChatCreated function is removed from functions/index.js",
+    "doLogout properly awaits or captures userId before cleanupFCMToken",
+    "VAPID_KEY and gcm_sender_id have clear explanatory comments"
+  ],
+  "verification": [
+    "Run: node -c firebase-messaging-sw.js (syntax check)",
+    "Run: node -c core.js (syntax check)",
+    "Run: node -c functions/index.js (syntax check)",
+    "Run: npx prettier --check firebase-messaging-sw.js core.js functions/index.js manifest.json"
+  ],
+  "blocked_reason": null,
+  "findings": "All review issues resolved. Used messaging.onBackgroundMessage() instead of manual push listener. Token storage moved to subcollection hrd_fcm_tokens/{userId}/devices/{tokenHash}. onChatCreated removed because chat already notifies via hrd_notifikasi. Logout race fixed by passing userId as parameter to cleanupFCMToken."
+}

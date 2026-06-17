@@ -16,9 +16,26 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
 // ── FCM (Firebase Cloud Messaging) Push Notifications ──────────────────
-// Generate your VAPID key in Firebase Console > Project Settings > Cloud Messaging > Web Push certificates
+// IMPORTANT: Replace this placeholder with your actual VAPID public key.
+// Generate it in Firebase Console > Project Settings > Cloud Messaging >
+// Web Push certificates > "Generate key pair". Without a valid key,
+// getToken() will fail and push notifications will not work.
 const VAPID_KEY = "YOUR_VAPID_KEY_HERE";
 let messagingInstance = null;
+
+/**
+ * Generate a simple hash string from an FCM token to use as a document ID.
+ * This allows storing multiple device tokens per user.
+ */
+function hashToken(token) {
+  let hash = 0;
+  for (let i = 0; i < token.length; i++) {
+    const chr = token.charCodeAt(i);
+    hash = (hash << 5) - hash + chr;
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(36);
+}
 
 async function initFCM() {
   try {
@@ -41,15 +58,23 @@ async function initFCM() {
     });
 
     if (token) {
-      // Store FCM token in Firestore
-      await db.collection("hrd_fcm_tokens").doc(currentUser.id).set({
-        token: token,
-        userId: currentUser.id,
-        userName: currentUser.nama,
-        role: currentUser.role,
-        device: navigator.userAgent,
-        updatedAt: new Date().toISOString(),
-      });
+      // Store FCM token in subcollection to support multiple devices per user.
+      // Path: hrd_fcm_tokens/{userId}/devices/{tokenHash}
+      const tokenId = hashToken(token);
+      await db
+        .collection("hrd_fcm_tokens")
+        .doc(currentUser.id)
+        .collection("devices")
+        .doc(tokenId)
+        .set({
+          token: token,
+          userId: currentUser.id,
+          userName: currentUser.nama,
+          role: currentUser.role,
+          departemen: currentUser.departemen || "",
+          device: navigator.userAgent,
+          updatedAt: new Date().toISOString(),
+        });
     }
 
     // Handle foreground messages
@@ -66,10 +91,18 @@ async function initFCM() {
   }
 }
 
-async function cleanupFCMToken() {
+async function cleanupFCMToken(userId) {
   try {
-    if (!currentUser) return;
-    await db.collection("hrd_fcm_tokens").doc(currentUser.id).delete();
+    if (!userId) return;
+    // Delete all device tokens for this user
+    const devicesSnap = await db
+      .collection("hrd_fcm_tokens")
+      .doc(userId)
+      .collection("devices")
+      .get();
+    const batch = db.batch();
+    devicesSnap.forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
     if (messagingInstance) {
       await messagingInstance.deleteToken();
       messagingInstance = null;
@@ -161,7 +194,9 @@ async function doLogin(username, password) {
 }
 
 function doLogout() {
-  cleanupFCMToken();
+  // Capture userId before nulling currentUser to avoid race condition
+  const userId = currentUser?.id;
+  cleanupFCMToken(userId);
   currentUser = null;
   currentPage = "dashboard";
   localStorage.removeItem("hrd_session");

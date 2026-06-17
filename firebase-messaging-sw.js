@@ -7,6 +7,9 @@ importScripts(
   "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js",
 );
 
+// NOTE: The messagingSenderId and appId below are placeholders.
+// Replace them with your actual Firebase project values from
+// Firebase Console > Project Settings > General > Your apps > Config.
 const firebaseConfig = {
   apiKey: "AIzaSyAWlNi_iBOWxZBD6E20aHOSrRpPsirDdOM",
   authDomain: "test-kesehatan-ijef-corp-7c278.firebaseapp.com",
@@ -19,20 +22,11 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
-// Handle background push notifications
-self.addEventListener("push", (event) => {
-  let data = {};
-  if (event.data) {
-    try {
-      data = event.data.json();
-    } catch (e) {
-      data = {
-        notification: { title: "IMS Notifikasi", body: event.data.text() },
-      };
-    }
-  }
-
-  const notification = data.notification || {};
+// Handle background push notifications using the FCM SDK's built-in mechanism.
+// Do NOT add a separate self.addEventListener("push", ...) handler here -- the SDK
+// handles incoming push events internally. Using both would cause duplicate notifications.
+messaging.onBackgroundMessage((payload) => {
+  const notification = payload.notification || {};
   const title = notification.title || "IMS Notifikasi";
   const options = {
     body: notification.body || "",
@@ -44,12 +38,13 @@ self.addEventListener("push", (event) => {
     vibrate: [200, 100, 200, 100, 300],
     silent: false,
     data: {
-      click_action: notification.click_action || data.data?.click_action || "/",
-      url: notification.click_action || data.data?.url || "/",
+      click_action:
+        notification.click_action || payload.data?.click_action || "/",
+      url: notification.click_action || payload.data?.url || "/",
     },
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  return self.registration.showNotification(title, options);
 });
 
 // Handle notification click - open/focus the app window
