@@ -1595,9 +1595,12 @@ async function loadDailyTasks(filter) {
     const isOwn = t.userId === currentUser.id;
     const isAssignedByOther =
       t.assignedBy && t.assignedBy !== currentUser.id && t.userId === currentUser.id;
+    const isAssigner = t.assignedBy === currentUser.id && t.userId !== currentUser.id;
     const isFullAdmin = hasAccess(6);
-    if (isFullAdmin || isOwn) {
-      html += `<div style="display:flex;gap:4px;flex-wrap:wrap"><a href="${buildGCalUrl(t)}" target="_blank" class="btn btn-xs btn-info" title="Tambah ke Google Calendar" style="text-decoration:none">📅</a><button class="btn btn-xs btn-info" onclick="viewDailyTask('${t.id}')" title="Lihat">👁️</button><button class="btn btn-xs btn-warning" onclick="editDailyTask('${t.id}')">✏️</button>${isFullAdmin || !isAssignedByOther ? `<button class="btn btn-xs btn-danger" onclick="hapusDailyTask('${t.id}')">🗑️</button>` : ''}</div></div>`;
+    const canEdit = isFullAdmin || (isOwn && !isAssignedByOther) || isAssigner;
+    const canDelete = isFullAdmin || (isOwn && !isAssignedByOther) || isAssigner;
+    if (canEdit) {
+      html += `<div style="display:flex;gap:4px;flex-wrap:wrap"><a href="${buildGCalUrl(t)}" target="_blank" class="btn btn-xs btn-info" title="Tambah ke Google Calendar" style="text-decoration:none">📅</a><button class="btn btn-xs btn-info" onclick="viewDailyTask('${t.id}')" title="Lihat">👁️</button><button class="btn btn-xs btn-warning" onclick="editDailyTask('${t.id}')">✏️</button>${canDelete ? `<button class="btn btn-xs btn-danger" onclick="hapusDailyTask('${t.id}')">🗑️</button>` : ''}</div></div>`;
     } else {
       html += `<div style="display:flex;gap:4px;flex-wrap:wrap"><a href="${buildGCalUrl(t)}" target="_blank" class="btn btn-xs btn-info" title="Tambah ke Google Calendar" style="text-decoration:none">📅</a><button class="btn btn-xs btn-info" onclick="viewDailyTask('${t.id}')" title="Lihat">👁️</button></div></div>`;
     }
