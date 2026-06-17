@@ -1,0 +1,39 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Integrate Firebase Cloud Messaging (FCM) client-side for push notifications that work even when the app/browser is closed - like WhatsApp notifications on Android, iPhone, laptop, and PC.",
+  "status": "in_progress",
+  "steps": [
+    "Step 1 - Add Firebase Messaging SDK to index.html: Add the firebase-messaging-compat.js script tag (v10.12.2 from gstatic CDN) AFTER the existing firebase-firestore-compat.js script on line 893. The tag should be: <script src=\"https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js\"></script>",
+    "Step 2 - Update manifest.json: Add \"gcm_sender_id\": \"103953800507\" to the manifest.json file. This is a required fixed value for FCM web push (it's always this value for all projects, not the project's sender ID).",
+    "Step 3 - Create firebase-messaging-sw.js at the project root: This is the dedicated FCM service worker that handles background push notifications. It must: (a) Import Firebase app and messaging compat scripts using importScripts(), (b) Initialize Firebase with the same config from core.js, (c) Handle the 'push' event to show notification with title, body, icon, click_action, (d) Handle 'notificationclick' event to open/focus the app window, (e) Use self.registration.showNotification() with options including vibrate pattern [200,100,200,100,300], icon, badge, and data for click handling, (f) Play a sound indication via notification options { silent: false }.",
+    "Step 4 - Update the service worker registration in core.js (around line 872-878): (a) Remove the code that unregisters ALL service workers (it kills the FCM SW), (b) Instead, only unregister service workers that are NOT firebase-messaging-sw.js, (c) Keep registering /sw.js for caching, (d) The firebase-messaging-sw.js will be auto-registered by the FCM SDK.",
+    "Step 5 - Add FCM initialization and token management in core.js: After the firebase.initializeApp(firebaseConfig) line (line 15), add: (a) A variable for the messaging instance, (b) A function initFCM() that: initializes firebase.messaging(), requests notification permission, gets the FCM token using messaging.getToken({vapidKey: vapidKey, serviceWorkerRegistration: registration}), stores the token in Firestore collection 'hrd_fcm_tokens' with document ID = currentUser.id containing {token, userId, userName, role, device: navigator.userAgent, updatedAt}, (c) A function to handle foreground messages using messaging.onMessage() that calls playNotificationSound() and showSystemNotification(), (d) Handle token refresh. Note: For the VAPID key, add a placeholder constant VAPID_KEY = 'YOUR_VAPID_KEY_HERE' with a comment explaining the user needs to generate this in Firebase Console > Project Settings > Cloud Messaging > Web Push certificates.",
+    "Step 6 - Call initFCM() after successful login: In the renderApp() function (line 133), after the call to listenNotifications() on line 155, add a call to initFCM(). This ensures FCM is initialized only when a user is logged in.",
+    "Step 7 - Clean up FCM token on logout: In doLogout() function, add code to delete the FCM token from Firestore (hrd_fcm_tokens collection, doc ID = currentUser.id) and call messaging.deleteToken() to unsubscribe.",
+    "Step 8 - Update the existing sw.js: Add a comment at the top explaining that firebase-messaging-sw.js handles push notifications separately. The caching SW remains as-is but should not interfere with the messaging SW."
+  ],
+  "acceptance_criteria": [
+    "index.html loads firebase-messaging-compat.js SDK after firestore SDK",
+    "manifest.json contains gcm_sender_id field with value '103953800507'",
+    "firebase-messaging-sw.js exists at project root with push and notificationclick event handlers",
+    "core.js no longer unregisters all service workers indiscriminately",
+    "core.js has initFCM() function that gets FCM token and stores in Firestore",
+    "core.js calls initFCM() in renderApp() after listenNotifications()",
+    "doLogout() cleans up FCM token",
+    "Foreground message handler shows notification with sound via existing playNotificationSound()",
+    "firebase-messaging-sw.js shows notification with vibrate pattern when push received in background",
+    "Notification click opens/focuses the app window"
+  ],
+  "verification": [
+    "Run: node -c firebase-messaging-sw.js (syntax check)",
+    "Run: node -c core.js (syntax check)",
+    "Run: npx prettier --check index.html manifest.json core.js sw.js firebase-messaging-sw.js",
+    "Verify firebase-messaging-sw.js contains 'push' event listener",
+    "Verify firebase-messaging-sw.js contains 'notificationclick' event listener",
+    "Verify core.js contains initFCM function",
+    "Verify manifest.json contains gcm_sender_id"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}
