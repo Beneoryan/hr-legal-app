@@ -9,8 +9,8 @@ const firebaseConfig = {
   authDomain: 'test-kesehatan-ijef-corp-7c278.firebaseapp.com',
   projectId: 'test-kesehatan-ijef-corp-7c278',
   storageBucket: 'test-kesehatan-ijef-corp-7c278.appspot.com',
-  messagingSenderId: '123456789',
-  appId: '1:123456789:web:abc123',
+  messagingSenderId: '48180557823',
+  appId: '1:48180557823:web:47ea8db8126737dbc0d9ca',
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
@@ -20,7 +20,8 @@ const db = firebase.firestore();
 // Generate it in Firebase Console > Project Settings > Cloud Messaging >
 // Web Push certificates > "Generate key pair". Without a valid key,
 // getToken() will fail and push notifications will not work.
-const VAPID_KEY = 'YOUR_VAPID_KEY_HERE';
+const VAPID_KEY =
+  'BKGJy5_3Z0dSIifKhousIb_mp06c0-bLVcUcOq0HyOTnpHY65DuUJ4hpyz0xyO48bJgwBId_LPfM1Twcn_QGwUc';
 let messagingInstance = null;
 
 /**
