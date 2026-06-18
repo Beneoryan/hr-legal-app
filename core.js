@@ -43,22 +43,55 @@ async function initFCM() {
     if (!('serviceWorker' in navigator) || !('Notification' in window)) return;
     if (!currentUser) return;
 
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') return;
+    // Request permission - retry if user dismisses
+    var permission = Notification.permission;
+    if (permission === 'default') {
+      permission = await Notification.requestPermission();
+    }
+    if (permission !== 'granted') {
+      console.warn('[FCM] Notification permission not granted:', permission);
+      return;
+    }
 
     // Register the FCM service worker
-    const swRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+    var swRegistration;
+    try {
+      swRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+      // Wait for service worker to be ready
+      await navigator.serviceWorker.ready;
+    } catch (swErr) {
+      console.warn('[FCM] Service Worker registration failed:', swErr.message);
+      return;
+    }
 
     messagingInstance = firebase.messaging();
 
-    const token = await messagingInstance.getToken({
-      vapidKey: VAPID_KEY,
-      serviceWorkerRegistration: swRegistration,
-    });
+    var token;
+    try {
+      token = await messagingInstance.getToken({
+        vapidKey: VAPID_KEY,
+        serviceWorkerRegistration: swRegistration,
+      });
+    } catch (tokenErr) {
+      console.warn('[FCM] getToken failed, retrying...', tokenErr.message);
+      // Retry once after 2 seconds
+      await new Promise(function (r) {
+        setTimeout(r, 2000);
+      });
+      try {
+        token = await messagingInstance.getToken({
+          vapidKey: VAPID_KEY,
+          serviceWorkerRegistration: swRegistration,
+        });
+      } catch (e) {
+        console.error('[FCM] getToken retry failed:', e.message);
+        return;
+      }
+    }
 
     if (token) {
+      console.log('[FCM] Token registered successfully');
       // Store FCM token in subcollection to support multiple devices per user.
-      // Path: hrd_fcm_tokens/{userId}/devices/{tokenHash}
       const tokenId = hashToken(token);
       await db
         .collection('hrd_fcm_tokens')
@@ -74,14 +107,18 @@ async function initFCM() {
           device: navigator.userAgent,
           updatedAt: new Date().toISOString(),
         });
+    } else {
+      console.warn('[FCM] No token received');
     }
 
     // Handle foreground messages
     messagingInstance.onMessage((payload) => {
-      const notification = payload.notification || {};
+      const notification = payload.notification || payload.data || {};
+      var title = notification.title || payload.data?.title || 'IMS Notifikasi';
+      var body = notification.body || payload.data?.body || '';
       playNotificationSound();
-      showSystemNotification(notification.title || 'IMS Notifikasi', notification.body || '');
-      showInAppNotification(notification.title || 'IMS Notifikasi', notification.body || '', '');
+      showSystemNotification(title, body);
+      showInAppNotification(title, body, '');
     });
   } catch (e) {
     console.warn('FCM init failed:', e);

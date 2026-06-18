@@ -23,19 +23,20 @@ const messaging = firebase.messaging();
 // handles incoming push events internally. Using both would cause duplicate notifications.
 messaging.onBackgroundMessage((payload) => {
   const notification = payload.notification || {};
-  const title = notification.title || 'IMS Notifikasi';
+  const data = payload.data || {};
+  const title = notification.title || data.title || 'IMS Notifikasi';
+  const body = notification.body || data.body || '';
   const options = {
-    body: notification.body || '',
-    icon:
-      notification.icon ||
-      'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🏛️</text></svg>',
-    badge:
-      'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🏛️</text></svg>',
+    body: body,
+    icon: 'https://hr-legal-app.netlify.app/icons/icon-192x192.png',
+    badge: 'https://hr-legal-app.netlify.app/icons/icon-192x192.png',
     vibrate: [200, 100, 200, 100, 300],
     silent: false,
+    tag: 'ims-notif-' + Date.now(),
+    renotify: true,
     data: {
-      click_action: notification.click_action || payload.data?.click_action || '/',
-      url: notification.click_action || payload.data?.url || '/',
+      click_action: data.click_action || notification.click_action || '/',
+      url: data.url || data.click_action || '/',
     },
   };
 
