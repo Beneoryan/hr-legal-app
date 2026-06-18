@@ -80,6 +80,7 @@ async function initFCM() {
       const notification = payload.notification || {};
       playNotificationSound();
       showSystemNotification(notification.title || 'IMS Notifikasi', notification.body || '');
+      showInAppNotification(notification.title || 'IMS Notifikasi', notification.body || '', '');
     });
   } catch (e) {
     console.warn('FCM init failed:', e);
@@ -632,9 +633,14 @@ function listenNotifications() {
         if (change.type === 'added') {
           const d = change.doc.data();
           if (d.read === false) {
-            playNotificationSound();
-            showSystemNotification(d.title || 'Notifikasi', d.message || '');
-            showInAppNotification(d.title || 'Notifikasi', d.message || '', d.link || '');
+            // Only show popup for truly new notifications (created within last 30s)
+            var created = d.createdAt ? new Date(d.createdAt) : null;
+            var isRecent = created && new Date() - created < 60000;
+            if (isRecent) {
+              playNotificationSound();
+              showSystemNotification(d.title || 'Notifikasi', d.message || '');
+              showInAppNotification(d.title || 'Notifikasi', d.message || '', d.link || '');
+            }
           }
         }
       });
@@ -650,8 +656,12 @@ function listenNotifications() {
         if (change.type === 'added') {
           const d = change.doc.data();
           if (d.read === false) {
-            playNotificationSound();
-            showInAppNotification(d.title || 'Notifikasi', d.message || '', d.link || '');
+            var created = d.createdAt ? new Date(d.createdAt) : null;
+            var isRecent = created && new Date() - created < 60000;
+            if (isRecent) {
+              playNotificationSound();
+              showInAppNotification(d.title || 'Notifikasi', d.message || '', d.link || '');
+            }
           }
         }
       });
