@@ -15,6 +15,25 @@ self.addEventListener("activate", (e) => {
   self.clients.claim();
 });
 
+self.addEventListener("notificationclick", function (event) {
+  event.notification.close();
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then(function (clientList) {
+        for (var i = 0; i < clientList.length; i++) {
+          if (
+            clientList[i].url.includes(self.location.origin) &&
+            "focus" in clientList[i]
+          ) {
+            return clientList[i].focus();
+          }
+        }
+        return self.clients.openWindow("/");
+      }),
+  );
+});
+
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
   // Network-first: always try to get fresh content
