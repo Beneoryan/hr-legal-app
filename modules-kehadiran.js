@@ -3022,10 +3022,8 @@ async function submitWeeklyImport() {
 
 // ── DISPLAY LAPORAN MINGGUAN ──────────────────────────────────
 var _weeklyReportFilter = 'all';
-
 async function loadWeeklyReports(divFilter) {
   if (divFilter !== undefined) _weeklyReportFilter = divFilter;
-  // Highlight tab
   document.querySelectorAll('#taskTabs .tab').forEach(function (t) {
     t.classList.remove('active');
   });
@@ -3036,64 +3034,100 @@ async function loadWeeklyReports(divFilter) {
   if (!listEl) return;
   listEl.innerHTML = '<p class="text-sm" style="color:#999">Memuat laporan mingguan...</p>';
   try {
-    var snap = await db.collection('hrd_weekly_reports').get();
     var items = [];
+    var snap = await db
+      .collection('hrd_daily_tasks')
+      .where('source', '==', 'spreadsheet-import')
+      .get();
     snap.forEach(function (d) {
-      items.push({ id: d.id, ...d.data() });
+      items.push({ id: d.id, col: 'hrd_daily_tasks', ...d.data() });
     });
-    // Sort by tanggal desc
+    try {
+      var snap2 = await db.collection('hrd_weekly_reports').get();
+      snap2.forEach(function (d) {
+        items.push({ id: d.id, col: 'hrd_weekly_reports', ...d.data() });
+      });
+    } catch (e2) {}
     items.sort(function (a, b) {
       return (b.tanggal || b.bulan || '').localeCompare(a.tanggal || a.bulan || '');
     });
     if (!items.length) {
       listEl.innerHTML =
-        '<div style="text-align:center;padding:32px;color:#999"><div style="font-size:2rem;margin-bottom:8px">📈</div><p>Belum ada laporan mingguan. Klik "⬆️ Import Laporan" untuk upload dari spreadsheet.</p></div>';
+        '<div style="text-align:center;padding:32px;color:#999"><div style="font-size:2rem;margin-bottom:8px">📈</div><p>Belum ada laporan mingguan.</p></div>';
       return;
     }
-    // Division filter tabs
-    var filterHtml = '<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">';
-    filterHtml +=
+    var filtered = items;
+    if (_weeklyReportFilter === 'akademik')
+      filtered = items.filter(function (r) {
+        return (r.departemen || r.divisi || '').toUpperCase().includes('AKADEMIK');
+      });
+    else if (_weeklyReportFilter === 'manajemen')
+      filtered = items.filter(function (r) {
+        return (r.departemen || r.divisi || '').toUpperCase().includes('MANAJEMEN');
+      });
+    var filterFrom = document.getElementById('wrDateFrom')?.value || '';
+    var filterTo = document.getElementById('wrDateTo')?.value || '';
+    if (filterFrom)
+      filtered = filtered.filter(function (r) {
+        return (r.tanggal || '') >= filterFrom;
+      });
+    if (filterTo)
+      filtered = filtered.filter(function (r) {
+        return (r.tanggal || '') <= filterTo;
+      });
+    var html = '';
+    html +=
+      '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">';
+    html +=
       '<button class="btn btn-xs ' +
       (_weeklyReportFilter === 'all' ? 'btn-primary' : 'btn-outline') +
       '" onclick="loadWeeklyReports(\'all\')">Semua</button>';
-    filterHtml +=
+    html +=
       '<button class="btn btn-xs ' +
       (_weeklyReportFilter === 'akademik' ? 'btn-primary' : 'btn-outline') +
       '" onclick="loadWeeklyReports(\'akademik\')">📚 Divisi Akademik</button>';
-    filterHtml +=
+    html +=
       '<button class="btn btn-xs ' +
       (_weeklyReportFilter === 'manajemen' ? 'btn-primary' : 'btn-outline') +
       '" onclick="loadWeeklyReports(\'manajemen\')">🏢 Divisi Manajemen</button>';
-    filterHtml += '</div>';
-    // Apply division filter
-    var filtered = items;
-    if (_weeklyReportFilter === 'akademik') {
-      filtered = items.filter(function (r) {
-        return (r.divisi || '').toUpperCase().includes('AKADEMIK');
-      });
-    } else if (_weeklyReportFilter === 'manajemen') {
-      filtered = items.filter(function (r) {
-        return (r.divisi || '').toUpperCase().includes('MANAJEMEN');
-      });
-    }
+    html += '<span style="margin-left:auto"></span>';
+    html +=
+      '<button class="btn btn-xs btn-danger" onclick="deleteSelectedWeeklyReports()">🗑️ Hapus Terpilih</button> ';
+    html +=
+      '<button class="btn btn-xs btn-warning" onclick="resetAllWeeklyReports()">⚠️ Reset Semua</button>';
+    html += '</div>';
+    html +=
+      '<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;padding:8px 12px;background:#f8f9ff;border-radius:8px">';
+    html += '<span class="text-sm fw-700">📅 Periode:</span>';
+    html +=
+      '<input type="date" class="form-control" id="wrDateFrom" value="' +
+      filterFrom +
+      '" style="max-width:140px;padding:4px 8px;font-size:.82rem" onchange="loadWeeklyReports()">';
+    html += '<span class="text-sm">—</span>';
+    html +=
+      '<input type="date" class="form-control" id="wrDateTo" value="' +
+      filterTo +
+      '" style="max-width:140px;padding:4px 8px;font-size:.82rem" onchange="loadWeeklyReports()">';
+    if (filterFrom || filterTo)
+      html +=
+        "<button class=\"btn btn-xs btn-outline\" onclick=\"document.getElementById('wrDateFrom').value='';document.getElementById('wrDateTo').value='';loadWeeklyReports()\">✕</button>";
+    html += '</div>';
+    html +=
+      '<div style="margin-bottom:8px"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="wrSelectAll" onchange="document.querySelectorAll(\'.wr-check\').forEach(function(c){c.checked=this.checked}.bind(this))"> <span class="text-sm fw-700">Pilih Semua (' +
+      filtered.length +
+      ' data)</span></label></div>';
     if (!filtered.length) {
-      listEl.innerHTML =
-        filterHtml +
-        '<div style="text-align:center;padding:32px;color:#999"><p>Tidak ada data untuk filter ini.</p></div>';
+      html +=
+        '<div style="text-align:center;padding:24px;color:#999">Tidak ada data untuk filter ini.</div>';
+      listEl.innerHTML = html;
       return;
     }
-    // Group by divisi
     var groups = {};
     filtered.forEach(function (r) {
-      var div = r.divisi || 'Tanpa Divisi';
+      var div = r.departemen || r.divisi || 'Tanpa Divisi';
       if (!groups[div]) groups[div] = [];
       groups[div].push(r);
     });
-    var html = filterHtml;
-    html +=
-      '<div style="margin-bottom:12px"><span class="fw-700">📈 Laporan Mingguan</span> <span class="text-sm" style="color:#666">(' +
-      filtered.length +
-      ' data)</span></div>';
     Object.keys(groups)
       .sort()
       .forEach(function (div) {
@@ -3102,42 +3136,110 @@ async function loadWeeklyReports(divFilter) {
         html +=
           '<div style="padding:8px 14px;background:#e8eaf6;border-radius:8px;font-weight:700;font-size:.88rem;color:#283593;border-left:4px solid #3f51b5;margin-bottom:8px">🏢 ' +
           escHtml(div) +
-          ' <span style="font-weight:400;color:#666;font-size:.75rem">(' +
+          ' (' +
           rows.length +
-          ' data)</span></div>';
-        html +=
-          '<div class="table-wrap"><table style="font-size:.8rem"><thead style="background:#1a1a1a;color:#fff"><tr><th>Tanggal</th><th>Kategori</th><th>Progress</th><th>Case</th><th>Solution</th><th>Planning & Target</th><th>PIC</th><th>Ket</th></tr></thead><tbody>';
+          ' data)</div>';
         rows.forEach(function (r) {
-          html += '<tr>';
-          html += '<td>' + escHtml(String(r.tanggal || r.bulan || '-')) + '</td>';
-          html += '<td>' + escHtml(r.kategori || '-') + '</td>';
+          var tgl = r.tanggal || r.bulan || '-';
+          var kat = r.kategori || '-';
+          var aktivitas = r.aktivitas || r.progress || '';
+          var kendala = r.kendala || r.case_desc || '';
+          var solusi = r.solusi || r.solution || '';
+          var rencana = r.rencanaBesok || r.planning || '';
+          var pic = r.targetUserName || r.pic || r.nama || '-';
+          var komentar = r.komentar || r.keterangan || '';
           html +=
-            '<td style="max-width:200px;white-space:pre-wrap;font-size:.75rem">' +
-            escHtml(r.progress || '-') +
-            '</td>';
+            '<div style="border:1px solid #e0e0e0;border-radius:10px;padding:14px;margin-bottom:10px;background:#fff">';
+          html += '<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">';
           html +=
-            '<td style="max-width:150px;white-space:pre-wrap;font-size:.75rem">' +
-            escHtml(r.case_desc || '-') +
-            '</td>';
+            '<input type="checkbox" class="wr-check" value="' +
+            r.id +
+            '" data-col="' +
+            (r.col || 'hrd_daily_tasks') +
+            '">';
+          html += '<div style="flex:1"><div class="fw-700">' + escHtml(pic) + '</div>';
           html +=
-            '<td style="max-width:150px;white-space:pre-wrap;font-size:.75rem">' +
-            escHtml(r.solution || '-') +
-            '</td>';
-          html +=
-            '<td style="max-width:150px;white-space:pre-wrap;font-size:.75rem">' +
-            escHtml(r.planning || '-') +
-            '</td>';
-          html += '<td class="fw-700">' + escHtml(r.pic || '-') + '</td>';
-          html += '<td class="text-sm">' + escHtml(r.keterangan || '-') + '</td>';
-          html += '</tr>';
+            '<div class="text-xs" style="color:#666">📅 ' +
+            escHtml(tgl) +
+            ' | 🏢 ' +
+            escHtml(div) +
+            ' | 🏷️ ' +
+            escHtml(kat) +
+            '</div></div></div>';
+          if (aktivitas)
+            html +=
+              '<div style="margin-bottom:8px"><div class="text-xs fw-700" style="color:#1565c0">📋 Aktivitas / Progress</div><div style="padding:8px;background:#f8f9ff;border-radius:6px;font-size:.82rem;white-space:pre-wrap;margin-top:4px">' +
+              escHtml(aktivitas) +
+              '</div></div>';
+          if (kendala)
+            html +=
+              '<div style="margin-bottom:8px"><div class="text-xs fw-700" style="color:#e65100">⚠️ Kendala / Case</div><div style="padding:8px;background:#fff8e1;border-radius:6px;font-size:.82rem;white-space:pre-wrap;margin-top:4px">' +
+              escHtml(kendala) +
+              '</div></div>';
+          if (solusi)
+            html +=
+              '<div style="margin-bottom:8px"><div class="text-xs fw-700" style="color:#2e7d32">💡 Solusi / Tindakan</div><div style="padding:8px;background:#e8f5e9;border-radius:6px;font-size:.82rem;white-space:pre-wrap;margin-top:4px">' +
+              escHtml(solusi) +
+              '</div></div>';
+          if (rencana)
+            html +=
+              '<div style="margin-bottom:8px"><div class="text-xs fw-700" style="color:#6a1b9a">🌟 Planning & Target</div><div style="padding:8px;background:#f3e5f5;border-radius:6px;font-size:.82rem;white-space:pre-wrap;margin-top:4px">' +
+              escHtml(rencana) +
+              '</div></div>';
+          if (komentar)
+            html +=
+              '<div><div class="text-xs fw-700" style="color:#555">💬 Keterangan</div><div style="padding:8px;background:#f5f5f5;border-radius:6px;font-size:.82rem;margin-top:4px">' +
+              escHtml(komentar) +
+              '</div></div>';
+          html += '</div>';
         });
-        html += '</tbody></table></div></div>';
+        html += '</div>';
       });
     listEl.innerHTML = html;
   } catch (e) {
     listEl.innerHTML =
       '<p class="text-sm" style="color:#c62828">Gagal memuat: ' + escHtml(e.message) + '</p>';
   }
+}
+async function deleteSelectedWeeklyReports() {
+  var checked = document.querySelectorAll('.wr-check:checked');
+  if (!checked.length) return toast('Pilih data yang mau dihapus', 'warning');
+  if (!confirm('Hapus ' + checked.length + ' data yang dipilih?')) return;
+  for (var i = 0; i < checked.length; i++) {
+    try {
+      await db
+        .collection(checked[i].dataset.col || 'hrd_daily_tasks')
+        .doc(checked[i].value)
+        .delete();
+    } catch (e) {}
+  }
+  toast('🗑️ ' + checked.length + ' data dihapus', 'success');
+  loadWeeklyReports();
+}
+async function resetAllWeeklyReports() {
+  if (!confirm('RESET SEMUA laporan mingguan? Data import dari spreadsheet akan dihapus permanen.'))
+    return;
+  if (!confirm('Yakin? Tindakan ini TIDAK BISA dibatalkan.')) return;
+  var count = 0;
+  try {
+    var s1 = await db
+      .collection('hrd_daily_tasks')
+      .where('source', '==', 'spreadsheet-import')
+      .get();
+    for (var i = 0; i < s1.docs.length; i++) {
+      await s1.docs[i].ref.delete();
+      count++;
+    }
+  } catch (e) {}
+  try {
+    var s2 = await db.collection('hrd_weekly_reports').get();
+    for (var j = 0; j < s2.docs.length; j++) {
+      await s2.docs[j].ref.delete();
+      count++;
+    }
+  } catch (e) {}
+  toast('⚠️ ' + count + ' data dihapus', 'success');
+  loadWeeklyReports();
 }
 
 // Parse date string to yyyy-MM-dd format
