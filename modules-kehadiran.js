@@ -2481,7 +2481,11 @@ function importFromGoogleSheets() {
       '<optgroup label="DIVISI AKADEMIK"><option value="SISWA">SISWA</option><option value="TSK-JOB">TSK-JOB</option><option value="SENSEI">SENSEI</option><option value="CURRICULUM">CURRICULUM</option></optgroup>' +
       '<optgroup label="DIVISI MANAJEMEN"><option value="FACILITY\'S">FACILITY\'S</option><option value="FINANCE">FINANCE</option><option value="HR & LEGAL">HR & LEGAL</option><option value="PROMOSI">PROMOSI</option><option value="DOCUMENT">DOCUMENT</option><option value="MARKETING & SALES">MARKETING & SALES</option></optgroup>' +
       '</select></div>' +
-      '<div class="form-group"><label>Filter Bulan</label><input class="form-control" type="month" id="gsFilterBulan"></div>' +
+      '<div class="form-group"><label>Filter Waktu</label>' +
+      '<select class="form-control mb-8" id="gsFilterMode" onchange="toggleGsFilterMode()" style="margin-bottom:8px"><option value="">Tanpa Filter</option><option value="bulan">Bulan Tertentu</option><option value="periode">Periode (Dari - Sampai)</option></select>' +
+      '<div id="gsFilterBulanWrap" style="display:none"><input class="form-control" type="month" id="gsFilterBulan"></div>' +
+      '<div id="gsFilterPeriodeWrap" style="display:none"><div style="display:flex;gap:6px;align-items:center"><input class="form-control" type="month" id="gsFilterDari" style="flex:1"> <span class="text-sm">s/d</span> <input class="form-control" type="month" id="gsFilterSampai" style="flex:1"></div></div>' +
+      '</div>' +
       '</div>' +
       '</div>' +
       '<div id="gsPreview" style="margin-bottom:16px"></div>' +
@@ -2495,11 +2499,22 @@ function importFromGoogleSheets() {
 
 var _gsImportData = [];
 
+function toggleGsFilterMode() {
+  var mode = document.getElementById('gsFilterMode').value;
+  var bulanWrap = document.getElementById('gsFilterBulanWrap');
+  var periodeWrap = document.getElementById('gsFilterPeriodeWrap');
+  if (bulanWrap) bulanWrap.style.display = mode === 'bulan' ? 'block' : 'none';
+  if (periodeWrap) periodeWrap.style.display = mode === 'periode' ? 'flex' : 'none';
+}
+
 async function pullFromGoogleSheets() {
   var sheetId = document.getElementById('gsSheetId').value.trim();
   var gid = document.getElementById('gsGid').value.trim();
   var filterDivisi = document.getElementById('gsFilterDivisi').value;
-  var filterBulan = document.getElementById('gsFilterBulan').value;
+  var filterMode = document.getElementById('gsFilterMode').value;
+  var filterBulan = document.getElementById('gsFilterBulan')?.value || '';
+  var filterDari = document.getElementById('gsFilterDari')?.value || '';
+  var filterSampai = document.getElementById('gsFilterSampai')?.value || '';
   var preview = document.getElementById('gsPreview');
   preview.innerHTML =
     '<p class="text-sm" style="color:#999">⏳ Mengambil data dari Google Sheets...</p>';
@@ -2544,9 +2559,16 @@ async function pullFromGoogleSheets() {
         );
       });
     }
-    if (filterBulan) {
+    if (filterMode === 'bulan' && filterBulan) {
       _gsImportData = _gsImportData.filter(function (r) {
         return (r.bulan || '').includes(filterBulan) || (r.tanggal || '').includes(filterBulan);
+      });
+    } else if (filterMode === 'periode' && (filterDari || filterSampai)) {
+      _gsImportData = _gsImportData.filter(function (r) {
+        var val = (r.bulan || r.tanggal || '').substring(0, 7);
+        if (filterDari && val < filterDari) return false;
+        if (filterSampai && val > filterSampai) return false;
+        return true;
       });
     }
     if (!_gsImportData.length) {
