@@ -2708,10 +2708,10 @@ async function pullFromGoogleSheets() {
     // Apply filters
     if (filterDivisi) {
       _gsImportData = _gsImportData.filter(function (r) {
-        return (
-          (r.kategori || '').toUpperCase() === filterDivisi.toUpperCase() ||
-          (r.divisi || '').toUpperCase() === filterDivisi.toUpperCase()
-        );
+        var kat = (r.kategori || '').toUpperCase().trim();
+        var div = (r.divisi || '').toUpperCase().trim();
+        var filt = filterDivisi.toUpperCase().trim();
+        return kat === filt || div === filt || kat.includes(filt) || div.includes(filt);
       });
     }
     if (filterMode === 'bulan' && filterBulan) {
