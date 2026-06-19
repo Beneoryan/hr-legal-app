@@ -282,8 +282,8 @@ function renderApp() {
     <div class="title">${isPortalUser ? 'IMS Karyawan' : 'IMS (IJEF Management System)'}</div>
     <div class="notif-badge" onclick="navigateTo('notifikasi')" title="Notifikasi">🔔<span class="count" id="notifCount" style="display:none">0</span></div>
     <div class="user-info">
-      <div class="avatar">${currentUser.profilePic ? `<img src="${currentUser.profilePic}" style="width:100%;height:100%;border-radius:50%;object-fit:cover">` : currentUser.nama.charAt(0)}</div>
-      <span>${currentUser.nama}</span>
+      <div class="avatar" style="cursor:pointer" onclick="viewUserProfile('${escHtml(currentUser.nama)}')">${currentUser.profilePic ? `<img src="${currentUser.profilePic}" style="width:100%;height:100%;border-radius:50%;object-fit:cover">` : currentUser.nama.charAt(0)}</div>
+      <span style="cursor:pointer" onclick="viewUserProfile('${escHtml(currentUser.nama)}')">${currentUser.nama}</span>
       <button class="btn btn-xs" style="background:rgba(255,255,255,.15);color:#fff" onclick="doLogout()">Keluar</button>
     </div>
   </div>
