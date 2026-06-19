@@ -1222,9 +1222,14 @@ async function renderDailyTask() {
 
   // Button: Staff only sees report, Leader+ sees both
   let addBtn = '';
-  if (hasAccess(5)) {
-    // BOD: no task, only view reports
-    addBtn = '';
+  if (hasAccess(6)) {
+    // Admin: full access + import
+    addBtn =
+      '<button class="btn btn-primary btn-sm" onclick="modalAddTaskChoice()">+ Tambah</button> <button class="btn btn-success btn-sm" onclick="modalImportWeeklyReport()">⬆️ Import Laporan</button>';
+  } else if (hasAccess(5)) {
+    // BOD: no task, only view reports + import
+    addBtn =
+      '<button class="btn btn-success btn-sm" onclick="modalImportWeeklyReport()">⬆️ Import Laporan</button>';
   } else if (hasAccess(2)) {
     // Leader/Manager/Head: can add task + report
     addBtn =
