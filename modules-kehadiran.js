@@ -3354,8 +3354,8 @@ async function viewUserProfile(nama) {
     var fotoHtml = foto
       ? '<img src="' +
         foto +
-        '" style="width:100px;height:100px;border-radius:50%;object-fit:cover;border:3px solid var(--primary);cursor:pointer" onclick="viewProfilePhoto(this.src)">'
-      : '<div style="width:100px;height:100px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:2.5rem;font-weight:700">' +
+        '" style="width:150px;height:150px;border-radius:50%;object-fit:cover;border:4px solid var(--primary);cursor:pointer;transition:transform .2s" onmouseover="this.style.transform=\'scale(1.05)\'" onmouseout="this.style.transform=\'scale(1)\'" onclick="viewProfilePhoto(this.src)">'
+      : '<div style="width:150px;height:150px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:3.5rem;font-weight:700">' +
         escHtml((profile.nama || '?').charAt(0)) +
         '</div>';
     openModal(
@@ -3415,14 +3415,15 @@ function viewProfilePhoto(src) {
   if (!src) return;
   var overlay = document.createElement('div');
   overlay.style.cssText =
-    'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.92);z-index:999999;display:flex;align-items:center;justify-content:center;flex-direction:column;cursor:pointer;animation:fadeIn .2s ease';
-  overlay.onclick = function () {
-    overlay.remove();
+    'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.95);z-index:999999;display:flex;align-items:center;justify-content:center;flex-direction:column';
+  overlay.onclick = function (e) {
+    if (e.target === overlay || e.target.tagName === 'DIV') overlay.remove();
   };
   overlay.innerHTML =
+    '<div style="position:absolute;top:16px;right:20px;color:#fff;font-size:2rem;cursor:pointer" onclick="this.parentElement.remove()">✕</div>' +
     '<img src="' +
     src +
-    '" style="max-width:90%;max-height:80vh;border-radius:12px;object-fit:contain;box-shadow:0 8px 40px rgba(0,0,0,.5)">' +
-    '<div style="color:#fff;margin-top:16px;font-size:.85rem;opacity:.7">Klik di mana saja untuk menutup</div>';
+    '" style="max-width:85vw;max-height:85vh;object-fit:contain;border-radius:8px;box-shadow:0 0 60px rgba(0,0,0,.5)">' +
+    '<div style="color:rgba(255,255,255,.5);margin-top:12px;font-size:.8rem">Klik ✕ atau area gelap untuk menutup</div>';
   document.body.appendChild(overlay);
 }
