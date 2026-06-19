@@ -2443,8 +2443,8 @@ function viewDailyReport(id) {
     task.progress >= 80 ? '#2e7d32' : task.progress >= 50 ? '#f57f17' : '#c62828';
   openModal(
     `<div class="modal-title">📝 Daily Report</div>
-    <div style="background:#f8f9ff;padding:16px;border-radius:8px;margin-bottom:16px;border-left:4px solid var(--primary)">
-      <div class="fw-700">${escHtml(task.targetUserName || currentUser.nama)}</div>
+    <div style="background:#f8f9ff;padding:16px;border-radius:8px;margin-bottom:16px;border-left:4px solid var(--primary);cursor:pointer" onclick="viewUserProfile('${escHtml(task.targetUserName || task.nama || currentUser.nama)}')">
+      <div class="fw-700" style="color:var(--primary)">${escHtml(task.targetUserName || currentUser.nama)} <span style="font-size:.7rem;color:#999;font-weight:400">👤 klik untuk lihat profil</span></div>
       <div class="text-sm" style="color:#666">📅 ${formatDate(task.tanggal)} | ⏰ ${task.jamMasuk || '-'} - ${task.jamKeluar || '-'}</div>
       <div class="text-sm mt-4">🏢 ${escHtml(task.departemen || '-')} | 📂 ${escHtml(task.kategori || '-')}</div>
       <div class="text-sm mt-4">Progress: <span style="color:${progressColor};font-weight:700">${task.progress || 0}%</span> | Durasi: <b>${task.durasi || '-'} hari</b> | Mood: ${moodLabel}</div>
@@ -3330,4 +3330,82 @@ function _convertDivisi(divisi) {
   if (upper.includes('MANAJEMEN') || upper.includes('MANAGEMENT') || upper.includes('OFFICE'))
     return 'OFFICE';
   return divisi || '';
+}
+
+// View user profile by name
+async function viewUserProfile(nama) {
+  if (!nama) return;
+  try {
+    // Search in hrd_karyawan first
+    var kSnap = await db.collection('hrd_karyawan').where('nama', '==', nama).limit(1).get();
+    var profile = null;
+    if (!kSnap.empty) {
+      profile = kSnap.docs[0].data();
+    } else {
+      // Try hrd_users
+      var uSnap = await db.collection('hrd_users').where('nama', '==', nama).limit(1).get();
+      if (!uSnap.empty) profile = uSnap.docs[0].data();
+    }
+    if (!profile) {
+      toast('Profil tidak ditemukan untuk: ' + nama, 'warning');
+      return;
+    }
+    var foto = profile.foto || profile.profilePic || '';
+    var fotoHtml = foto
+      ? '<img src="' +
+        foto +
+        '" style="width:100px;height:100px;border-radius:50%;object-fit:cover;border:3px solid var(--primary)">'
+      : '<div style="width:100px;height:100px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:2.5rem;font-weight:700">' +
+        escHtml((profile.nama || '?').charAt(0)) +
+        '</div>';
+    openModal(
+      '<div class="modal-title">👤 Profil Karyawan</div>' +
+        '<div style="text-align:center;margin-bottom:20px">' +
+        fotoHtml +
+        '<div class="fw-700" style="font-size:1.2rem;margin-top:12px">' +
+        escHtml(profile.nama || nama) +
+        '</div>' +
+        '<div class="text-sm" style="color:#666">' +
+        escHtml(profile.posisi || profile.role || '-') +
+        '</div></div>' +
+        '<div style="background:#f8f9ff;border-radius:10px;padding:16px;border:1px solid #e0e0e0">' +
+        '<table style="width:100%;border-collapse:collapse;font-size:.88rem">' +
+        '<tr><td style="padding:8px;font-weight:700;width:140px;color:#555">NIP</td><td style="padding:8px">' +
+        escHtml(profile.nip || '-') +
+        '</td></tr>' +
+        '<tr><td style="padding:8px;font-weight:700;color:#555">Departemen</td><td style="padding:8px">' +
+        escHtml(profile.departemen || '-') +
+        '</td></tr>' +
+        '<tr><td style="padding:8px;font-weight:700;color:#555">Posisi/Jabatan</td><td style="padding:8px">' +
+        escHtml(profile.posisi || profile.role || '-') +
+        '</td></tr>' +
+        '<tr><td style="padding:8px;font-weight:700;color:#555">Status</td><td style="padding:8px"><span class="badge badge-' +
+        (profile.status === 'aktif' || profile.status === 'active' ? 'success' : 'warning') +
+        '">' +
+        escHtml(profile.status || 'aktif') +
+        '</span></td></tr>' +
+        '<tr><td style="padding:8px;font-weight:700;color:#555">Email</td><td style="padding:8px">' +
+        escHtml(profile.email || '-') +
+        '</td></tr>' +
+        '<tr><td style="padding:8px;font-weight:700;color:#555">No. HP</td><td style="padding:8px">' +
+        escHtml(profile.noHp || profile.telepon || '-') +
+        '</td></tr>' +
+        '<tr><td style="padding:8px;font-weight:700;color:#555">Alamat</td><td style="padding:8px">' +
+        escHtml(profile.alamat || '-') +
+        '</td></tr>' +
+        '<tr><td style="padding:8px;font-weight:700;color:#555">Tanggal Masuk</td><td style="padding:8px">' +
+        escHtml(profile.tanggalMasuk || profile.joinDate || '-') +
+        '</td></tr>' +
+        '<tr><td style="padding:8px;font-weight:700;color:#555">Atasan</td><td style="padding:8px">' +
+        escHtml(profile.atasan || '-') +
+        '</td></tr>' +
+        '<tr><td style="padding:8px;font-weight:700;color:#555">Grade</td><td style="padding:8px">' +
+        escHtml(profile.gradeJabatan || '-') +
+        '</td></tr>' +
+        '</table></div>' +
+        '<div style="margin-top:16px;text-align:right"><button class="btn btn-outline" onclick="closeModalDirect()">Tutup</button></div>'
+    );
+  } catch (e) {
+    toast('Gagal memuat profil: ' + e.message, 'error');
+  }
 }
