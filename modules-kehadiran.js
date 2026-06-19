@@ -2512,6 +2512,79 @@ function toggleGsFilterMode() {
   if (periodeWrap) periodeWrap.style.display = mode === 'periode' ? 'flex' : 'none';
 }
 
+// Parse month/year from various formats in spreadsheet data
+function _parseMonthFromReport(bulan, tanggal) {
+  var src = (bulan || tanggal || '').toString().trim();
+  if (!src) return null;
+  var monthNames = {
+    jan: 1,
+    januari: 1,
+    january: 1,
+    feb: 2,
+    februari: 2,
+    february: 2,
+    mar: 3,
+    maret: 3,
+    march: 3,
+    apr: 4,
+    april: 4,
+    may: 5,
+    mei: 5,
+    jun: 6,
+    juni: 6,
+    june: 6,
+    jul: 7,
+    juli: 7,
+    july: 7,
+    aug: 8,
+    agustus: 8,
+    august: 8,
+    agu: 8,
+    sep: 9,
+    september: 9,
+    okt: 10,
+    oktober: 10,
+    oct: 10,
+    october: 10,
+    nov: 11,
+    november: 11,
+    nop: 11,
+    des: 12,
+    desember: 12,
+    dec: 12,
+    december: 12,
+  };
+  // Try yyyy-MM or yyyy-MM-dd
+  var m1 = src.match(/^(\d{4})-(\d{1,2})/);
+  if (m1) return { year: parseInt(m1[1]), month: parseInt(m1[2]) };
+  // Try dd/MM/yyyy or MM/dd/yyyy
+  var m2 = src.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if (m2) return { year: parseInt(m2[3]), month: parseInt(m2[2]) };
+  // Try "Okt 2025", "Oktober 2025", "Oct-25"
+  var m3 = src.match(/([a-zA-Z]+)\s*[\/\-]?\s*(\d{2,4})/i);
+  if (m3) {
+    var mn = monthNames[m3[1].toLowerCase().substring(0, 3)];
+    var yr = parseInt(m3[2]);
+    if (yr < 100) yr += 2000;
+    if (mn && yr) return { year: yr, month: mn };
+  }
+  // Try "2025 Oktober" or "2025-Okt"
+  var m4 = src.match(/(\d{4})\s*[\/\-]?\s*([a-zA-Z]+)/i);
+  if (m4) {
+    var mn2 = monthNames[m4[2].toLowerCase().substring(0, 3)];
+    if (mn2) return { year: parseInt(m4[1]), month: mn2 };
+  }
+  // Try Excel serial date number
+  var num = parseFloat(src);
+  if (num > 40000 && num < 60000) {
+    var d = new Date((num - 25569) * 86400000);
+    return { year: d.getFullYear(), month: d.getMonth() + 1 };
+  }
+  // Try just a number as month (1-12)
+  if (num >= 1 && num <= 12) return { year: new Date().getFullYear(), month: parseInt(num) };
+  return null;
+}
+
 async function pullFromGoogleSheets() {
   var sheetId = document.getElementById('gsSheetId').value.trim();
   var gid = document.getElementById('gsGid').value.trim();
@@ -2565,20 +2638,32 @@ async function pullFromGoogleSheets() {
       });
     }
     if (filterMode === 'bulan' && filterBulan) {
+      var fYear = filterBulan.split('-')[0];
+      var fMonth = parseInt(filterBulan.split('-')[1]);
       _gsImportData = _gsImportData.filter(function (r) {
-        return (r.bulan || '').includes(filterBulan) || (r.tanggal || '').includes(filterBulan);
+        var parsed = _parseMonthFromReport(r.bulan, r.tanggal);
+        if (!parsed) return false;
+        return parsed.year === parseInt(fYear) && parsed.month === fMonth;
       });
     } else if (filterMode === 'periode' && (filterDari || filterSampai)) {
+      var dariY = filterDari ? parseInt(filterDari.split('-')[0]) : 0;
+      var dariM = filterDari ? parseInt(filterDari.split('-')[1]) : 0;
+      var sampaiY = filterSampai ? parseInt(filterSampai.split('-')[0]) : 9999;
+      var sampaiM = filterSampai ? parseInt(filterSampai.split('-')[1]) : 12;
+      var dariVal = dariY * 100 + dariM;
+      var sampaiVal = sampaiY * 100 + sampaiM;
       _gsImportData = _gsImportData.filter(function (r) {
-        var val = (r.bulan || r.tanggal || '').substring(0, 7);
-        if (filterDari && val < filterDari) return false;
-        if (filterSampai && val > filterSampai) return false;
-        return true;
+        var parsed = _parseMonthFromReport(r.bulan, r.tanggal);
+        if (!parsed) return true; // include if can't parse
+        var val = parsed.year * 100 + parsed.month;
+        return val >= dariVal && val <= sampaiVal;
       });
     }
     if (!_gsImportData.length) {
       preview.innerHTML =
-        '<p class="text-sm" style="color:#f57f17">Tidak ada data yang cocok dengan filter.</p>';
+        '<p class="text-sm" style="color:#f57f17">Tidak ada data yang cocok dengan filter. (Total baris dari spreadsheet: ' +
+        jsonData.length +
+        ')</p>';
       return;
     }
     // Show preview
