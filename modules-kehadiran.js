@@ -2835,7 +2835,7 @@ async function submitGSheetImport() {
         rencanaBesok: r.planning || '',
         komentar: r.keterangan || '',
         kategori: r.kategori || '',
-        departemen: r.divisi || '',
+        departemen: _convertDivisi(r.divisi || ''),
         targetUserName: r.pic || '',
         nama: r.pic || '',
         userId: '',
@@ -3059,11 +3059,13 @@ async function loadWeeklyReports(divFilter) {
     var filtered = items;
     if (_weeklyReportFilter === 'akademik')
       filtered = items.filter(function (r) {
-        return (r.departemen || r.divisi || '').toUpperCase().includes('AKADEMIK');
+        var d = (r.departemen || r.divisi || '').toUpperCase();
+        return d.includes('ACADEMIC') || d.includes('AKADEMIK');
       });
     else if (_weeklyReportFilter === 'manajemen')
       filtered = items.filter(function (r) {
-        return (r.departemen || r.divisi || '').toUpperCase().includes('MANAJEMEN');
+        var d = (r.departemen || r.divisi || '').toUpperCase();
+        return d.includes('OFFICE') || d.includes('MANAJEMEN');
       });
     var filterFrom = document.getElementById('wrDateFrom')?.value || '';
     var filterTo = document.getElementById('wrDateTo')?.value || '';
@@ -3085,11 +3087,11 @@ async function loadWeeklyReports(divFilter) {
     html +=
       '<button class="btn btn-xs ' +
       (_weeklyReportFilter === 'akademik' ? 'btn-primary' : 'btn-outline') +
-      '" onclick="loadWeeklyReports(\'akademik\')">📚 Divisi Akademik</button>';
+      '" onclick="loadWeeklyReports(\'akademik\')">📚 ACADEMIC</button>';
     html +=
       '<button class="btn btn-xs ' +
       (_weeklyReportFilter === 'manajemen' ? 'btn-primary' : 'btn-outline') +
-      '" onclick="loadWeeklyReports(\'manajemen\')">🏢 Divisi Manajemen</button>';
+      '" onclick="loadWeeklyReports(\'manajemen\')">🏢 OFFICE</button>';
     html += '<span style="margin-left:auto"></span>';
     html +=
       '<button class="btn btn-xs btn-danger" onclick="deleteSelectedWeeklyReports()">🗑️ Hapus Terpilih</button> ';
@@ -3291,4 +3293,13 @@ function _parseDateToISO(dateStr) {
     return d.toISOString().split('T')[0];
   }
   return s;
+}
+
+// Convert divisi names from spreadsheet to system format
+function _convertDivisi(divisi) {
+  var upper = (divisi || '').toUpperCase().trim();
+  if (upper.includes('AKADEMIK') || upper.includes('ACADEMIC')) return 'ACADEMIC';
+  if (upper.includes('MANAJEMEN') || upper.includes('MANAGEMENT') || upper.includes('OFFICE'))
+    return 'OFFICE';
+  return divisi || '';
 }
