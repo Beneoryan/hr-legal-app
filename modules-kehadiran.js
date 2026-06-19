@@ -2780,35 +2780,39 @@ async function pullFromGoogleSheets() {
 
 async function submitGSheetImport() {
   if (!_gsImportData.length) return toast('Tidak ada data', 'warning');
-  if (!confirm('Import ' + _gsImportData.length + ' baris ke sistem?')) return;
+  if (!confirm('Import ' + _gsImportData.length + ' baris sebagai Daily Report ke sistem?')) return;
   var btn = document.getElementById('gsImportBtn');
   if (btn) {
     btn.disabled = true;
     btn.textContent = '⏳ Cek duplikat & mengimport...';
   }
-  // Load existing data to check duplicates
-  var existingSnap = await db.collection('hrd_weekly_reports').get();
+  // Load existing imported reports to check duplicates
   var existingKeys = new Set();
-  existingSnap.forEach(function (d) {
-    var e = d.data();
-    // Create unique key from tanggal + kategori + progress + pic
-    var key =
-      (e.tanggal || '') +
-      '|' +
-      (e.kategori || '') +
-      '|' +
-      (e.progress || '').substring(0, 50) +
-      '|' +
-      (e.pic || '');
-    existingKeys.add(key.toLowerCase().trim());
-  });
-  var success = 0;
-  var skipped = 0;
+  try {
+    var existingSnap = await db
+      .collection('hrd_daily_tasks')
+      .where('source', '==', 'spreadsheet-import')
+      .get();
+    existingSnap.forEach(function (d) {
+      var e = d.data();
+      var key =
+        (e.tanggal || '') +
+        '|' +
+        (e.kategori || '') +
+        '|' +
+        (e.aktivitas || '').substring(0, 50) +
+        '|' +
+        (e.targetUserName || '');
+      existingKeys.add(key.toLowerCase().trim());
+    });
+  } catch (ex) {}
+  var success = 0,
+    skipped = 0;
   for (var i = 0; i < _gsImportData.length; i++) {
     var r = _gsImportData[i];
-    // Check duplicate
+    var tgl = _parseDateToISO(r.tanggal || r.bulan || '') || r.tanggal || '';
     var key =
-      (r.tanggal || '') +
+      tgl +
       '|' +
       (r.kategori || '') +
       '|' +
@@ -2821,31 +2825,36 @@ async function submitGSheetImport() {
     }
     existingKeys.add(key.toLowerCase().trim());
     try {
-      await db.collection('hrd_weekly_reports').add({
-        bulan: r.bulan,
-        tanggal: r.tanggal,
-        divisi: r.divisi,
-        kategori: r.kategori,
-        progress: r.progress,
-        case_desc: r.case_desc,
-        solution: r.solution,
-        planning: r.planning,
-        pic: r.pic,
-        keterangan: r.keterangan,
+      await db.collection('hrd_daily_tasks').add({
+        title: 'Laporan ' + (r.kategori || r.divisi || 'Mingguan') + ' - ' + (r.pic || ''),
+        type: 'report',
+        tanggal: tgl,
+        aktivitas: r.progress || '',
+        kendala: r.case_desc || '',
+        solusi: r.solution || '',
+        rencanaBesok: r.planning || '',
+        komentar: r.keterangan || '',
+        kategori: r.kategori || '',
+        departemen: r.divisi || '',
+        targetUserName: r.pic || '',
+        nama: r.pic || '',
+        userId: '',
+        done: true,
+        progress: 100,
+        ownerLevel: 0,
+        source: 'spreadsheet-import',
         importedBy: currentUser.nama,
-        importedAt: new Date().toISOString(),
-        type: 'weekly-report',
-        source: 'google-sheets',
+        createdAt: new Date().toISOString(),
       });
       success++;
     } catch (e) {}
   }
   toast(
-    '✅ ' + success + ' baris diimport' + (skipped ? ', ' + skipped + ' duplikat dilewati' : ''),
+    '✅ ' + success + ' laporan diimport' + (skipped ? ', ' + skipped + ' duplikat dilewati' : ''),
     'success'
   );
   closeModalDirect();
-  loadWeeklyReports();
+  loadDailyTasks('report');
 }
 
 function modalImportFromFile() {
@@ -3129,4 +3138,55 @@ async function loadWeeklyReports(divFilter) {
     listEl.innerHTML =
       '<p class="text-sm" style="color:#c62828">Gagal memuat: ' + escHtml(e.message) + '</p>';
   }
+}
+
+// Parse date string to yyyy-MM-dd format
+function _parseDateToISO(dateStr) {
+  if (!dateStr) return '';
+  var s = String(dateStr).trim();
+  // Already yyyy-MM-dd
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // Try dd-Mon-yy (e.g. "31-Oct-25")
+  var monthNames = {
+    jan: '01',
+    feb: '02',
+    mar: '03',
+    apr: '04',
+    may: '05',
+    mei: '05',
+    jun: '06',
+    jul: '07',
+    aug: '08',
+    agu: '08',
+    sep: '09',
+    oct: '10',
+    okt: '10',
+    nov: '11',
+    dec: '12',
+    des: '12',
+  };
+  var m1 = s.match(/^(\d{1,2})[\-\/]([a-zA-Z]+)[\-\/](\d{2,4})$/);
+  if (m1) {
+    var day = m1[1].padStart(2, '0');
+    var mon = monthNames[m1[2].toLowerCase().substring(0, 3)] || '01';
+    var yr = m1[3].length === 2 ? '20' + m1[3] : m1[3];
+    return yr + '-' + mon + '-' + day;
+  }
+  // Try dd/MM/yyyy
+  var m2 = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (m2) return m2[3] + '-' + m2[2].padStart(2, '0') + '-' + m2[1].padStart(2, '0');
+  // Try Mon-yy or "Oct 25"
+  var m3 = s.match(/^([a-zA-Z]+)\s*[\-\/]?\s*(\d{2,4})$/);
+  if (m3) {
+    var mon2 = monthNames[m3[1].toLowerCase().substring(0, 3)] || '01';
+    var yr2 = m3[2].length === 2 ? '20' + m3[2] : m3[2];
+    return yr2 + '-' + mon2 + '-01';
+  }
+  // Try Excel serial number
+  var num = parseFloat(s);
+  if (num > 40000 && num < 60000) {
+    var d = new Date((num - 25569) * 86400000);
+    return d.toISOString().split('T')[0];
+  }
+  return s;
 }
