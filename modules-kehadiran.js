@@ -3423,7 +3423,7 @@ function viewProfilePhoto(src) {
     '<div style="position:absolute;top:16px;right:20px;color:#fff;font-size:2rem;cursor:pointer" onclick="this.parentElement.remove()">✕</div>' +
     '<img src="' +
     src +
-    '" style="max-width:85vw;max-height:85vh;object-fit:contain;border-radius:8px;box-shadow:0 0 60px rgba(0,0,0,.5)">' +
+    '" style="width:auto;height:auto;min-width:300px;min-height:300px;max-width:90vw;max-height:90vh;object-fit:contain;border-radius:4px">' +
     '<div style="color:rgba(255,255,255,.5);margin-top:12px;font-size:.8rem">Klik ✕ atau area gelap untuk menutup</div>';
   document.body.appendChild(overlay);
 }
