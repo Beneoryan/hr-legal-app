@@ -1408,6 +1408,13 @@ async function loadDailyTasks(filter) {
     const drTo = document.getElementById('reportDateTo')?.value || '';
     if (drFrom) filtered = filtered.filter((t) => (t.tanggal || '') >= drFrom);
     if (drTo) filtered = filtered.filter((t) => (t.tanggal || '') <= drTo);
+    // Apply division filter
+    if (window._allReportDivFilter) {
+      filtered = filtered.filter(function (t) {
+        var dept = (t.departemen || '').toUpperCase();
+        return dept.includes(window._allReportDivFilter);
+      });
+    }
     // Sort by departemen then kategori then date
     filtered.sort(
       (a, b) =>
@@ -1447,6 +1454,13 @@ async function loadDailyTasks(filter) {
       <input type="date" class="form-control" id="reportDateTo" value="${curTo}" style="max-width:160px;padding:6px 10px" onchange="loadDailyTasks('${filter}')">
       <button class="btn btn-xs btn-outline" onclick="document.getElementById('reportDateFrom').value='';document.getElementById('reportDateTo').value='';loadDailyTasks('${filter}')">Reset</button>
     </div>`;
+    if (filter === 'all-report') {
+      dateFilterHtml += `<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <button class="btn btn-xs ${!window._allReportDivFilter ? 'btn-primary' : 'btn-outline'}" onclick="window._allReportDivFilter='';loadDailyTasks('all-report')">Semua</button>
+        <button class="btn btn-xs ${window._allReportDivFilter === 'ACADEMIC' ? 'btn-primary' : 'btn-outline'}" onclick="window._allReportDivFilter='ACADEMIC';loadDailyTasks('all-report')">📚 ACADEMIC</button>
+        <button class="btn btn-xs ${window._allReportDivFilter === 'OFFICE' ? 'btn-primary' : 'btn-outline'}" onclick="window._allReportDivFilter='OFFICE';loadDailyTasks('all-report')">🏢 OFFICE</button>
+      </div>`;
+    }
   }
   if (filter === 'history-assigned') {
     const curFrom = document.getElementById('historyAssignedFrom')?.value || '';
