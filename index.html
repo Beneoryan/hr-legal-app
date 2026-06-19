@@ -38,7 +38,7 @@
         --radius: 10px;
       }
       body {
-        font-family: "Segoe UI", system-ui, sans-serif;
+        font-family: 'Segoe UI', system-ui, sans-serif;
         background: var(--bg);
         color: var(--text);
         font-size: 14px;
@@ -123,12 +123,7 @@
         left: 0;
         width: var(--sidebar-w);
         height: 100vh;
-        background: linear-gradient(
-          180deg,
-          #0a0a0a 0%,
-          #1a1a1a 60%,
-          #2d1010 100%
-        );
+        background: linear-gradient(180deg, #0a0a0a 0%, #1a1a1a 60%, #2d1010 100%);
         color: #fff;
         overflow-y: auto;
         z-index: 200;
@@ -416,6 +411,8 @@
       }
       .modal-lg {
         max-width: 900px;
+        max-height: 85vh;
+        overflow-y: auto;
       }
       .modal-title {
         font-size: 1.05rem;
@@ -624,12 +621,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background: linear-gradient(
-          135deg,
-          #0a0a0a 0%,
-          #1a1a1a 40%,
-          #2d1010 100%
-        );
+        background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 40%, #2d1010 100%);
       }
       .login-box {
         background: #fff;
@@ -896,17 +888,9 @@
     <div id="app"></div>
     <div class="toast-container" id="toastContainer"></div>
     <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
-      <div
-        class="modal"
-        id="modalContent"
-        onclick="event.stopPropagation()"
-      ></div>
+      <div class="modal" id="modalContent" onclick="event.stopPropagation()"></div>
     </div>
-    <div
-      class="overlay-sidebar"
-      id="overlaySidebar"
-      onclick="toggleSidebar()"
-    ></div>
+    <div class="overlay-sidebar" id="overlaySidebar" onclick="toggleSidebar()"></div>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
