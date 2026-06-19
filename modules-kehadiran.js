@@ -2657,11 +2657,28 @@ async function pullFromGoogleSheets() {
   preview.innerHTML =
     '<p class="text-sm" style="color:#999">⏳ Mengambil data dari Google Sheets...</p>';
   try {
-    var url = 'https://docs.google.com/spreadsheets/d/' + sheetId + '/export?format=csv&gid=' + gid;
-    var response = await fetch(url);
+    // Use gviz endpoint (no CORS issues) with fallback to export
+    var url =
+      'https://docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?tqx=out:csv&gid=' + gid;
+    var response;
+    try {
+      response = await fetch(url);
+      if (!response.ok) throw new Error('gviz failed');
+    } catch (e1) {
+      url = 'https://docs.google.com/spreadsheets/d/' + sheetId + '/export?format=csv&gid=' + gid;
+      response = await fetch(url);
+    }
     if (!response.ok)
-      throw new Error('Gagal akses spreadsheet (pastikan sharing = Anyone with link)');
+      throw new Error(
+        'Gagal akses spreadsheet (HTTP ' +
+          response.status +
+          '). Pastikan sharing = Anyone with link.'
+      );
     var csvText = await response.text();
+    if (!csvText || csvText.includes('<!DOCTYPE html>'))
+      throw new Error(
+        'Spreadsheet tidak bisa diakses. Pastikan sharing = Anyone with the link can view.'
+      );
     var workbook = XLSX.read(csvText, { type: 'string' });
     var sheet = workbook.Sheets[workbook.SheetNames[0]];
     var jsonData = XLSX.utils.sheet_to_json(sheet, { defval: '' });
