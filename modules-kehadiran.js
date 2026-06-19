@@ -2477,10 +2477,10 @@ function importFromGoogleSheets() {
       '<div style="margin-bottom:16px">' +
       '<div class="form-group"><label>Spreadsheet ID</label><input class="form-control" id="gsSheetId" value="' +
       GSHEET_ID +
-      '"></div>' +
-      '<div class="form-group"><label>Sheet GID (GABUNGAN REPORT)</label><input class="form-control" id="gsGid" value="' +
+      '" onchange="loadSheetList()"></div>' +
+      '<div class="form-group"><label>Pilih Sheet</label><div style="display:flex;gap:8px"><select class="form-control" id="gsSheetSelect"><option value="' +
       GSHEET_GID +
-      '"></div>' +
+      '">GABUNGAN REPORT (default)</option></select><button class="btn btn-xs btn-info" onclick="loadSheetList()">🔄 Muat Sheet</button></div></div>' +
       '<div class="grid-2">' +
       '<div class="form-group"><label>Filter Divisi</label><select class="form-control" id="gsFilterDivisi"><option value="">Semua Divisi</option>' +
       '<optgroup label="DIVISI AKADEMIK"><option value="SISWA">SISWA</option><option value="TSK-JOB">TSK-JOB</option><option value="SENSEI">SENSEI</option><option value="CURRICULUM">CURRICULUM</option></optgroup>' +
@@ -2500,6 +2500,66 @@ function importFromGoogleSheets() {
       '</div>' +
       '<div class="text-xs mt-8" style="color:#999">⚠️ Spreadsheet harus di-set "Anyone with the link can view"</div>'
   );
+  // Auto-load sheet list
+  setTimeout(loadSheetList, 500);
+}
+
+async function loadSheetList() {
+  var sheetId = document.getElementById('gsSheetId').value.trim();
+  var selectEl = document.getElementById('gsSheetSelect');
+  if (!selectEl || !sheetId) return;
+  selectEl.innerHTML = '<option value="">⏳ Memuat daftar sheet...</option>';
+  try {
+    // Fetch spreadsheet HTML page to extract sheet names and gids
+    var resp = await fetch('https://docs.google.com/spreadsheets/d/' + sheetId + '/edit');
+    if (!resp.ok) throw new Error('Gagal akses');
+    var html = await resp.text();
+    // Parse sheet tabs from HTML - look for sheet names in the page
+    var sheets = [];
+    // Method 1: Extract from gid parameter in page content
+    var regex = /gid=(\d+)[^"]*"[^>]*>([^<]+)</g;
+    var match;
+    while ((match = regex.exec(html)) !== null) {
+      sheets.push({ gid: match[1], name: match[2].trim() });
+    }
+    // Method 2: Try alternate pattern
+    if (!sheets.length) {
+      var regex2 = /"name":"([^"]+)"[^}]*"sheetId":(\d+)/g;
+      while ((match = regex2.exec(html)) !== null) {
+        sheets.push({ gid: match[2], name: match[1] });
+      }
+    }
+    // Method 3: Simple fallback - extract from sheet-tab elements
+    if (!sheets.length) {
+      var regex3 = /sheet-button-text[^>]*>([^<]+)/g;
+      var gidRegex = /gid=(\d+)/g;
+      var names = [];
+      var gids = [];
+      while ((match = regex3.exec(html)) !== null) names.push(match[1].trim());
+      while ((match = gidRegex.exec(html)) !== null) gids.push(match[1]);
+      // Remove duplicate gids
+      var uniqueGids = [...new Set(gids)];
+      for (var i = 0; i < Math.min(names.length, uniqueGids.length); i++) {
+        sheets.push({ gid: uniqueGids[i], name: names[i] });
+      }
+    }
+    if (sheets.length) {
+      var opts = '';
+      sheets.forEach(function (s) {
+        var selected = s.name.toUpperCase().includes('GABUNGAN') ? ' selected' : '';
+        opts += '<option value="' + s.gid + '"' + selected + '>' + escHtml(s.name) + '</option>';
+      });
+      selectEl.innerHTML = opts;
+    } else {
+      // Fallback: use default
+      selectEl.innerHTML =
+        '<option value="' +
+        GSHEET_GID +
+        '">GABUNGAN REPORT (default)</option><option value="0">Sheet1 (gid=0)</option>';
+    }
+  } catch (e) {
+    selectEl.innerHTML = '<option value="' + GSHEET_GID + '">GABUNGAN REPORT (default)</option>';
+  }
 }
 
 var _gsImportData = [];
@@ -2587,7 +2647,7 @@ function _parseMonthFromReport(bulan, tanggal) {
 
 async function pullFromGoogleSheets() {
   var sheetId = document.getElementById('gsSheetId').value.trim();
-  var gid = document.getElementById('gsGid').value.trim();
+  var gid = document.getElementById('gsSheetSelect').value || GSHEET_GID;
   var filterDivisi = document.getElementById('gsFilterDivisi').value;
   var filterMode = document.getElementById('gsFilterMode').value;
   var filterBulan = document.getElementById('gsFilterBulan')?.value || '';
