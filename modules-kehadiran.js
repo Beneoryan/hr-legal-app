@@ -1648,8 +1648,8 @@ async function loadDailyTasks(filter) {
         : isToday2
           ? '#1565c0'
           : '#e0e0e0';
-    html += `<div style="display:flex;align-items:flex-start;gap:12px;padding:12px;border-left:4px solid ${borderColor};margin-bottom:8px;background:${t.done ? '#f1f8e9' : isOverdue ? '#fff8f8' : '#fff'};border-radius:0 8px 8px 0">`;
-    html += `<input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggleDailyTask('${t.id}')" style="margin-top:4px;width:18px;height:18px;accent-color:#2e7d32;cursor:pointer">`;
+    html += `<div style="display:flex;align-items:flex-start;gap:12px;padding:12px;border-left:4px solid ${borderColor};margin-bottom:8px;background:${t.done ? '#f1f8e9' : isOverdue ? '#fff8f8' : '#fff'};border-radius:0 8px 8px 0;cursor:pointer" onclick="viewDailyTask('${t.id}')">`;
+    html += `<input type="checkbox" ${t.done ? 'checked' : ''} onchange="event.stopPropagation();toggleDailyTask('${t.id}')" style="margin-top:4px;width:18px;height:18px;accent-color:#2e7d32;cursor:pointer">`;
     html += `<div style="flex:1"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-weight:700;font-size:.9rem;${t.done ? 'text-decoration:line-through;color:#999' : ''}">${escHtml(t.title)}</span><span style="font-size:.65rem;padding:2px 6px;border-radius:4px;background:${priorityColor}20;color:${priorityColor};font-weight:600">${priorityLabel}</span>`;
     if (isOverdue)
       html += `<span class="badge badge-danger" style="font-size:.6rem">Terlambat</span>`;
@@ -3022,6 +3022,8 @@ async function submitWeeklyImport() {
 
 // ── DISPLAY LAPORAN MINGGUAN ──────────────────────────────────
 var _weeklyReportFilter = 'all';
+var _wrDateFrom = '';
+var _wrDateTo = '';
 async function loadWeeklyReports(divFilter) {
   if (divFilter !== undefined) _weeklyReportFilter = divFilter;
   document.querySelectorAll('#taskTabs .tab').forEach(function (t) {
@@ -3077,8 +3079,10 @@ async function loadWeeklyReports(divFilter) {
         var d = (r.departemen || r.divisi || '').toUpperCase();
         return d.includes('OFFICE') || d.includes('MANAJEMEN');
       });
-    var filterFrom = document.getElementById('wrDateFrom')?.value || '';
-    var filterTo = document.getElementById('wrDateTo')?.value || '';
+    var filterFrom = document.getElementById('wrDateFrom')?.value || _wrDateFrom;
+    var filterTo = document.getElementById('wrDateTo')?.value || _wrDateTo;
+    _wrDateFrom = filterFrom;
+    _wrDateTo = filterTo;
     if (filterFrom)
       filtered = filtered.filter(function (r) {
         return (r.tanggal || '') >= filterFrom;
@@ -3114,15 +3118,15 @@ async function loadWeeklyReports(divFilter) {
     html +=
       '<input type="date" class="form-control" id="wrDateFrom" value="' +
       filterFrom +
-      '" style="max-width:140px;padding:4px 8px;font-size:.82rem" onchange="loadWeeklyReports()">';
+      '" style="max-width:140px;padding:4px 8px;font-size:.82rem" onchange="_wrDateFrom=this.value;loadWeeklyReports()">';
     html += '<span class="text-sm">—</span>';
     html +=
       '<input type="date" class="form-control" id="wrDateTo" value="' +
       filterTo +
-      '" style="max-width:140px;padding:4px 8px;font-size:.82rem" onchange="loadWeeklyReports()">';
+      '" style="max-width:140px;padding:4px 8px;font-size:.82rem" onchange="_wrDateTo=this.value;loadWeeklyReports()">';
     if (filterFrom || filterTo)
       html +=
-        "<button class=\"btn btn-xs btn-outline\" onclick=\"document.getElementById('wrDateFrom').value='';document.getElementById('wrDateTo').value='';loadWeeklyReports()\">✕</button>";
+        '<button class="btn btn-xs btn-outline" onclick="_wrDateFrom=\'\';_wrDateTo=\'\';loadWeeklyReports()">✕</button>';
     html += '</div>';
     html +=
       '<div style="margin-bottom:8px"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="wrSelectAll" onchange="document.querySelectorAll(\'.wr-check\').forEach(function(c){c.checked=this.checked}.bind(this))"> <span class="text-sm fw-700">Pilih Semua (' +
