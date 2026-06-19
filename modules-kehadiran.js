@@ -1215,6 +1215,10 @@ async function renderDailyTask() {
     tabs +=
       '<div class="tab" onclick="filterDailyTasks(\'history-assigned\')">📊 History Tugas</div>';
   }
+  if (hasAccess(2)) {
+    // Leader+ can view weekly reports
+    tabs += '<div class="tab" onclick="loadWeeklyReports()">📈 Laporan Mingguan</div>';
+  }
 
   // Button: Staff only sees report, Leader+ sees both
   let addBtn = '';
@@ -1224,7 +1228,7 @@ async function renderDailyTask() {
   } else if (hasAccess(2)) {
     // Leader/Manager/Head: can add task + report
     addBtn =
-      '<button class="btn btn-primary btn-sm" onclick="modalAddTaskChoice()">+ Tambah</button>';
+      '<button class="btn btn-primary btn-sm" onclick="modalAddTaskChoice()">+ Tambah</button> <button class="btn btn-success btn-sm" onclick="modalImportWeeklyReport()">⬆️ Import Laporan</button>';
   } else {
     // Staff: can only add report
     addBtn =
@@ -2437,4 +2441,261 @@ function viewDailyReport(id) {
     <div class="text-xs" style="color:#999">Dikirim: ${formatDateTime(task.createdAt)}</div>`,
     true
   );
+}
+
+// ── IMPORT LAPORAN MINGGUAN (dari Spreadsheet) ────────────────────────
+function modalImportWeeklyReport() {
+  openModal(
+    '<div class="modal-title">⬆️ Import Laporan Mingguan</div>' +
+      '<p class="text-sm mb-16" style="color:#666">Upload file Excel (.xlsx) atau CSV dari spreadsheet laporan mingguan. Format kolom: <b>BULAN, TANGGAL, DIVISI, KATEGORI, PROGRESS, CASE, SOLUTION, PLANNING & TARGET, PIC, KETERANGAN</b></p>' +
+      '<div class="form-group"><label>Pilih File Spreadsheet</label>' +
+      '<input type="file" id="weeklyReportFile" class="form-control" accept=".xlsx,.xls,.csv" onchange="previewWeeklyImport(this)">' +
+      '</div>' +
+      '<div id="weeklyImportPreview" style="margin-bottom:16px"></div>' +
+      '<div id="weeklyImportActions" style="display:none">' +
+      '<button class="btn btn-primary" onclick="submitWeeklyImport()">💾 Import ke Sistem</button>' +
+      '</div>'
+  );
+}
+
+var _weeklyImportData = [];
+
+function previewWeeklyImport(input) {
+  var file = input.files[0];
+  if (!file) return;
+  var preview = document.getElementById('weeklyImportPreview');
+  var actions = document.getElementById('weeklyImportActions');
+  preview.innerHTML = '<p class="text-sm" style="color:#999">Membaca file...</p>';
+  var reader = new FileReader();
+  reader.onload = function (e) {
+    try {
+      var workbook = XLSX.read(e.target.result, { type: 'array' });
+      // Try to find sheet "GABUNGAN REPORT" or use first sheet
+      var sheetName =
+        workbook.SheetNames.find(function (n) {
+          return n.toUpperCase().includes('GABUNGAN');
+        }) || workbook.SheetNames[0];
+      var sheet = workbook.Sheets[sheetName];
+      var jsonData = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      if (!jsonData.length) {
+        preview.innerHTML =
+          '<p class="text-sm" style="color:#c62828">File kosong atau format tidak sesuai.</p>';
+        return;
+      }
+      // Map columns (flexible matching)
+      _weeklyImportData = [];
+      jsonData.forEach(function (row) {
+        var mapped = {
+          bulan: row['BULAN'] || row['bulan'] || row['Bulan'] || '',
+          tanggal: row['TANGGAL'] || row['tanggal'] || row['Tanggal'] || '',
+          divisi: row['DIVISI'] || row['divisi'] || row['Divisi'] || '',
+          kategori: row['KATEGORI'] || row['kategori'] || row['Kategori'] || '',
+          progress: row['PROGRESS'] || row['progress'] || row['Progress'] || '',
+          case_desc: row['CASE'] || row['case'] || row['Case'] || '',
+          solution: row['SOLUTION'] || row['solution'] || row['Solution'] || '',
+          planning:
+            row['PLANNING & TARGET'] ||
+            row['PLANNING'] ||
+            row['planning'] ||
+            row['Planning & Target'] ||
+            '',
+          pic: row['PIC'] || row['pic'] || row['Pic'] || '',
+          keterangan: row['KETERANGAN'] || row['keterangan'] || row['Keterangan'] || '',
+        };
+        // Skip empty rows
+        if (mapped.progress || mapped.case_desc || mapped.planning || mapped.pic) {
+          _weeklyImportData.push(mapped);
+        }
+      });
+      if (!_weeklyImportData.length) {
+        preview.innerHTML =
+          '<p class="text-sm" style="color:#c62828">Tidak ada data valid ditemukan.</p>';
+        return;
+      }
+      // Show preview table
+      var h =
+        '<div class="text-sm fw-700 mb-8">📋 Preview: ' +
+        _weeklyImportData.length +
+        ' baris dari sheet "' +
+        escHtml(sheetName) +
+        '"</div>';
+      h +=
+        '<div class="table-wrap" style="max-height:250px;overflow-y:auto"><table style="font-size:.75rem"><thead><tr><th>Bulan</th><th>Tanggal</th><th>Divisi</th><th>Kategori</th><th>Progress</th><th>PIC</th></tr></thead><tbody>';
+      _weeklyImportData.slice(0, 20).forEach(function (r) {
+        h +=
+          '<tr><td>' +
+          escHtml(r.bulan) +
+          '</td><td>' +
+          escHtml(String(r.tanggal)) +
+          '</td><td>' +
+          escHtml(r.divisi) +
+          '</td><td>' +
+          escHtml(r.kategori) +
+          '</td><td>' +
+          escHtml((r.progress || '').substring(0, 50)) +
+          '</td><td>' +
+          escHtml(r.pic) +
+          '</td></tr>';
+      });
+      if (_weeklyImportData.length > 20)
+        h +=
+          '<tr><td colspan="6" class="text-center">... dan ' +
+          (_weeklyImportData.length - 20) +
+          ' baris lagi</td></tr>';
+      h += '</tbody></table></div>';
+      preview.innerHTML = h;
+      actions.style.display = 'block';
+    } catch (err) {
+      preview.innerHTML =
+        '<p class="text-sm" style="color:#c62828">Gagal membaca file: ' +
+        escHtml(err.message) +
+        '</p>';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+async function submitWeeklyImport() {
+  if (!_weeklyImportData.length) return toast('Tidak ada data untuk diimport', 'warning');
+  if (!confirm('Import ' + _weeklyImportData.length + ' baris laporan mingguan ke sistem?')) return;
+  var btn = document.querySelector('#weeklyImportActions button');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '⏳ Mengimport...';
+  }
+  var success = 0;
+  var failed = 0;
+  try {
+    for (var i = 0; i < _weeklyImportData.length; i++) {
+      var r = _weeklyImportData[i];
+      try {
+        await db.collection('hrd_weekly_reports').add({
+          bulan: r.bulan,
+          tanggal: String(r.tanggal),
+          divisi: r.divisi,
+          kategori: r.kategori,
+          progress: r.progress,
+          case_desc: r.case_desc,
+          solution: r.solution,
+          planning: r.planning,
+          pic: r.pic,
+          keterangan: r.keterangan,
+          importedBy: currentUser.nama,
+          importedAt: new Date().toISOString(),
+          type: 'weekly-report',
+        });
+        success++;
+      } catch (e) {
+        failed++;
+      }
+    }
+    toast(
+      '✅ Import selesai: ' + success + ' berhasil' + (failed ? ', ' + failed + ' gagal' : ''),
+      'success'
+    );
+    closeModalDirect();
+    // Refresh view if on report tab
+    if (_dailyTaskFilter === 'team-report' || _dailyTaskFilter === 'all-report') {
+      loadDailyTasks(_dailyTaskFilter);
+    }
+  } catch (e) {
+    toast('Gagal import: ' + e.message, 'error');
+  }
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = '💾 Import ke Sistem';
+  }
+}
+
+// ── DISPLAY LAPORAN MINGGUAN ──────────────────────────────────
+async function loadWeeklyReports() {
+  // Highlight tab
+  document.querySelectorAll('#taskTabs .tab').forEach(function (t) {
+    t.classList.remove('active');
+  });
+  document.querySelectorAll('#taskTabs .tab').forEach(function (t) {
+    if (t.textContent.trim() === '📈 Laporan Mingguan') t.classList.add('active');
+  });
+  var listEl = document.getElementById('taskList');
+  if (!listEl) return;
+  listEl.innerHTML = '<p class="text-sm" style="color:#999">Memuat laporan mingguan...</p>';
+  try {
+    var snap = await db.collection('hrd_weekly_reports').get();
+    var items = [];
+    snap.forEach(function (d) {
+      items.push({ id: d.id, ...d.data() });
+    });
+    // Sort by importedAt desc
+    items.sort(function (a, b) {
+      return (b.importedAt || '').localeCompare(a.importedAt || '');
+    });
+    // Filter by dept for non-admin
+    if (!hasAccess(5)) {
+      var myDept = (currentUser.departemen || '').toLowerCase().trim();
+      if (myDept) {
+        items = items.filter(function (r) {
+          return (r.divisi || '').toLowerCase().trim() === myDept || !r.divisi;
+        });
+      }
+    }
+    if (!items.length) {
+      listEl.innerHTML =
+        '<div style="text-align:center;padding:32px;color:#999"><div style="font-size:2rem;margin-bottom:8px">📈</div><p>Belum ada laporan mingguan. Klik "⬆️ Import Laporan" untuk upload dari spreadsheet.</p></div>';
+      return;
+    }
+    // Group by divisi
+    var groups = {};
+    items.forEach(function (r) {
+      var div = r.divisi || 'Tanpa Divisi';
+      if (!groups[div]) groups[div] = [];
+      groups[div].push(r);
+    });
+    var html =
+      '<div style="margin-bottom:12px"><span class="fw-700">📈 Laporan Mingguan</span> <span class="text-sm" style="color:#666">(' +
+      items.length +
+      ' data)</span></div>';
+    Object.keys(groups)
+      .sort()
+      .forEach(function (div) {
+        var rows = groups[div];
+        html += '<div style="margin-bottom:20px">';
+        html +=
+          '<div style="padding:8px 14px;background:#e8eaf6;border-radius:8px;font-weight:700;font-size:.88rem;color:#283593;border-left:4px solid #3f51b5;margin-bottom:8px">🏢 ' +
+          escHtml(div) +
+          ' <span style="font-weight:400;color:#666;font-size:.75rem">(' +
+          rows.length +
+          ' data)</span></div>';
+        html +=
+          '<div class="table-wrap"><table style="font-size:.8rem"><thead><tr><th>Tanggal</th><th>Kategori</th><th>Progress</th><th>Case</th><th>Solution</th><th>Planning & Target</th><th>PIC</th><th>Ket</th></tr></thead><tbody>';
+        rows.forEach(function (r) {
+          html += '<tr>';
+          html += '<td>' + escHtml(String(r.tanggal || r.bulan || '-')) + '</td>';
+          html += '<td>' + escHtml(r.kategori || '-') + '</td>';
+          html +=
+            '<td style="max-width:200px;white-space:pre-wrap;font-size:.75rem">' +
+            escHtml(r.progress || '-') +
+            '</td>';
+          html +=
+            '<td style="max-width:150px;white-space:pre-wrap;font-size:.75rem">' +
+            escHtml(r.case_desc || '-') +
+            '</td>';
+          html +=
+            '<td style="max-width:150px;white-space:pre-wrap;font-size:.75rem">' +
+            escHtml(r.solution || '-') +
+            '</td>';
+          html +=
+            '<td style="max-width:150px;white-space:pre-wrap;font-size:.75rem">' +
+            escHtml(r.planning || '-') +
+            '</td>';
+          html += '<td class="fw-700">' + escHtml(r.pic || '-') + '</td>';
+          html += '<td class="text-sm">' + escHtml(r.keterangan || '-') + '</td>';
+          html += '</tr>';
+        });
+        html += '</tbody></table></div></div>';
+      });
+    listEl.innerHTML = html;
+  } catch (e) {
+    listEl.innerHTML =
+      '<p class="text-sm" style="color:#c62828">Gagal memuat: ' + escHtml(e.message) + '</p>';
+  }
 }
