@@ -43,6 +43,8 @@
         color: var(--text);
         font-size: 14px;
         overflow-x: hidden;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
       }
       a {
         color: var(--primary);
@@ -703,12 +705,12 @@
         }
         .main {
           margin-left: 0;
-          overflow-y: auto;
+          overflow-y: visible;
           overflow-x: hidden;
           -webkit-overflow-scrolling: touch;
           padding-bottom: 60px;
           min-height: auto;
-          height: calc(100vh - var(--header-h));
+          height: auto;
         }
         .stats-grid {
           grid-template-columns: repeat(2, 1fr);
