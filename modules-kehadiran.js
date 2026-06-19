@@ -2447,6 +2447,187 @@ function viewDailyReport(id) {
 function modalImportWeeklyReport() {
   openModal(
     '<div class="modal-title">⬆️ Import Laporan Mingguan</div>' +
+      '<p class="text-sm mb-16" style="color:#666">Pilih metode import laporan mingguan:</p>' +
+      '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">' +
+      '<div style="flex:1;min-width:200px;padding:16px;border:2px solid var(--border);border-radius:12px;cursor:pointer;text-align:center" onclick="importFromGoogleSheets()" onmouseover="this.style.borderColor=\'#1565c0\';this.style.background=\'#f8f9ff\'" onmouseout="this.style.borderColor=\'var(--border)\';this.style.background=\'\'">' +
+      '<div style="font-size:2rem;margin-bottom:8px">🌐</div>' +
+      '<div class="fw-700">Tarik dari Google Sheets</div>' +
+      '<div class="text-xs" style="color:#666;margin-top:4px">Langsung tarik data dari spreadsheet online</div></div>' +
+      '<div style="flex:1;min-width:200px;padding:16px;border:2px solid var(--border);border-radius:12px;cursor:pointer;text-align:center" onclick="closeModalDirect();modalImportFromFile()" onmouseover="this.style.borderColor=\'#2e7d32\';this.style.background=\'#f0fff0\'" onmouseout="this.style.borderColor=\'var(--border)\';this.style.background=\'\'">' +
+      '<div style="font-size:2rem;margin-bottom:8px">📁</div>' +
+      '<div class="fw-700">Upload File Excel/CSV</div>' +
+      '<div class="text-xs" style="color:#666;margin-top:4px">Upload file .xlsx atau .csv dari komputer</div></div>' +
+      '</div>'
+  );
+}
+
+// Google Sheets config
+var GSHEET_ID = '1K_EiWBpjukWXhiEzJAUXgpT6pmZUb3akRmq298T4g3c';
+var GSHEET_GID = '329845829';
+
+function importFromGoogleSheets() {
+  closeModalDirect();
+  openModal(
+    '<div class="modal-title">🌐 Import dari Google Sheets</div>' +
+      '<div style="margin-bottom:16px">' +
+      '<div class="form-group"><label>Spreadsheet ID</label><input class="form-control" id="gsSheetId" value="' +
+      GSHEET_ID +
+      '"></div>' +
+      '<div class="form-group"><label>Sheet GID (GABUNGAN REPORT)</label><input class="form-control" id="gsGid" value="' +
+      GSHEET_GID +
+      '"></div>' +
+      '<div class="grid-2">' +
+      '<div class="form-group"><label>Filter Divisi</label><select class="form-control" id="gsFilterDivisi"><option value="">Semua Divisi</option>' +
+      '<optgroup label="DIVISI AKADEMIK"><option value="SISWA">SISWA</option><option value="TSK-JOB">TSK-JOB</option><option value="SENSEI">SENSEI</option><option value="CURRICULUM">CURRICULUM</option></optgroup>' +
+      '<optgroup label="DIVISI MANAJEMEN"><option value="FACILITY\'S">FACILITY\'S</option><option value="FINANCE">FINANCE</option><option value="HR & LEGAL">HR & LEGAL</option><option value="PROMOSI">PROMOSI</option><option value="DOCUMENT">DOCUMENT</option><option value="MARKETING & SALES">MARKETING & SALES</option></optgroup>' +
+      '</select></div>' +
+      '<div class="form-group"><label>Filter Bulan</label><input class="form-control" type="month" id="gsFilterBulan"></div>' +
+      '</div>' +
+      '</div>' +
+      '<div id="gsPreview" style="margin-bottom:16px"></div>' +
+      '<div style="display:flex;gap:8px">' +
+      '<button class="btn btn-info" onclick="pullFromGoogleSheets()">🔄 Tarik Data</button>' +
+      '<button class="btn btn-primary" id="gsImportBtn" style="display:none" onclick="submitGSheetImport()">💾 Import ke Sistem</button>' +
+      '</div>' +
+      '<div class="text-xs mt-8" style="color:#999">⚠️ Spreadsheet harus di-set "Anyone with the link can view"</div>'
+  );
+}
+
+var _gsImportData = [];
+
+async function pullFromGoogleSheets() {
+  var sheetId = document.getElementById('gsSheetId').value.trim();
+  var gid = document.getElementById('gsGid').value.trim();
+  var filterDivisi = document.getElementById('gsFilterDivisi').value;
+  var filterBulan = document.getElementById('gsFilterBulan').value;
+  var preview = document.getElementById('gsPreview');
+  preview.innerHTML =
+    '<p class="text-sm" style="color:#999">⏳ Mengambil data dari Google Sheets...</p>';
+  try {
+    var url = 'https://docs.google.com/spreadsheets/d/' + sheetId + '/export?format=csv&gid=' + gid;
+    var response = await fetch(url);
+    if (!response.ok)
+      throw new Error('Gagal akses spreadsheet (pastikan sharing = Anyone with link)');
+    var csvText = await response.text();
+    var workbook = XLSX.read(csvText, { type: 'string' });
+    var sheet = workbook.Sheets[workbook.SheetNames[0]];
+    var jsonData = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+    if (!jsonData.length) {
+      preview.innerHTML = '<p class="text-sm" style="color:#c62828">Data kosong.</p>';
+      return;
+    }
+    // Map columns
+    _gsImportData = [];
+    jsonData.forEach(function (row) {
+      var mapped = {
+        bulan: String(row['BULAN'] || row['bulan'] || ''),
+        tanggal: String(row['TANGGAL'] || row['tanggal'] || ''),
+        divisi: String(row['DIVISI'] || row['divisi'] || ''),
+        kategori: String(row['KATEGORI'] || row['kategori'] || ''),
+        progress: String(row['PROGRESS'] || row['progress'] || ''),
+        case_desc: String(row['CASE'] || row['case'] || ''),
+        solution: String(row['SOLUTION'] || row['solution'] || ''),
+        planning: String(row['PLANNING & TARGET'] || row['PLANNING'] || ''),
+        pic: String(row['PIC'] || row['pic'] || ''),
+        keterangan: String(row['KETERANGAN'] || row['keterangan'] || ''),
+      };
+      if (mapped.progress || mapped.case_desc || mapped.planning || mapped.pic) {
+        _gsImportData.push(mapped);
+      }
+    });
+    // Apply filters
+    if (filterDivisi) {
+      _gsImportData = _gsImportData.filter(function (r) {
+        return (
+          (r.kategori || '').toUpperCase() === filterDivisi.toUpperCase() ||
+          (r.divisi || '').toUpperCase() === filterDivisi.toUpperCase()
+        );
+      });
+    }
+    if (filterBulan) {
+      _gsImportData = _gsImportData.filter(function (r) {
+        return (r.bulan || '').includes(filterBulan) || (r.tanggal || '').includes(filterBulan);
+      });
+    }
+    if (!_gsImportData.length) {
+      preview.innerHTML =
+        '<p class="text-sm" style="color:#f57f17">Tidak ada data yang cocok dengan filter.</p>';
+      return;
+    }
+    // Show preview
+    var h =
+      '<div class="text-sm fw-700 mb-8">📋 ' + _gsImportData.length + ' baris data ditemukan</div>';
+    h +=
+      '<div class="table-wrap" style="max-height:220px;overflow-y:auto"><table style="font-size:.75rem"><thead><tr><th>Bulan</th><th>Tgl</th><th>Divisi</th><th>Kategori</th><th>Progress</th><th>PIC</th></tr></thead><tbody>';
+    _gsImportData.slice(0, 15).forEach(function (r) {
+      h +=
+        '<tr><td>' +
+        escHtml(r.bulan) +
+        '</td><td>' +
+        escHtml(r.tanggal) +
+        '</td><td>' +
+        escHtml(r.divisi) +
+        '</td><td>' +
+        escHtml(r.kategori) +
+        '</td><td>' +
+        escHtml((r.progress || '').substring(0, 40)) +
+        '</td><td>' +
+        escHtml(r.pic) +
+        '</td></tr>';
+    });
+    if (_gsImportData.length > 15)
+      h +=
+        '<tr><td colspan="6" class="text-center">... ' +
+        (_gsImportData.length - 15) +
+        ' baris lagi</td></tr>';
+    h += '</tbody></table></div>';
+    preview.innerHTML = h;
+    document.getElementById('gsImportBtn').style.display = 'inline-block';
+  } catch (e) {
+    preview.innerHTML =
+      '<p class="text-sm" style="color:#c62828">❌ ' + escHtml(e.message) + '</p>';
+  }
+}
+
+async function submitGSheetImport() {
+  if (!_gsImportData.length) return toast('Tidak ada data', 'warning');
+  if (!confirm('Import ' + _gsImportData.length + ' baris ke sistem?')) return;
+  var btn = document.getElementById('gsImportBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '⏳ Mengimport...';
+  }
+  var success = 0;
+  for (var i = 0; i < _gsImportData.length; i++) {
+    var r = _gsImportData[i];
+    try {
+      await db.collection('hrd_weekly_reports').add({
+        bulan: r.bulan,
+        tanggal: r.tanggal,
+        divisi: r.divisi,
+        kategori: r.kategori,
+        progress: r.progress,
+        case_desc: r.case_desc,
+        solution: r.solution,
+        planning: r.planning,
+        pic: r.pic,
+        keterangan: r.keterangan,
+        importedBy: currentUser.nama,
+        importedAt: new Date().toISOString(),
+        type: 'weekly-report',
+        source: 'google-sheets',
+      });
+      success++;
+    } catch (e) {}
+  }
+  toast('✅ ' + success + ' baris berhasil diimport', 'success');
+  closeModalDirect();
+  loadWeeklyReports();
+}
+
+function modalImportFromFile() {
+  openModal(
+    '<div class="modal-title">⬆️ Import Laporan Mingguan</div>' +
       '<p class="text-sm mb-16" style="color:#666">Upload file Excel (.xlsx) atau CSV dari spreadsheet laporan mingguan. Format kolom: <b>BULAN, TANGGAL, DIVISI, KATEGORI, PROGRESS, CASE, SOLUTION, PLANNING & TARGET, PIC, KETERANGAN</b></p>' +
       '<div class="form-group"><label>Pilih File Spreadsheet</label>' +
       '<input type="file" id="weeklyReportFile" class="form-control" accept=".xlsx,.xls,.csv" onchange="previewWeeklyImport(this)">' +
