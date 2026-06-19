@@ -3056,6 +3056,16 @@ async function loadWeeklyReports(divFilter) {
         '<div style="text-align:center;padding:32px;color:#999"><div style="font-size:2rem;margin-bottom:8px">📈</div><p>Belum ada laporan mingguan.</p></div>';
       return;
     }
+    // Manager/Leader: only see own division. HEAD/Admin see all.
+    if (!hasAccess(4)) {
+      var myDept = (currentUser.departemen || '').toUpperCase().trim();
+      if (myDept) {
+        items = items.filter(function (r) {
+          var d = (r.departemen || r.divisi || '').toUpperCase().trim();
+          return d === myDept || d.includes(myDept) || myDept.includes(d) || !d;
+        });
+      }
+    }
     var filtered = items;
     if (_weeklyReportFilter === 'akademik')
       filtered = items.filter(function (r) {
