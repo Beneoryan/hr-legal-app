@@ -3354,7 +3354,7 @@ async function viewUserProfile(nama) {
     var fotoHtml = foto
       ? '<img src="' +
         foto +
-        '" style="width:100px;height:100px;border-radius:50%;object-fit:cover;border:3px solid var(--primary)">'
+        '" style="width:100px;height:100px;border-radius:50%;object-fit:cover;border:3px solid var(--primary);cursor:pointer" onclick="viewProfilePhoto(this.src)">'
       : '<div style="width:100px;height:100px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:2.5rem;font-weight:700">' +
         escHtml((profile.nama || '?').charAt(0)) +
         '</div>';
@@ -3408,4 +3408,21 @@ async function viewUserProfile(nama) {
   } catch (e) {
     toast('Gagal memuat profil: ' + e.message, 'error');
   }
+}
+
+// Full-screen photo viewer (WhatsApp style)
+function viewProfilePhoto(src) {
+  if (!src) return;
+  var overlay = document.createElement('div');
+  overlay.style.cssText =
+    'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.92);z-index:999999;display:flex;align-items:center;justify-content:center;flex-direction:column;cursor:pointer;animation:fadeIn .2s ease';
+  overlay.onclick = function () {
+    overlay.remove();
+  };
+  overlay.innerHTML =
+    '<img src="' +
+    src +
+    '" style="max-width:90%;max-height:80vh;border-radius:12px;object-fit:contain;box-shadow:0 8px 40px rgba(0,0,0,.5)">' +
+    '<div style="color:#fff;margin-top:16px;font-size:.85rem;opacity:.7">Klik di mana saja untuk menutup</div>';
+  document.body.appendChild(overlay);
 }
