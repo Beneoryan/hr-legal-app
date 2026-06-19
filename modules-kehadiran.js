@@ -2784,11 +2784,42 @@ async function submitGSheetImport() {
   var btn = document.getElementById('gsImportBtn');
   if (btn) {
     btn.disabled = true;
-    btn.textContent = '⏳ Mengimport...';
+    btn.textContent = '⏳ Cek duplikat & mengimport...';
   }
+  // Load existing data to check duplicates
+  var existingSnap = await db.collection('hrd_weekly_reports').get();
+  var existingKeys = new Set();
+  existingSnap.forEach(function (d) {
+    var e = d.data();
+    // Create unique key from tanggal + kategori + progress + pic
+    var key =
+      (e.tanggal || '') +
+      '|' +
+      (e.kategori || '') +
+      '|' +
+      (e.progress || '').substring(0, 50) +
+      '|' +
+      (e.pic || '');
+    existingKeys.add(key.toLowerCase().trim());
+  });
   var success = 0;
+  var skipped = 0;
   for (var i = 0; i < _gsImportData.length; i++) {
     var r = _gsImportData[i];
+    // Check duplicate
+    var key =
+      (r.tanggal || '') +
+      '|' +
+      (r.kategori || '') +
+      '|' +
+      (r.progress || '').substring(0, 50) +
+      '|' +
+      (r.pic || '');
+    if (existingKeys.has(key.toLowerCase().trim())) {
+      skipped++;
+      continue;
+    }
+    existingKeys.add(key.toLowerCase().trim());
     try {
       await db.collection('hrd_weekly_reports').add({
         bulan: r.bulan,
@@ -2809,7 +2840,10 @@ async function submitGSheetImport() {
       success++;
     } catch (e) {}
   }
-  toast('✅ ' + success + ' baris berhasil diimport', 'success');
+  toast(
+    '✅ ' + success + ' baris diimport' + (skipped ? ', ' + skipped + ' duplikat dilewati' : ''),
+    'success'
+  );
   closeModalDirect();
   loadWeeklyReports();
 }
@@ -2978,7 +3012,10 @@ async function submitWeeklyImport() {
 }
 
 // ── DISPLAY LAPORAN MINGGUAN ──────────────────────────────────
-async function loadWeeklyReports() {
+var _weeklyReportFilter = 'all';
+
+async function loadWeeklyReports(divFilter) {
+  if (divFilter !== undefined) _weeklyReportFilter = divFilter;
   // Highlight tab
   document.querySelectorAll('#taskTabs .tab').forEach(function (t) {
     t.classList.remove('active');
@@ -2995,34 +3032,58 @@ async function loadWeeklyReports() {
     snap.forEach(function (d) {
       items.push({ id: d.id, ...d.data() });
     });
-    // Sort by importedAt desc
+    // Sort by tanggal desc
     items.sort(function (a, b) {
-      return (b.importedAt || '').localeCompare(a.importedAt || '');
+      return (b.tanggal || b.bulan || '').localeCompare(a.tanggal || a.bulan || '');
     });
-    // Filter by dept for non-admin
-    if (!hasAccess(5)) {
-      var myDept = (currentUser.departemen || '').toLowerCase().trim();
-      if (myDept) {
-        items = items.filter(function (r) {
-          return (r.divisi || '').toLowerCase().trim() === myDept || !r.divisi;
-        });
-      }
-    }
     if (!items.length) {
       listEl.innerHTML =
         '<div style="text-align:center;padding:32px;color:#999"><div style="font-size:2rem;margin-bottom:8px">📈</div><p>Belum ada laporan mingguan. Klik "⬆️ Import Laporan" untuk upload dari spreadsheet.</p></div>';
       return;
     }
+    // Division filter tabs
+    var filterHtml = '<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">';
+    filterHtml +=
+      '<button class="btn btn-xs ' +
+      (_weeklyReportFilter === 'all' ? 'btn-primary' : 'btn-outline') +
+      '" onclick="loadWeeklyReports(\'all\')">Semua</button>';
+    filterHtml +=
+      '<button class="btn btn-xs ' +
+      (_weeklyReportFilter === 'akademik' ? 'btn-primary' : 'btn-outline') +
+      '" onclick="loadWeeklyReports(\'akademik\')">📚 Divisi Akademik</button>';
+    filterHtml +=
+      '<button class="btn btn-xs ' +
+      (_weeklyReportFilter === 'manajemen' ? 'btn-primary' : 'btn-outline') +
+      '" onclick="loadWeeklyReports(\'manajemen\')">🏢 Divisi Manajemen</button>';
+    filterHtml += '</div>';
+    // Apply division filter
+    var filtered = items;
+    if (_weeklyReportFilter === 'akademik') {
+      filtered = items.filter(function (r) {
+        return (r.divisi || '').toUpperCase().includes('AKADEMIK');
+      });
+    } else if (_weeklyReportFilter === 'manajemen') {
+      filtered = items.filter(function (r) {
+        return (r.divisi || '').toUpperCase().includes('MANAJEMEN');
+      });
+    }
+    if (!filtered.length) {
+      listEl.innerHTML =
+        filterHtml +
+        '<div style="text-align:center;padding:32px;color:#999"><p>Tidak ada data untuk filter ini.</p></div>';
+      return;
+    }
     // Group by divisi
     var groups = {};
-    items.forEach(function (r) {
+    filtered.forEach(function (r) {
       var div = r.divisi || 'Tanpa Divisi';
       if (!groups[div]) groups[div] = [];
       groups[div].push(r);
     });
-    var html =
+    var html = filterHtml;
+    html +=
       '<div style="margin-bottom:12px"><span class="fw-700">📈 Laporan Mingguan</span> <span class="text-sm" style="color:#666">(' +
-      items.length +
+      filtered.length +
       ' data)</span></div>';
     Object.keys(groups)
       .sort()
@@ -3036,7 +3097,7 @@ async function loadWeeklyReports() {
           rows.length +
           ' data)</span></div>';
         html +=
-          '<div class="table-wrap"><table style="font-size:.8rem"><thead><tr><th>Tanggal</th><th>Kategori</th><th>Progress</th><th>Case</th><th>Solution</th><th>Planning & Target</th><th>PIC</th><th>Ket</th></tr></thead><tbody>';
+          '<div class="table-wrap"><table style="font-size:.8rem"><thead style="background:#1a1a1a;color:#fff"><tr><th>Tanggal</th><th>Kategori</th><th>Progress</th><th>Case</th><th>Solution</th><th>Planning & Target</th><th>PIC</th><th>Ket</th></tr></thead><tbody>';
         rows.forEach(function (r) {
           html += '<tr>';
           html += '<td>' + escHtml(String(r.tanggal || r.bulan || '-')) + '</td>';
