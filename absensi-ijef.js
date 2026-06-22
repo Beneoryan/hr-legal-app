@@ -1,5 +1,5 @@
 ﻿'use strict';
-console.log('[ABSENSI-IJEF] v2.1 loaded');
+console.log('[ABSENSI-IJEF] v2.2-flexible loaded');
 // ============================================================
 // ABSENSI-IJEF.JS — Selfie+GPS + Dinas Luar + Setting + Rekap
 // ============================================================
@@ -82,7 +82,7 @@ async function renderAbsenSetting(container) {
   const s = doc.exists ? doc.data() : {};
 
   document.getElementById('settingContent').innerHTML = `
-    <div class="tabs mb-16">
+    <div class="tabs mb-16" id="settingTabs">
       <div class="tab active" onclick="showSettingSection('lokasi')">📍 Lokasi & Radius</div>
       <div class="tab" onclick="showSettingSection('jamkerja')">⏰ Jam Kerja</div>
       <div class="tab" onclick="showSettingSection('flexible')">🚗 Flexible</div>
@@ -93,16 +93,19 @@ async function renderAbsenSetting(container) {
 }
 
 async function showSettingSection(section) {
-  document.querySelectorAll('.tabs .tab').forEach((t) => t.classList.remove('active'));
-  document.querySelectorAll('.tabs .tab').forEach((t) => {
-    if (section === 'lokasi' && t.textContent.includes('Lokasi & Radius'))
-      t.classList.add('active');
-    else if (section === 'jamkerja' && t.textContent.includes('Jam Kerja'))
-      t.classList.add('active');
-    else if (section === 'flexible' && t.textContent.includes('Flexible'))
-      t.classList.add('active');
-    else if (section === 'log' && t.textContent.includes('Log Lokasi')) t.classList.add('active');
-  });
+  const tabContainer = document.getElementById('settingTabs');
+  if (tabContainer) {
+    tabContainer.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
+    tabContainer.querySelectorAll('.tab').forEach((t) => {
+      if (section === 'lokasi' && t.textContent.includes('Lokasi & Radius'))
+        t.classList.add('active');
+      else if (section === 'jamkerja' && t.textContent.includes('Jam Kerja'))
+        t.classList.add('active');
+      else if (section === 'flexible' && t.textContent.includes('Flexible'))
+        t.classList.add('active');
+      else if (section === 'log' && t.textContent.includes('Log Lokasi')) t.classList.add('active');
+    });
+  }
   const el = document.getElementById('settingSection');
   const doc = await db.collection('hrd_settings').doc('absensi').get();
   const s = doc.exists ? doc.data() : {};
