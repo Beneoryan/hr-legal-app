@@ -11,6 +11,22 @@ let dinasStream = null,
   dinasPhoto = null,
   dinasGPS = null;
 
+// ── FLEXIBLE ATTENDANCE HELPER ────────────────────────────────
+// Checks if current user is whitelisted for flexible (no geofence) attendance
+async function isFlexibleUser() {
+  try {
+    const doc = await db.collection('hrd_settings').doc('absensi').get();
+    const s = doc.exists ? doc.data() : {};
+    const flexibleUsers = s.flexibleUsers || [];
+    return flexibleUsers.some(
+      (u) =>
+        u.userId === currentUser.id || u.nama?.toLowerCase() === currentUser.nama?.toLowerCase()
+    );
+  } catch (e) {
+    return false;
+  }
+}
+
 // ── MAIN RENDER ───────────────────────────────────────────────
 function renderAbsensiIJEF() {
   const main = document.getElementById('mainContent');
@@ -69,6 +85,7 @@ async function renderAbsenSetting(container) {
     <div class="tabs mb-16">
       <div class="tab active" onclick="showSettingSection('lokasi')">📍 Lokasi & Radius</div>
       <div class="tab" onclick="showSettingSection('jamkerja')">⏰ Jam Kerja</div>
+      <div class="tab" onclick="showSettingSection('flexible')">🚗 Flexible</div>
       <div class="tab" onclick="showSettingSection('log')">📋 Log Lokasi</div>
     </div>
     <div id="settingSection"></div>`;
@@ -81,6 +98,8 @@ async function showSettingSection(section) {
     if (section === 'lokasi' && t.textContent.includes('Lokasi & Radius'))
       t.classList.add('active');
     else if (section === 'jamkerja' && t.textContent.includes('Jam Kerja'))
+      t.classList.add('active');
+    else if (section === 'flexible' && t.textContent.includes('Flexible'))
       t.classList.add('active');
     else if (section === 'log' && t.textContent.includes('Log Lokasi')) t.classList.add('active');
   });
@@ -191,6 +210,34 @@ async function showSettingSection(section) {
           </ul>
         </div>
       </div>`;
+  } else if (section === 'flexible') {
+    const flexibleUsers = s.flexibleUsers || [];
+    let flexUsersHtml = '';
+    flexibleUsers.forEach((u, i) => {
+      flexUsersHtml += `<tr>
+        <td class="fw-700">${escHtml(u.nama)}</td>
+        <td>${escHtml(u.departemen || '-')}</td>
+        <td>${escHtml(u.alasan || '-')}</td>
+        <td class="text-xs">${u.ditambahkan || '-'}</td>
+        <td><button class="btn btn-xs btn-danger" onclick="hapusFlexibleUser(${i})">🗑️</button></td>
+      </tr>`;
+    });
+
+    el.innerHTML = `
+      <div class="card">
+        <div class="card-header"><div class="card-title">🚗 Absensi Flexible (Tanpa Radius)</div><button class="btn btn-primary btn-sm" onclick="modalTambahFlexibleUser()">+ Tambah Karyawan</button></div>
+        <p class="text-sm mb-16" style="color:#666">Karyawan di daftar ini bisa absen dari lokasi mana saja tanpa dibatasi radius kantor. Lokasi GPS mereka tetap tercatat untuk monitoring. Cocok untuk karyawan marketing/field/mobile.</p>
+        <div class="table-wrap"><table><thead><tr><th>Nama</th><th>Departemen</th><th>Alasan</th><th>Ditambahkan</th><th>Aksi</th></tr></thead><tbody id="tblFlexUsers">${flexUsersHtml || '<tr><td colspan="5" class="text-center">Belum ada karyawan flexible. Tambahkan dari tombol di atas.</td></tr>'}</tbody></table></div>
+        <div class="mt-16" style="padding:12px;background:#fff3e0;border-radius:8px;border-left:4px solid var(--warning)">
+          <div class="text-sm fw-700 mb-8">📋 Informasi:</div>
+          <ul class="text-xs" style="padding-left:16px;line-height:1.8;color:#666">
+            <li>Karyawan flexible <b>tetap wajib</b> selfie + GPS saat absen</li>
+            <li>Lokasi absen mereka tercatat di Log Lokasi dan rekap absensi</li>
+            <li>Admin bisa monitor dari mana karyawan absen melalui tab "Log Lokasi"</li>
+            <li>Gunakan untuk karyawan marketing/sales yang sering di lapangan</li>
+          </ul>
+        </div>
+      </div>`;
   } else if (section === 'log') {
     el.innerHTML =
       '<div class="card"><div class="card-title mb-16">📋 Log Lokasi Absensi</div><div id="logLokasiContent">Loading...</div></div>';
@@ -280,6 +327,110 @@ async function hapusLokasiAbsen(idx) {
   await db.collection('hrd_settings').doc('absensi').set(s);
   toast('Dihapus', 'success');
   showSettingSection('lokasi');
+}
+
+// ── FLEXIBLE USER MANAGEMENT ──────────────────────────────────
+function modalTambahFlexibleUser() {
+  // Load karyawan list for selection
+  db.collection('hrd_karyawan')
+    .get()
+    .then((snap) => {
+      let optionsHtml = '<option value="">-- Pilih Karyawan --</option>';
+      snap.forEach((d) => {
+        const k = d.data();
+        if (k.status === 'aktif' || !k.status) {
+          optionsHtml += `<option value="${d.id}" data-nama="${escHtml(k.nama)}" data-dept="${escHtml(k.departemen || '')}">${escHtml(k.nama)} — ${escHtml(k.departemen || '-')} (${escHtml(k.posisi || '-')})</option>`;
+        }
+      });
+      openModal(`<div class="modal-title">🚗 Tambah Karyawan Flexible</div>
+      <p class="text-sm mb-16" style="color:#666">Karyawan yang ditambahkan bisa absen dari mana saja tanpa dibatasi radius kantor. Lokasi GPS tetap tercatat.</p>
+      <div class="form-group"><label>Pilih Karyawan</label><select class="form-control" id="flexUserSelect" onchange="onFlexUserSelect()">${optionsHtml}</select></div>
+      <div class="form-group"><label>Alasan / Catatan</label><input class="form-control" id="flexUserAlasan" placeholder="Contoh: Marketing field, sering mobile ke klien"></div>
+      <div id="flexUserPreview" class="mb-16"></div>
+      <button class="btn btn-primary" onclick="simpanFlexibleUser()">💾 Simpan</button>`);
+    });
+}
+
+function onFlexUserSelect() {
+  const sel = document.getElementById('flexUserSelect');
+  const opt = sel.options[sel.selectedIndex];
+  const preview = document.getElementById('flexUserPreview');
+  if (sel.value && preview) {
+    preview.innerHTML = `<span class="badge badge-info">Dipilih: ${opt.dataset.nama} (${opt.dataset.dept || '-'})</span>`;
+  } else if (preview) {
+    preview.innerHTML = '';
+  }
+}
+
+async function simpanFlexibleUser() {
+  const sel = document.getElementById('flexUserSelect');
+  const alasan = document.getElementById('flexUserAlasan').value;
+  if (!sel.value) return toast('Pilih karyawan dulu', 'warning');
+  const opt = sel.options[sel.selectedIndex];
+  const nama = opt.dataset.nama;
+  const departemen = opt.dataset.dept;
+
+  // Get userId from hrd_users linked to this karyawan
+  let userId = sel.value; // fallback to karyawan doc id
+  try {
+    const usersSnap = await db
+      .collection('hrd_users')
+      .where('linkedKaryawan', '==', sel.value)
+      .limit(1)
+      .get();
+    if (!usersSnap.empty) {
+      userId = usersSnap.docs[0].id;
+    } else {
+      // Try matching by nama
+      const usersByName = await db.collection('hrd_users').where('nama', '==', nama).limit(1).get();
+      if (!usersByName.empty) userId = usersByName.docs[0].id;
+    }
+  } catch (e) {}
+
+  const doc = await db.collection('hrd_settings').doc('absensi').get();
+  const s = doc.exists ? doc.data() : {};
+  const flexibleUsers = s.flexibleUsers || [];
+
+  // Check duplicate
+  if (flexibleUsers.some((u) => u.userId === userId || u.nama === nama)) {
+    return toast('Karyawan sudah ada di daftar flexible', 'warning');
+  }
+
+  flexibleUsers.push({
+    userId,
+    karyawanId: sel.value,
+    nama,
+    departemen,
+    alasan: alasan || 'Marketing/Field',
+    ditambahkan: new Date().toLocaleDateString('id-ID', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    }),
+  });
+
+  await db
+    .collection('hrd_settings')
+    .doc('absensi')
+    .set({ ...s, flexibleUsers }, { merge: true });
+  closeModalDirect();
+  toast(`✅ ${nama} ditambahkan ke daftar absensi flexible`, 'success');
+  showSettingSection('flexible');
+}
+
+async function hapusFlexibleUser(idx) {
+  if (!confirm('Hapus karyawan ini dari daftar flexible?')) return;
+  const doc = await db.collection('hrd_settings').doc('absensi').get();
+  const s = doc.data() || {};
+  const flexibleUsers = s.flexibleUsers || [];
+  const removed = flexibleUsers[idx];
+  flexibleUsers.splice(idx, 1);
+  await db
+    .collection('hrd_settings')
+    .doc('absensi')
+    .set({ ...s, flexibleUsers }, { merge: true });
+  toast(`${removed?.nama || 'Karyawan'} dihapus dari daftar flexible`, 'success');
+  showSettingSection('flexible');
 }
 
 async function simpanFlexTime() {
@@ -447,9 +598,14 @@ async function autoDetectLocation() {
         statusEl.textContent = `📍 ${currentGPS.lat.toFixed(5)}, ${currentGPS.lng.toFixed(5)} (±${currentGPS.accuracy?.toFixed(0) || '?'}m)`;
         // Check nearest office
         const locStatus = await getNearestOfficeLocation(currentGPS.lat, currentGPS.lng);
+        const flexUser = await isFlexibleUser();
         if (locStatus.allowed) {
           locEl.textContent = `✅ ${locStatus.nearest.nama}`;
           distEl.textContent = `Jarak: ${locStatus.dist.toFixed(0)}m (dalam radius ${locStatus.nearest.radius || locStatus.radius}m)`;
+          if (flexUser && autoEl) {
+            autoEl.innerHTML =
+              '<span class="badge badge-info" style="background:#e3f2fd;color:#1565c0">🚗 Mode Flexible — Absen dari mana saja, lokasi tercatat</span>';
+          }
           // Determine: clock in or clock out
           try {
             const todaySnap = await db
@@ -470,14 +626,14 @@ async function autoDetectLocation() {
               btn.textContent = '⏰ ABSEN MASUK (Selfie + GPS)';
               btn.style.background = 'var(--success)';
               btn.disabled = false;
-              if (autoEl)
+              if (autoEl && !flexUser)
                 autoEl.innerHTML =
                   '<span class="badge badge-info">Belum absen hari ini — Ambil foto lalu klik untuk Clock In</span>';
             } else if (!hasPulang) {
               btn.textContent = '🏠 ABSEN PULANG (Selfie + GPS)';
               btn.style.background = 'var(--warning)';
               btn.disabled = false;
-              if (autoEl)
+              if (autoEl && !flexUser)
                 autoEl.innerHTML =
                   '<span class="badge badge-success">Sudah Clock In — Ambil foto lalu klik untuk Clock Out</span>';
             } else {
@@ -497,6 +653,59 @@ async function autoDetectLocation() {
             if (autoEl)
               autoEl.innerHTML =
                 '<span class="badge badge-warning">⚠️ Gagal cek status hari ini, tapi lokasi valid</span>';
+          }
+        } else if (flexUser) {
+          // Flexible user: outside radius but allowed to clock in/out from anywhere
+          locEl.textContent = `🚗 Mode Flexible`;
+          distEl.textContent = locStatus.nearest
+            ? `Jarak ke ${locStatus.nearest.nama}: ${locStatus.dist.toFixed(0)}m — Lokasi Anda akan tercatat`
+            : 'Lokasi GPS tercatat otomatis';
+          // Determine: clock in or clock out
+          try {
+            const todaySnap = await db
+              .collection('hrd_absensi')
+              .where('userId', '==', currentUser.id)
+              .get();
+            let hasMasuk = false,
+              hasPulang = false;
+            const todayDate = todayStr();
+            todaySnap.forEach((d) => {
+              const data = d.data();
+              if (data.tanggal === todayDate) {
+                if (data.tipe === 'masuk') hasMasuk = true;
+                if (data.tipe === 'pulang') hasPulang = true;
+              }
+            });
+            if (!hasMasuk) {
+              btn.textContent = '⏰ ABSEN MASUK (Flexible + GPS)';
+              btn.style.background = 'var(--success)';
+              btn.disabled = false;
+              if (autoEl)
+                autoEl.innerHTML =
+                  '<span class="badge badge-info" style="background:#e3f2fd;color:#1565c0">🚗 Mode Flexible — Absen dari mana saja, lokasi tercatat</span>';
+            } else if (!hasPulang) {
+              btn.textContent = '🏠 ABSEN PULANG (Flexible + GPS)';
+              btn.style.background = 'var(--warning)';
+              btn.disabled = false;
+              if (autoEl)
+                autoEl.innerHTML =
+                  '<span class="badge badge-info" style="background:#e3f2fd;color:#1565c0">🚗 Mode Flexible — Sudah Clock In, klik untuk Clock Out</span>';
+            } else {
+              btn.textContent = '✅ Sudah Lengkap';
+              btn.disabled = true;
+              btn.style.background = '#9e9e9e';
+              if (autoEl)
+                autoEl.innerHTML =
+                  '<span class="badge badge-success">✅ Absen hari ini sudah lengkap (masuk & pulang)</span>';
+            }
+          } catch (e) {
+            console.error('Error check today status:', e);
+            btn.textContent = '⏰ ABSEN (Flexible + GPS)';
+            btn.style.background = 'var(--success)';
+            btn.disabled = false;
+            if (autoEl)
+              autoEl.innerHTML =
+                '<span class="badge badge-info" style="background:#e3f2fd;color:#1565c0">🚗 Mode Flexible — Lokasi tercatat</span>';
           }
         } else {
           locEl.textContent = `❌ Di luar radius kantor`;
@@ -795,7 +1004,8 @@ async function doClockIn() {
   }
 
   const locationStatus = await getNearestOfficeLocation(currentGPS.lat, currentGPS.lng);
-  if (!locationStatus.allowed)
+  const flexUser = await isFlexibleUser();
+  if (!locationStatus.allowed && !flexUser)
     return toast(
       `Lokasi di luar radius "${locationStatus.nearest.nama}". Absen hanya boleh dari lokasi kantor terdaftar.`,
       'warning'
@@ -858,29 +1068,33 @@ async function doClockIn() {
   }
 
   const shift = await getActiveShift();
-  await db
-    .collection('hrd_absensi')
-    .add({
-      userId: currentUser.id,
-      nama: currentUser.nama,
-      departemen: currentUser.departemen || '',
-      tanggal: todayStr(),
-      waktu: now.toTimeString().slice(0, 5),
-      tipe: 'masuk',
-      foto: capturedPhoto,
-      lat: currentGPS.lat,
-      lng: currentGPS.lng,
-      accuracy: currentGPS.accuracy,
-      shift: shift.nama,
-      status,
-      coreHoursViolation,
-      officeLocation: locationStatus.nearest.nama,
-      officeDistance: locationStatus.dist,
-      officeRadius: locationStatus.radius,
-      flexMode: flex.enabled,
-      createdAt: now.toISOString(),
-    });
+  await db.collection('hrd_absensi').add({
+    userId: currentUser.id,
+    nama: currentUser.nama,
+    departemen: currentUser.departemen || '',
+    tanggal: todayStr(),
+    waktu: now.toTimeString().slice(0, 5),
+    tipe: 'masuk',
+    foto: capturedPhoto,
+    lat: currentGPS.lat,
+    lng: currentGPS.lng,
+    accuracy: currentGPS.accuracy,
+    shift: shift.nama,
+    status,
+    coreHoursViolation,
+    officeLocation: locationStatus.allowed
+      ? locationStatus.nearest.nama
+      : flexUser
+        ? 'Flexible - ' + (locationStatus.nearest?.nama || 'Di luar kantor')
+        : locationStatus.nearest.nama,
+    officeDistance: locationStatus.dist,
+    officeRadius: locationStatus.radius,
+    flexMode: flex.enabled,
+    flexibleAttendance: flexUser || false,
+    createdAt: now.toISOString(),
+  });
   let clockInMsg = `✅ Clock In: ${now.toTimeString().slice(0, 5)} ${flex.enabled ? '(Jam Kerja Fleksibel)' : status === 'terlambat' ? '(⚠️ Terlambat)' : '(Tepat Waktu)'}`;
+  if (flexUser) clockInMsg += ' 📍 Lokasi tercatat (Flexible)';
   if (coreHoursViolation) clockInMsg += ` ⚠️ Melewati core hours (${flex.coreHoursStart})`;
   toast(clockInMsg, 'success');
   capturedPhoto = null;
@@ -895,7 +1109,8 @@ async function doClockOut() {
   if (!capturedPhoto) return toast('Ambil foto selfie dulu', 'warning');
   if (!currentGPS) return toast('Deteksi lokasi GPS dulu', 'warning');
   const locationStatus = await getNearestOfficeLocation(currentGPS.lat, currentGPS.lng);
-  if (!locationStatus.allowed)
+  const flexUser = await isFlexibleUser();
+  if (!locationStatus.allowed && !flexUser)
     return toast(
       `Lokasi di luar radius "${locationStatus.nearest.nama}". Absen hanya boleh dari lokasi kantor terdaftar.`,
       'warning'
@@ -1009,36 +1224,40 @@ async function doClockOut() {
     }
   }
 
-  await db
-    .collection('hrd_absensi')
-    .add({
-      userId: currentUser.id,
-      nama: currentUser.nama,
-      departemen: currentUser.departemen || '',
-      tanggal: todayStr(),
-      waktu: now.toTimeString().slice(0, 5),
-      tipe: 'pulang',
-      foto: capturedPhoto,
-      lat: currentGPS.lat,
-      lng: currentGPS.lng,
-      accuracy: currentGPS.accuracy,
-      status: statusPulang,
-      officeLocation: locationStatus.nearest.nama,
-      officeDistance: locationStatus.dist,
-      officeRadius: locationStatus.radius,
-      flexMode: flex.enabled,
-      jamKerjaActual: jamKerjaActual,
-      lembur: lembur,
-      lemburJam: lemburJam,
-      coreHoursViolation: coreHoursViolation,
-      createdAt: now.toISOString(),
-    });
+  await db.collection('hrd_absensi').add({
+    userId: currentUser.id,
+    nama: currentUser.nama,
+    departemen: currentUser.departemen || '',
+    tanggal: todayStr(),
+    waktu: now.toTimeString().slice(0, 5),
+    tipe: 'pulang',
+    foto: capturedPhoto,
+    lat: currentGPS.lat,
+    lng: currentGPS.lng,
+    accuracy: currentGPS.accuracy,
+    status: statusPulang,
+    officeLocation: locationStatus.allowed
+      ? locationStatus.nearest.nama
+      : flexUser
+        ? 'Flexible - ' + (locationStatus.nearest?.nama || 'Di luar kantor')
+        : locationStatus.nearest.nama,
+    officeDistance: locationStatus.dist,
+    officeRadius: locationStatus.radius,
+    flexMode: flex.enabled,
+    flexibleAttendance: flexUser || false,
+    jamKerjaActual: jamKerjaActual,
+    lembur: lembur,
+    lemburJam: lemburJam,
+    coreHoursViolation: coreHoursViolation,
+    createdAt: now.toISOString(),
+  });
   let msg = '';
   if (flex.enabled) {
     if (lembur) msg = `(🟣 Lembur ${lemburJam} jam)`;
     else if (statusPulang === 'lengkap') msg = '(✅ Jam kerja lengkap)';
     else msg = `(⚠️ Kurang jam - ${jamKerjaActual.toFixed(1)} jam)`;
   }
+  if (flexUser) msg += ' 📍 Lokasi tercatat (Flexible)';
   toast(`✅ Clock Out: ${now.toTimeString().slice(0, 5)} ${msg}`, 'success');
   capturedPhoto = null;
   currentGPS = null;
@@ -1181,17 +1400,15 @@ async function loadBreakStatus() {
 
 async function doStartBreak() {
   const now = new Date();
-  await db
-    .collection('hrd_absensi')
-    .add({
-      userId: currentUser.id,
-      nama: currentUser.nama,
-      departemen: currentUser.departemen || '',
-      tanggal: todayStr(),
-      waktu: now.toTimeString().slice(0, 5),
-      tipe: 'istirahat_mulai',
-      createdAt: now.toISOString(),
-    });
+  await db.collection('hrd_absensi').add({
+    userId: currentUser.id,
+    nama: currentUser.nama,
+    departemen: currentUser.departemen || '',
+    tanggal: todayStr(),
+    waktu: now.toTimeString().slice(0, 5),
+    tipe: 'istirahat_mulai',
+    createdAt: now.toISOString(),
+  });
   toast('☕ Istirahat dimulai', 'info');
   loadBreakStatus();
   loadTodayHistory();
@@ -1199,17 +1416,15 @@ async function doStartBreak() {
 
 async function doEndBreak() {
   const now = new Date();
-  await db
-    .collection('hrd_absensi')
-    .add({
-      userId: currentUser.id,
-      nama: currentUser.nama,
-      departemen: currentUser.departemen || '',
-      tanggal: todayStr(),
-      waktu: now.toTimeString().slice(0, 5),
-      tipe: 'istirahat_selesai',
-      createdAt: now.toISOString(),
-    });
+  await db.collection('hrd_absensi').add({
+    userId: currentUser.id,
+    nama: currentUser.nama,
+    departemen: currentUser.departemen || '',
+    tanggal: todayStr(),
+    waktu: now.toTimeString().slice(0, 5),
+    tipe: 'istirahat_selesai',
+    createdAt: now.toISOString(),
+  });
   toast('🔙 Istirahat selesai', 'success');
   loadBreakStatus();
   loadTodayHistory();
@@ -2781,35 +2996,31 @@ async function doGenerateAbsensi() {
       // Skip if already exists
       if (existSet.has(`${namaLow}_${tgl}_masuk`)) continue;
       // Add Clock In
-      await db
-        .collection('hrd_absensi')
-        .add({
-          userId: k.id,
-          nama: k.nama,
-          tanggal: tgl,
-          waktu: jamIn,
-          tipe: 'masuk',
-          status,
-          departemen: k.departemen || '',
-          manual: true,
-          editedBy: currentUser.nama,
-          createdAt: new Date().toISOString(),
-        });
+      await db.collection('hrd_absensi').add({
+        userId: k.id,
+        nama: k.nama,
+        tanggal: tgl,
+        waktu: jamIn,
+        tipe: 'masuk',
+        status,
+        departemen: k.departemen || '',
+        manual: true,
+        editedBy: currentUser.nama,
+        createdAt: new Date().toISOString(),
+      });
       // Add Clock Out
-      await db
-        .collection('hrd_absensi')
-        .add({
-          userId: k.id,
-          nama: k.nama,
-          tanggal: tgl,
-          waktu: jamOut,
-          tipe: 'pulang',
-          status: 'lengkap',
-          departemen: k.departemen || '',
-          manual: true,
-          editedBy: currentUser.nama,
-          createdAt: new Date().toISOString(),
-        });
+      await db.collection('hrd_absensi').add({
+        userId: k.id,
+        nama: k.nama,
+        tanggal: tgl,
+        waktu: jamOut,
+        tipe: 'pulang',
+        status: 'lengkap',
+        departemen: k.departemen || '',
+        manual: true,
+        editedBy: currentUser.nama,
+        createdAt: new Date().toISOString(),
+      });
       count++;
     }
   }
