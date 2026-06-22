@@ -1176,10 +1176,9 @@ async function doClockOut() {
         const [beH, beM] = breakEnds[i].waktu.split(':').map(Number);
         actualBreakMinutes += beH * 60 + beM - (bsH * 60 + bsM);
       }
-    } else if (!breakStartSnap.empty && breakEndSnap.empty) {
+    } else if (breakStarts.length && !breakEnds.length) {
       // Still on break - count from break start to now
-      const bData = breakStartSnap.docs[0].data();
-      const [bsH, bsM] = bData.waktu.split(':').map(Number);
+      const [bsH, bsM] = breakStarts[0].waktu.split(':').map(Number);
       actualBreakMinutes = nowMinutes - (bsH * 60 + bsM);
     }
 
