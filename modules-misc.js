@@ -245,17 +245,50 @@ async function simpanPelatihan(id) {
 // ── KONTRAK ───────────────────────────────────────────────────
 async function renderKontrak() {
   const main = document.getElementById('mainContent');
-  main.innerHTML = `<div class="page-title"><span>📄 Kontrak & Perjanjian</span><button class="btn btn-primary btn-sm" onclick="modalKontrak()">+ Tambah</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Judul</th><th>Pihak</th><th>Mulai</th><th>Berakhir</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="tblKontrak"></tbody></table></div></div>`;
+  main.innerHTML = `<div class="page-title"><span>📄 Kontrak Karyawan</span><button class="btn btn-primary btn-sm" onclick="modalKontrak()">+ Upload Kontrak</button></div>
+    <div class="tabs mb-16" id="kontrakTabs">
+      <div class="tab active" onclick="showKontrakTab('list')">📋 Daftar Kontrak</div>
+      <div class="tab" onclick="showKontrakTab('dokumen')">📁 Dokumen Karyawan</div>
+    </div>
+    <div id="kontrakContent"></div>`;
+  showKontrakTab('list');
+}
+
+async function showKontrakTab(tab) {
+  const tabs = document.getElementById('kontrakTabs');
+  if (tabs) {
+    tabs.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
+    tabs.querySelectorAll('.tab').forEach((t) => {
+      if (tab === 'list' && t.textContent.includes('Daftar')) t.classList.add('active');
+      else if (tab === 'dokumen' && t.textContent.includes('Dokumen')) t.classList.add('active');
+    });
+  }
+  const c = document.getElementById('kontrakContent');
+  if (tab === 'list') await renderKontrakList(c);
+  else if (tab === 'dokumen') await renderDokumenKaryawan(c);
+}
+
+async function renderKontrakList(container) {
+  container.innerHTML =
+    '<div class="card"><div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Kontrak Ke-</th><th>Jenis</th><th>Mulai</th><th>Berakhir</th><th>Status</th><th>File</th><th>Aksi</th></tr></thead><tbody id="tblKontrak"></tbody></table></div></div>';
   const snap = await db.collection('hrd_kontrak').get();
   const today = todayStr();
   let h = '';
-  if (snap.empty) h = '<tr><td colspan="6" class="text-center">Belum ada</td></tr>';
-  else
-    snap.forEach((d) => {
-      const p = d.data();
-      const expired = p.berakhir < today;
-      h += `<tr><td class="fw-700">${escHtml(p.judul)}</td><td>${escHtml(p.pihak || '-')}</td><td>${formatDate(p.mulai)}</td><td>${formatDate(p.berakhir)}</td><td><span class="badge badge-${expired ? 'danger' : 'success'}">${expired ? 'Expired' : 'Aktif'}</span></td><td><button class="btn btn-xs btn-info" onclick="modalKontrak('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_kontrak','${d.id}','kontrak')">🗑️</button></td></tr>`;
+  if (snap.empty)
+    h =
+      '<tr><td colspan="8" class="text-center">Belum ada kontrak. Klik "+ Upload Kontrak" untuk menambahkan.</td></tr>';
+  else {
+    const docs = [];
+    snap.forEach((d) => docs.push({ id: d.id, ...d.data() }));
+    docs.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+    docs.forEach((p) => {
+      const expired = p.berakhir && p.berakhir < today;
+      const hasFile = p.fileData
+        ? '<span class="badge badge-success">Ada</span>'
+        : '<span class="badge badge-warning">-</span>';
+      h += `<tr><td class="fw-700">${escHtml(p.namaKaryawan || p.pihak || '-')}</td><td>${p.kontrakKe || '-'}</td><td>${escHtml(p.jenis === 'kerja' ? 'PKWT' : p.jenis === 'tetap' ? 'PKWTT' : p.jenis || '-')}</td><td>${formatDate(p.mulai)}</td><td>${formatDate(p.berakhir)}</td><td><span class="badge badge-${expired ? 'danger' : 'success'}">${expired ? 'Expired' : 'Aktif'}</span></td><td>${hasFile}</td><td><button class="btn btn-xs btn-info" onclick="modalKontrak('${p.id}')">✏️</button>${p.fileData ? ` <button class="btn btn-xs btn-success" onclick="lihatFileKontrak('${p.id}')">👁️</button>` : ''} <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_kontrak','${p.id}','kontrak')">🗑️</button></td></tr>`;
     });
+  }
   document.getElementById('tblKontrak').innerHTML = h;
 }
 function modalKontrak(id) {
@@ -266,26 +299,252 @@ function modalKontrak(id) {
       .then((d) => showKontrakForm(id, d.data() || {}));
   else showKontrakForm(null, {});
 }
-function showKontrakForm(id, p) {
+
+async function showKontrakForm(id, p) {
+  // Load karyawan list
+  const karySnap = await db.collection('hrd_karyawan').get();
+  let karyOptions = '<option value="">-- Pilih Karyawan --</option>';
+  karySnap.forEach((d) => {
+    const k = d.data();
+    if (k.status === 'aktif' || !k.status) {
+      const selected = p.karyawanId === d.id || p.namaKaryawan === k.nama ? 'selected' : '';
+      karyOptions += `<option value="${d.id}" data-nama="${escHtml(k.nama)}" data-dept="${escHtml(k.departemen || '')}" ${selected}>${escHtml(k.nama)} — ${escHtml(k.departemen || '-')}</option>`;
+    }
+  });
   openModal(
-    `<div class="modal-title">${id ? 'Edit' : 'Tambah'} Kontrak</div><div class="form-group"><label>Judul</label><input class="form-control" id="ktJudul" value="${escHtml(p.judul || '')}"></div><div class="grid-2"><div class="form-group"><label>Pihak</label><input class="form-control" id="ktPihak" value="${escHtml(p.pihak || '')}"></div><div class="form-group"><label>Jenis</label><select class="form-control" id="ktJenis"><option value="kerja" ${p.jenis === 'kerja' ? 'selected' : ''}>Kontrak Kerja</option><option value="vendor" ${p.jenis === 'vendor' ? 'selected' : ''}>Vendor</option><option value="nda" ${p.jenis === 'nda' ? 'selected' : ''}>NDA</option></select></div></div><div class="grid-2"><div class="form-group"><label>Mulai</label><input class="form-control" type="date" id="ktMulai" value="${p.mulai || ''}"></div><div class="form-group"><label>Berakhir</label><input class="form-control" type="date" id="ktAkhir" value="${p.berakhir || ''}"></div></div><button class="btn btn-primary" onclick="simpanKontrak('${id || ''}')">Simpan</button>`
+    `<div class="modal-title">${id ? 'Edit' : 'Upload'} Kontrak Karyawan</div>
+    <div class="form-group"><label>Karyawan <span style="color:var(--danger)">*</span></label><select class="form-control" id="ktKaryawan">${karyOptions}</select></div>
+    <div class="grid-2">
+      <div class="form-group"><label>Kontrak Ke-</label><input class="form-control" type="number" id="ktKontrakKe" value="${p.kontrakKe || 1}" min="1"></div>
+      <div class="form-group"><label>Jenis Kontrak</label><select class="form-control" id="ktJenis"><option value="kerja" ${p.jenis === 'kerja' ? 'selected' : ''}>PKWT (Kontrak)</option><option value="tetap" ${p.jenis === 'tetap' ? 'selected' : ''}>PKWTT (Tetap)</option><option value="magang" ${p.jenis === 'magang' ? 'selected' : ''}>Magang</option><option value="freelance" ${p.jenis === 'freelance' ? 'selected' : ''}>Freelance</option></select></div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group"><label>Durasi</label><input class="form-control" id="ktDurasi" value="${escHtml(p.durasi || '')}" placeholder="12 bulan"></div>
+      <div class="form-group"><label>Judul/Keterangan</label><input class="form-control" id="ktJudul" value="${escHtml(p.judul || '')}" placeholder="Perjanjian Kerja Ke-1"></div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group"><label>Tanggal Mulai</label><input class="form-control" type="date" id="ktMulai" value="${p.mulai || ''}"></div>
+      <div class="form-group"><label>Tanggal Berakhir</label><input class="form-control" type="date" id="ktAkhir" value="${p.berakhir || ''}"></div>
+    </div>
+    <div class="form-group"><label>Catatan</label><textarea class="form-control" id="ktCatatan" style="min-height:50px">${escHtml(p.catatan || '')}</textarea></div>
+    <div class="form-group">
+      <label>Upload Softcopy Kontrak (PDF/Image)</label>
+      <input class="form-control" type="file" id="ktFile" accept=".pdf,image/png,image/jpeg,image/jpg" onchange="previewKontrakFile(this)">
+      <div id="ktFilePreview" class="mt-8">${p.fileData ? '<span class="badge badge-success">File sudah ada</span>' : ''}</div>
+    </div>
+    <button class="btn btn-primary" onclick="simpanKontrak('${id || ''}')">💾 Simpan Kontrak</button>`,
+    true
   );
+  window._kontrakFileData = p.fileData || null;
+  window._kontrakFileName = p.fileName || null;
 }
+
+function previewKontrakFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) return toast('File terlalu besar (max 5MB)', 'warning');
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    window._kontrakFileData = e.target.result;
+    window._kontrakFileName = file.name;
+    const ext = file.name.split('.').pop().toLowerCase();
+    const icon = ext === 'pdf' ? '📄' : '🖼️';
+    document.getElementById('ktFilePreview').innerHTML =
+      `<span class="badge badge-success">${icon} ${escHtml(file.name)} (${(file.size / 1024).toFixed(0)} KB) ✅</span>`;
+  };
+  reader.readAsDataURL(file);
+}
+
 async function simpanKontrak(id) {
+  const selKary = document.getElementById('ktKaryawan');
+  const karyawanId = selKary.value;
+  const opt = selKary.options[selKary.selectedIndex];
+  const namaKaryawan = opt ? opt.dataset.nama || opt.textContent : '';
   const data = {
-    judul: document.getElementById('ktJudul').value,
-    pihak: document.getElementById('ktPihak').value,
+    karyawanId,
+    namaKaryawan,
+    kontrakKe: parseInt(document.getElementById('ktKontrakKe').value) || 1,
     jenis: document.getElementById('ktJenis').value,
+    durasi: document.getElementById('ktDurasi').value,
+    judul: document.getElementById('ktJudul').value,
     mulai: document.getElementById('ktMulai').value,
     berakhir: document.getElementById('ktAkhir').value,
+    catatan: document.getElementById('ktCatatan').value,
     updatedAt: new Date().toISOString(),
   };
-  if (!data.judul) return toast('Judul wajib', 'warning');
+  if (!karyawanId) return toast('Pilih karyawan dulu', 'warning');
+  if (!data.mulai || !data.berakhir) return toast('Tanggal mulai & berakhir wajib', 'warning');
+  if (window._kontrakFileData) {
+    data.fileData = window._kontrakFileData;
+    data.fileName = window._kontrakFileName;
+  }
   if (id) await db.collection('hrd_kontrak').doc(id).update(data);
   else await db.collection('hrd_kontrak').add({ ...data, createdAt: new Date().toISOString() });
+  window._kontrakFileData = null;
+  window._kontrakFileName = null;
   closeModalDirect();
-  toast('Disimpan', 'success');
-  renderKontrak();
+  toast('Kontrak disimpan', 'success');
+  showKontrakTab('list');
+}
+
+function lihatFileKontrak(id) {
+  db.collection('hrd_kontrak')
+    .doc(id)
+    .get()
+    .then((d) => {
+      const p = d.data();
+      if (!p || !p.fileData) return toast('File tidak ditemukan', 'warning');
+      const ext = (p.fileName || '').split('.').pop().toLowerCase();
+      let content = '';
+      if (ext === 'pdf') {
+        content = `<div class="modal-title">📄 ${escHtml(p.fileName || 'Kontrak')}</div><p class="text-sm mb-8">${escHtml(p.namaKaryawan || '')} — Kontrak Ke-${p.kontrakKe || 1}</p><iframe src="${p.fileData}" style="width:100%;height:500px;border:1px solid var(--border);border-radius:8px"></iframe><div class="mt-8"><a href="${p.fileData}" download="${escHtml(p.fileName || 'kontrak.pdf')}" class="btn btn-primary btn-sm">⬇️ Download</a></div>`;
+      } else {
+        content = `<div class="modal-title">🖼️ ${escHtml(p.fileName || 'Kontrak')}</div><p class="text-sm mb-8">${escHtml(p.namaKaryawan || '')} — Kontrak Ke-${p.kontrakKe || 1}</p><img src="${p.fileData}" style="max-width:100%;border-radius:8px;border:1px solid var(--border)"><div class="mt-8"><a href="${p.fileData}" download="${escHtml(p.fileName || 'kontrak.jpg')}" class="btn btn-primary btn-sm">⬇️ Download</a></div>`;
+      }
+      openModal(content, true);
+    });
+}
+
+// ══════════════════════════════════════════════════════════════
+// ── DOKUMEN KARYAWAN — Upload kelengkapan dokumen per karyawan ─
+// ══════════════════════════════════════════════════════════════
+
+async function renderDokumenKaryawan(container) {
+  container.innerHTML = `<div class="card">
+    <div class="card-header"><div class="card-title">📁 Dokumen Kelengkapan Karyawan</div><button class="btn btn-primary btn-sm" onclick="modalUploadDokumen()">+ Upload Dokumen</button></div>
+    <p class="text-sm mb-16" style="color:#666">Kelola softcopy dokumen karyawan: KTP, KK, SIM, Ijazah, SKCK, Sertifikat, dll. Pilih nama karyawan lalu upload file.</p>
+    <div class="flex gap-8 mb-16">
+      <select class="form-control" id="filterDokKary" onchange="filterDokumenList()" style="max-width:250px"><option value="">Semua Karyawan</option></select>
+      <select class="form-control" id="filterDokTipe" onchange="filterDokumenList()" style="max-width:180px"><option value="">Semua Tipe</option><option value="KTP">KTP</option><option value="KK">Kartu Keluarga</option><option value="SIM">SIM</option><option value="Ijazah">Ijazah</option><option value="SKCK">SKCK</option><option value="Sertifikat">Sertifikat</option><option value="BPJS">BPJS</option><option value="Passport">Passport</option><option value="CV">CV</option><option value="Kontrak">Kontrak</option><option value="Lainnya">Lainnya</option></select>
+    </div>
+    <div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Tipe Dokumen</th><th>Nama File</th><th>Keterangan</th><th>Tanggal Upload</th><th>Aksi</th></tr></thead><tbody id="tblDokumen"></tbody></table></div>
+  </div>`;
+  // Populate filter
+  const karySnap = await db.collection('hrd_karyawan').get();
+  const selFilter = document.getElementById('filterDokKary');
+  karySnap.forEach((d) => {
+    const k = d.data();
+    if (k.status === 'aktif' || !k.status)
+      selFilter.innerHTML += `<option value="${d.id}">${escHtml(k.nama)}</option>`;
+  });
+  await filterDokumenList();
+}
+
+async function filterDokumenList() {
+  const karyFilter = document.getElementById('filterDokKary')?.value || '';
+  const tipeFilter = document.getElementById('filterDokTipe')?.value || '';
+  let query = db.collection('hrd_dokumen_karyawan');
+  if (karyFilter) query = query.where('karyawanId', '==', karyFilter);
+  const snap = await query.get();
+  let docs = [];
+  snap.forEach((d) => docs.push({ id: d.id, ...d.data() }));
+  if (tipeFilter) docs = docs.filter((d) => d.tipeDokumen === tipeFilter);
+  docs.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  let h = '';
+  if (!docs.length) h = '<tr><td colspan="6" class="text-center">Belum ada dokumen.</td></tr>';
+  else
+    docs.forEach((p) => {
+      h += `<tr><td class="fw-700">${escHtml(p.namaKaryawan || '-')}</td><td><span class="badge badge-info">${escHtml(p.tipeDokumen || '-')}</span></td><td class="text-xs">${escHtml(p.fileName || '-')}</td><td class="text-xs">${escHtml(p.keterangan || '-')}</td><td class="text-xs">${p.createdAt ? new Date(p.createdAt).toLocaleDateString('id-ID') : '-'}</td><td><button class="btn btn-xs btn-success" onclick="lihatDokumen('${p.id}')">👁️</button> <button class="btn btn-xs btn-danger" onclick="hapusDokumen('${p.id}')">🗑️</button></td></tr>`;
+    });
+  document.getElementById('tblDokumen').innerHTML = h;
+}
+
+async function modalUploadDokumen(preKaryId) {
+  const karySnap = await db.collection('hrd_karyawan').get();
+  let karyOptions = '<option value="">-- Pilih Karyawan --</option>';
+  karySnap.forEach((d) => {
+    const k = d.data();
+    if (k.status === 'aktif' || !k.status)
+      karyOptions += `<option value="${d.id}" data-nama="${escHtml(k.nama)}" ${preKaryId === d.id ? 'selected' : ''}>${escHtml(k.nama)} — ${escHtml(k.departemen || '-')}</option>`;
+  });
+  openModal(
+    `<div class="modal-title">📁 Upload Dokumen Karyawan</div>
+    <div class="form-group"><label>Karyawan <span style="color:var(--danger)">*</span></label><select class="form-control" id="dokKaryawan">${karyOptions}</select></div>
+    <div class="grid-2">
+      <div class="form-group"><label>Tipe Dokumen <span style="color:var(--danger)">*</span></label><select class="form-control" id="dokTipe"><option value="">-- Pilih --</option><option value="KTP">KTP</option><option value="KK">Kartu Keluarga</option><option value="SIM">SIM</option><option value="Ijazah">Ijazah</option><option value="SKCK">SKCK</option><option value="Sertifikat">Sertifikat</option><option value="BPJS">BPJS</option><option value="Passport">Passport</option><option value="CV">CV / Lamaran</option><option value="Kontrak">Surat Kontrak</option><option value="Lainnya">Lainnya</option></select></div>
+      <div class="form-group"><label>Keterangan</label><input class="form-control" id="dokKeterangan" placeholder="No. dokumen, catatan, dll"></div>
+    </div>
+    <div class="form-group">
+      <label>Upload File (PDF/Image, max 5MB) <span style="color:var(--danger)">*</span></label>
+      <input class="form-control" type="file" id="dokFile" accept=".pdf,image/png,image/jpeg,image/jpg" onchange="previewDokumenFile(this)">
+      <div id="dokFilePreview" class="mt-8"></div>
+    </div>
+    <button class="btn btn-primary" onclick="simpanDokumen()">💾 Upload & Simpan</button>`,
+    true
+  );
+  window._dokFileData = null;
+  window._dokFileName = null;
+}
+
+function previewDokumenFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) return toast('File terlalu besar (max 5MB)', 'warning');
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    window._dokFileData = e.target.result;
+    window._dokFileName = file.name;
+    const ext = file.name.split('.').pop().toLowerCase();
+    const icon = ext === 'pdf' ? '📄' : '🖼️';
+    document.getElementById('dokFilePreview').innerHTML =
+      `<span class="badge badge-success">${icon} ${escHtml(file.name)} (${(file.size / 1024).toFixed(0)} KB) ✅</span>`;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function simpanDokumen() {
+  const selKary = document.getElementById('dokKaryawan');
+  const karyawanId = selKary.value;
+  const opt = selKary.options[selKary.selectedIndex];
+  const namaKaryawan = opt ? opt.dataset.nama || '' : '';
+  const tipeDokumen = document.getElementById('dokTipe').value;
+  const keterangan = document.getElementById('dokKeterangan').value;
+  if (!karyawanId) return toast('Pilih karyawan dulu', 'warning');
+  if (!tipeDokumen) return toast('Pilih tipe dokumen', 'warning');
+  if (!window._dokFileData) return toast('Upload file dulu', 'warning');
+  const data = {
+    karyawanId,
+    namaKaryawan,
+    tipeDokumen,
+    keterangan,
+    fileData: window._dokFileData,
+    fileName: window._dokFileName,
+    createdAt: new Date().toISOString(),
+  };
+  await db.collection('hrd_dokumen_karyawan').add(data);
+  window._dokFileData = null;
+  window._dokFileName = null;
+  closeModalDirect();
+  toast(`Dokumen ${tipeDokumen} untuk ${namaKaryawan} berhasil diupload`, 'success');
+  showKontrakTab('dokumen');
+}
+
+function lihatDokumen(id) {
+  db.collection('hrd_dokumen_karyawan')
+    .doc(id)
+    .get()
+    .then((d) => {
+      const p = d.data();
+      if (!p || !p.fileData) return toast('File tidak ditemukan', 'warning');
+      const ext = (p.fileName || '').split('.').pop().toLowerCase();
+      let content = `<div class="modal-title">📁 ${escHtml(p.tipeDokumen || 'Dokumen')} — ${escHtml(p.namaKaryawan || '')}</div>`;
+      if (p.keterangan)
+        content += `<p class="text-sm mb-8" style="color:#666">${escHtml(p.keterangan)}</p>`;
+      if (ext === 'pdf') {
+        content += `<iframe src="${p.fileData}" style="width:100%;height:500px;border:1px solid var(--border);border-radius:8px"></iframe>`;
+      } else {
+        content += `<img src="${p.fileData}" style="max-width:100%;border-radius:8px;border:1px solid var(--border)">`;
+      }
+      content += `<div class="mt-8"><a href="${p.fileData}" download="${escHtml(p.fileName || 'dokumen')}" class="btn btn-primary btn-sm">⬇️ Download</a></div>`;
+      openModal(content, true);
+    });
+}
+
+async function hapusDokumen(id) {
+  if (!confirm('Hapus dokumen ini?')) return;
+  await db.collection('hrd_dokumen_karyawan').doc(id).delete();
+  toast('Dokumen dihapus', 'success');
+  filterDokumenList();
 }
 
 // ── ASSET ─────────────────────────────────────────────────────
