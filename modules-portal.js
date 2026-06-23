@@ -1364,6 +1364,62 @@ async function renderPortalKPI() {
   document.getElementById('tblMyKPI').innerHTML = h;
 }
 
+// ── PORTAL: DOKUMEN SAYA ──────────────────────────────────────
+async function renderPortalDokumen() {
+  const main = document.getElementById('mainContent');
+  main.innerHTML = `<div class="page-title"><span>📁 Dokumen Saya</span></div><div class="card" id="portalDokContent">Loading...</div>`;
+  const u = currentUser;
+  // Find karyawan ID linked to this user
+  let karyawanId = u.linkedKaryawan || '';
+  if (!karyawanId) {
+    const kSnap = await db.collection('hrd_karyawan').where('nama', '==', u.nama).limit(1).get();
+    if (!kSnap.empty) karyawanId = kSnap.docs[0].id;
+  }
+  if (!karyawanId) {
+    document.getElementById('portalDokContent').innerHTML =
+      '<p class="text-sm" style="color:#999">Data karyawan belum terhubung. Hubungi admin.</p>';
+    return;
+  }
+  // Load documents
+  const [dokSnap, kontrakSnap] = await Promise.all([
+    db.collection('hrd_dokumen_karyawan').where('karyawanId', '==', karyawanId).get(),
+    db.collection('hrd_kontrak').where('karyawanId', '==', karyawanId).get(),
+  ]);
+  let html = '';
+  // Kontrak section
+  html += '<div class="fw-700 mb-8" style="color:var(--primary)">📄 Kontrak Kerja</div>';
+  if (kontrakSnap.empty) {
+    html += '<p class="text-sm mb-16" style="color:#999">Belum ada data kontrak.</p>';
+  } else {
+    html +=
+      '<div class="table-wrap mb-16"><table><thead><tr><th>Kontrak Ke-</th><th>Jenis</th><th>Mulai</th><th>Berakhir</th><th>File</th></tr></thead><tbody>';
+    kontrakSnap.forEach((kd) => {
+      const k = kd.data();
+      const viewBtn =
+        k.fileURL || k.fileData
+          ? `<button class="btn btn-xs btn-success" onclick="lihatFileKontrak('${kd.id}')">👁️ Lihat</button>`
+          : '<span class="text-xs" style="color:#999">-</span>';
+      html += `<tr><td class="fw-700">${k.kontrakKe || '-'}</td><td>${escHtml(k.jenis === 'kerja' ? 'PKWT' : k.jenis === 'tetap' ? 'PKWTT' : k.jenis || '-')}</td><td>${formatDate(k.mulai)}</td><td>${formatDate(k.berakhir)}</td><td>${viewBtn}</td></tr>`;
+    });
+    html += '</tbody></table></div>';
+  }
+  // Dokumen section
+  html +=
+    '<div class="fw-700 mb-8" style="color:var(--primary)">📁 Berkas & Kelengkapan Dokumen</div>';
+  if (dokSnap.empty) {
+    html += '<p class="text-sm" style="color:#999">Belum ada dokumen diupload.</p>';
+  } else {
+    html +=
+      '<div class="table-wrap"><table><thead><tr><th>Tipe Dokumen</th><th>Nama File</th><th>Keterangan</th><th>Tanggal Upload</th><th>Aksi</th></tr></thead><tbody>';
+    dokSnap.forEach((dd) => {
+      const doc = dd.data();
+      html += `<tr><td><span class="badge badge-info">${escHtml(doc.tipeDokumen || '-')}</span></td><td class="text-xs">${escHtml(doc.fileName || '-')}</td><td class="text-xs">${escHtml(doc.keterangan || '-')}</td><td class="text-xs">${doc.createdAt ? new Date(doc.createdAt).toLocaleDateString('id-ID') : '-'}</td><td><button class="btn btn-xs btn-success" onclick="lihatDokumen('${dd.id}')">👁️ Lihat</button></td></tr>`;
+    });
+    html += '</tbody></table></div>';
+  }
+  document.getElementById('portalDokContent').innerHTML = html;
+}
+
 // ── PORTAL: SETTING AKUN ──────────────────────────────────────
 function renderPortalSetting() {
   const u = currentUser;

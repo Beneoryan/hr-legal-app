@@ -428,41 +428,78 @@ function lihatFileKontrak(id) {
 async function renderDokumenKaryawan(container) {
   container.innerHTML = `<div class="card">
     <div class="card-header"><div class="card-title">📁 Dokumen Kelengkapan Karyawan</div><button class="btn btn-primary btn-sm" onclick="modalUploadDokumen()">+ Upload Dokumen</button></div>
-    <p class="text-sm mb-16" style="color:#666">Kelola softcopy dokumen karyawan: KTP, KK, SIM, Ijazah, SKCK, Sertifikat, dll. Pilih nama karyawan lalu upload file.</p>
+    <p class="text-sm mb-16" style="color:#666">Dokumen dikelompokkan per karyawan. Klik nama untuk melihat berkas.</p>
     <div class="flex gap-8 mb-16">
-      <select class="form-control" id="filterDokKary" onchange="filterDokumenList()" style="max-width:250px"><option value="">Semua Karyawan</option></select>
-      <select class="form-control" id="filterDokTipe" onchange="filterDokumenList()" style="max-width:180px"><option value="">Semua Tipe</option><option value="KTP">KTP</option><option value="KK">Kartu Keluarga</option><option value="SIM">SIM</option><option value="Ijazah">Ijazah</option><option value="SKCK">SKCK</option><option value="Sertifikat">Sertifikat</option><option value="BPJS">BPJS</option><option value="Passport">Passport</option><option value="CV">CV</option><option value="Kontrak">Kontrak</option><option value="Lainnya">Lainnya</option></select>
+      <input class="form-control" placeholder="🔍 Cari nama karyawan..." id="searchDokKary" oninput="renderDokFolders()" style="max-width:300px">
     </div>
-    <div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Tipe Dokumen</th><th>Nama File</th><th>Keterangan</th><th>Tanggal Upload</th><th>Aksi</th></tr></thead><tbody id="tblDokumen"></tbody></table></div>
+    <div id="dokFolderContainer">Loading...</div>
   </div>`;
-  // Populate filter
+  // Load all documents grouped by karyawan
+  const snap = await db.collection('hrd_dokumen_karyawan').get();
+  window._allDokumen = [];
+  snap.forEach((d) => window._allDokumen.push({ id: d.id, ...d.data() }));
+  // Also load karyawan list for names/photos
   const karySnap = await db.collection('hrd_karyawan').get();
-  const selFilter = document.getElementById('filterDokKary');
+  window._karyawanMap = {};
   karySnap.forEach((d) => {
-    const k = d.data();
-    if (k.status === 'aktif' || !k.status)
-      selFilter.innerHTML += `<option value="${d.id}">${escHtml(k.nama)}</option>`;
+    window._karyawanMap[d.id] = { id: d.id, ...d.data() };
   });
-  await filterDokumenList();
+  renderDokFolders();
 }
 
-async function filterDokumenList() {
-  const karyFilter = document.getElementById('filterDokKary')?.value || '';
-  const tipeFilter = document.getElementById('filterDokTipe')?.value || '';
-  let query = db.collection('hrd_dokumen_karyawan');
-  if (karyFilter) query = query.where('karyawanId', '==', karyFilter);
-  const snap = await query.get();
-  let docs = [];
-  snap.forEach((d) => docs.push({ id: d.id, ...d.data() }));
-  if (tipeFilter) docs = docs.filter((d) => d.tipeDokumen === tipeFilter);
-  docs.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-  let h = '';
-  if (!docs.length) h = '<tr><td colspan="6" class="text-center">Belum ada dokumen.</td></tr>';
-  else
-    docs.forEach((p) => {
-      h += `<tr><td class="fw-700">${escHtml(p.namaKaryawan || '-')}</td><td><span class="badge badge-info">${escHtml(p.tipeDokumen || '-')}</span></td><td class="text-xs">${escHtml(p.fileName || '-')}</td><td class="text-xs">${escHtml(p.keterangan || '-')}</td><td class="text-xs">${p.createdAt ? new Date(p.createdAt).toLocaleDateString('id-ID') : '-'}</td><td><button class="btn btn-xs btn-success" onclick="lihatDokumen('${p.id}')">👁️</button> <button class="btn btn-xs btn-danger" onclick="hapusDokumen('${p.id}')">🗑️</button></td></tr>`;
+function renderDokFolders() {
+  const searchQ = (document.getElementById('searchDokKary')?.value || '').toLowerCase();
+  const docs = window._allDokumen || [];
+  // Group by karyawanId
+  const grouped = {};
+  docs.forEach((d) => {
+    const key = d.karyawanId || 'unknown';
+    if (!grouped[key]) grouped[key] = { nama: d.namaKaryawan || '-', docs: [] };
+    grouped[key].docs.push(d);
+  });
+  // Sort by name
+  const entries = Object.entries(grouped).sort((a, b) => a[1].nama.localeCompare(b[1].nama));
+  let html = '';
+  let visibleCount = 0;
+  entries.forEach(([karyId, group]) => {
+    if (searchQ && !group.nama.toLowerCase().includes(searchQ)) return;
+    visibleCount++;
+    const kary = window._karyawanMap[karyId] || {};
+    const avatar = kary.foto
+      ? `<img src="${kary.foto}" style="width:36px;height:36px;border-radius:50%;object-fit:cover">`
+      : `<div style="width:36px;height:36px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.9rem">${(group.nama || '?').charAt(0)}</div>`;
+    const docCount = group.docs.length;
+    const tipes = [...new Set(group.docs.map((d) => d.tipeDokumen))].filter(Boolean);
+    html += `<div class="card mb-8" style="border-left:4px solid var(--primary);cursor:pointer" onclick="toggleDokFolder('${karyId}')">
+      <div style="display:flex;align-items:center;gap:12px">
+        ${avatar}
+        <div style="flex:1"><div class="fw-700">${escHtml(group.nama)}</div><div class="text-xs" style="color:#999">${escHtml(kary.departemen || '-')} • ${escHtml(kary.posisi || '-')}</div></div>
+        <div style="text-align:right"><span class="badge badge-info">${docCount} file</span><div class="text-xs mt-4" style="color:#999">${tipes.join(', ')}</div></div>
+        <span id="dokArrow_${karyId}" style="font-size:1.2rem;transition:.2s">▶</span>
+      </div>
+    </div>
+    <div id="dokFolder_${karyId}" style="display:none;margin-left:20px;margin-bottom:16px;border-left:2px solid var(--border);padding-left:12px">
+      <div class="table-wrap"><table><thead><tr><th>Tipe</th><th>Nama File</th><th>Keterangan</th><th>Tanggal</th><th>Aksi</th></tr></thead><tbody>`;
+    group.docs.sort((a, b) => (a.tipeDokumen || '').localeCompare(b.tipeDokumen || ''));
+    group.docs.forEach((p) => {
+      html += `<tr><td><span class="badge badge-info">${escHtml(p.tipeDokumen || '-')}</span></td><td class="text-xs">${escHtml(p.fileName || '-')}</td><td class="text-xs">${escHtml(p.keterangan || '-')}</td><td class="text-xs">${p.createdAt ? new Date(p.createdAt).toLocaleDateString('id-ID') : '-'}</td><td><button class="btn btn-xs btn-success" onclick="event.stopPropagation();lihatDokumen('${p.id}')">👁️</button> <button class="btn btn-xs btn-danger" onclick="event.stopPropagation();hapusDokumen('${p.id}')">🗑️</button></td></tr>`;
     });
-  document.getElementById('tblDokumen').innerHTML = h;
+    html += `</tbody></table></div>
+      <button class="btn btn-xs btn-primary mt-8" onclick="event.stopPropagation();modalUploadDokumen('${karyId}')">+ Upload untuk ${escHtml(group.nama)}</button>
+    </div>`;
+  });
+  if (!visibleCount)
+    html = '<p class="text-sm" style="color:#999;text-align:center">Tidak ada data dokumen.</p>';
+  document.getElementById('dokFolderContainer').innerHTML = html;
+}
+
+function toggleDokFolder(karyId) {
+  const folder = document.getElementById('dokFolder_' + karyId);
+  const arrow = document.getElementById('dokArrow_' + karyId);
+  if (!folder) return;
+  const open = folder.style.display !== 'none';
+  folder.style.display = open ? 'none' : 'block';
+  if (arrow) arrow.textContent = open ? '▶' : '▼';
 }
 
 async function modalUploadDokumen(preKaryId) {

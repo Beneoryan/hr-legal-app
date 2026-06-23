@@ -371,6 +371,7 @@ function buildNavItems(isPortalUser) {
       ['portal-disc', '🧠', 'DISC Test'],
       ['portal-kpi', '📈', 'KPI Saya'],
       ['portal-test-kesehatan', '🏥', 'Test Kesehatan'],
+      ['portal-dokumen', '📁', 'Dokumen Saya'],
     ]);
     nav += navGroup('🏢 Organisasi', [
       ['portal-struktur', '🌳', 'Struktur Org'],
@@ -562,6 +563,7 @@ function navigateTo(page) {
     'portal-cuti': renderPortalCuti,
     'portal-gaji': renderPortalGaji,
     'portal-jobdesk': renderPortalJobdesk,
+    'portal-dokumen': renderPortalDokumen,
     'portal-peraturan': renderPortalPeraturan,
     'portal-disc': renderPortalDisc,
     'portal-reimburse': renderPortalReimburse,
