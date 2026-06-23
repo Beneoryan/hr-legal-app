@@ -81,7 +81,7 @@ async function renderDashboard() {
         let bDate = new Date(thisYear, bMonth - 1, bDay);
         if (bDate < today) bDate = new Date(thisYear + 1, bMonth - 1, bDay);
         const diffDays = Math.floor((bDate - today) / (1000 * 60 * 60 * 24));
-        if (diffDays <= 7) {
+        if (diffDays <= 3) {
           const age = thisYear - parseInt(parts[0]) + (diffDays < 0 ? 1 : 0);
           upcoming.push({ ...k, diffDays, age, bDay, bMonth });
         }
