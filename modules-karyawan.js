@@ -58,6 +58,61 @@ async function renderDashboard() {
   widgetRight +=
     '<div class="card"><div class="card-title mb-8">⚡ Aksi Cepat</div><div class="flex flex-wrap gap-8"><button class="btn btn-sm" style="background:#0d47a1;color:#fff" onclick="navigateTo(\'daily-task\')">📋 Daily Task</button><button class="btn btn-primary btn-sm" onclick="navigateTo(\'absensi\')">📍 Absensi</button><button class="btn btn-info btn-sm" onclick="navigateTo(\'cuti\')">🏖️ Cuti</button><button class="btn btn-sm" style="background:#ff6f00;color:#fff" onclick="navigateTo(\'overtime\')">⏰ Overtime</button><button class="btn btn-success btn-sm" onclick="navigateTo(\'karyawan\')">👥 Karyawan</button><button class="btn btn-warning btn-sm" onclick="navigateTo(\'approval-center\')">✅ Approval</button><button class="btn btn-sm" style="background:#7b1fa2;color:#fff" onclick="navigateTo(\'penggajian\')">💰 Penggajian</button><button class="btn btn-sm" style="background:#00796b;color:#fff" onclick="navigateTo(\'reimbursement\')">🧾 Reimburse</button><button class="btn btn-sm" style="background:#1565c0;color:#fff" onclick="navigateTo(\'meeting\')">📅 Meeting</button><button class="btn btn-sm" style="background:#4e342e;color:#fff" onclick="navigateTo(\'chat\')">💬 Obrolan</button><button class="btn btn-sm" style="background:#37474f;color:#fff" onclick="navigateTo(\'broadcast\')">📡 Broadcast</button></div></div>';
   document.getElementById('dashWidgets').innerHTML = widgetLeft + widgetRight;
+  // Birthday Reminder — only for manager+ and admin (level 3+)
+  if (hasAccess(3)) {
+    try {
+      const allKary = [];
+      karyawan.forEach((d) => allKary.push({ id: d.id, ...d.data() }));
+      const today = new Date();
+      const todayMD =
+        String(today.getMonth() + 1).padStart(2, '0') +
+        '-' +
+        String(today.getDate()).padStart(2, '0');
+      // Check upcoming 7 days
+      const upcoming = [];
+      allKary.forEach((k) => {
+        if (!k.tanggalLahir) return;
+        const parts = k.tanggalLahir.split('-'); // YYYY-MM-DD
+        if (parts.length < 3) return;
+        const bMonth = parseInt(parts[1]);
+        const bDay = parseInt(parts[2]);
+        // Calculate days until birthday
+        const thisYear = today.getFullYear();
+        let bDate = new Date(thisYear, bMonth - 1, bDay);
+        if (bDate < today) bDate = new Date(thisYear + 1, bMonth - 1, bDay);
+        const diffDays = Math.floor((bDate - today) / (1000 * 60 * 60 * 24));
+        if (diffDays <= 7) {
+          const age = thisYear - parseInt(parts[0]) + (diffDays < 0 ? 1 : 0);
+          upcoming.push({ ...k, diffDays, age, bDay, bMonth });
+        }
+      });
+      upcoming.sort((a, b) => a.diffDays - b.diffDays);
+      if (upcoming.length) {
+        let bdHtml =
+          '<div class="card" style="border-left:4px solid #e91e63"><div class="card-title mb-8">🎂 Birthday Reminder</div>';
+        upcoming.forEach((k) => {
+          const label =
+            k.diffDays === 0
+              ? '<span class="badge badge-danger">HARI INI! 🎉</span>'
+              : k.diffDays === 1
+                ? '<span class="badge badge-warning">Besok</span>'
+                : `<span class="badge badge-info">${k.diffDays} hari lagi</span>`;
+          const avatar = k.foto
+            ? `<img src="${k.foto}" style="width:32px;height:32px;border-radius:50%;object-fit:cover">`
+            : `<div style="width:32px;height:32px;border-radius:50%;background:#e91e63;color:#fff;display:flex;align-items:center;justify-content:center;font-size:.8rem">${(k.nama || '?').charAt(0)}</div>`;
+          bdHtml += `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+            ${avatar}
+            <div style="flex:1"><div class="fw-700 text-sm">${escHtml(k.nama)}</div><div class="text-xs" style="color:#999">${escHtml(k.departemen || '-')} • ${escHtml(k.posisi || '-')}</div></div>
+            <div style="text-align:right"><div>${label}</div><div class="text-xs" style="color:#999">${k.bDay}/${k.bMonth} (${k.age} tahun)</div></div>
+          </div>`;
+        });
+        bdHtml += '</div>';
+        document.getElementById('dashWidgets').innerHTML += bdHtml;
+      }
+    } catch (e) {
+      console.warn('Birthday widget error:', e);
+    }
+  }
   // Load Daily Task summary for dashboard
   try {
     const dtSnap = await db.collection('hrd_daily_tasks').get();
@@ -148,14 +203,12 @@ async function syncDeptFromKaryawan() {
   let added = 0;
   for (const [nama, info] of depts) {
     if (!existing.has(nama)) {
-      await db
-        .collection('hrd_departemen')
-        .add({
-          nama,
-          kode: nama.substring(0, 3).toUpperCase(),
-          kepala: info.head,
-          createdAt: new Date().toISOString(),
-        });
+      await db.collection('hrd_departemen').add({
+        nama,
+        kode: nama.substring(0, 3).toUpperCase(),
+        kepala: info.head,
+        createdAt: new Date().toISOString(),
+      });
       added++;
     }
   }
@@ -453,18 +506,16 @@ async function simpanKaryawan(id) {
       data.kontrakAkhir &&
       (data.kontrakMulai !== old.kontrakMulai || data.kontrakAkhir !== old.kontrakAkhir)
     ) {
-      await db
-        .collection('hrd_kontrak_history')
-        .add({
-          karyawanId: id,
-          nama: data.nama,
-          kontrakKe: data.kontrakKe,
-          jenis: data.kontrakJenis,
-          mulai: data.kontrakMulai,
-          akhir: data.kontrakAkhir,
-          durasi: data.kontrakDurasi,
-          createdAt: new Date().toISOString(),
-        });
+      await db.collection('hrd_kontrak_history').add({
+        karyawanId: id,
+        nama: data.nama,
+        kontrakKe: data.kontrakKe,
+        jenis: data.kontrakJenis,
+        mulai: data.kontrakMulai,
+        akhir: data.kontrakAkhir,
+        durasi: data.kontrakDurasi,
+        createdAt: new Date().toISOString(),
+      });
     }
     await db.collection('hrd_karyawan').doc(id).update(data);
   } else await db.collection('hrd_karyawan').add({ ...data, createdAt: new Date().toISOString() });
@@ -1042,14 +1093,12 @@ async function simpanOnboarding() {
     .value.split('\n')
     .filter((x) => x.trim())
     .map((x) => ({ task: x.trim(), done: false }));
-  await db
-    .collection('hrd_onboarding')
-    .add({
-      nama,
-      tanggalMulai: document.getElementById('obTgl').value,
-      checklist: items,
-      createdAt: new Date().toISOString(),
-    });
+  await db.collection('hrd_onboarding').add({
+    nama,
+    tanggalMulai: document.getElementById('obTgl').value,
+    checklist: items,
+    createdAt: new Date().toISOString(),
+  });
   closeModalDirect();
   toast('Ditambahkan', 'success');
   renderOnboarding();
@@ -1414,22 +1463,20 @@ async function syncDiscCalonToKandidat() {
   for (const doc of discSnap.docs) {
     const r = doc.data();
     if (!r.nama || existingNames.has(r.nama.toLowerCase())) continue;
-    await db
-      .collection('hrd_kandidat')
-      .add({
-        nama: r.nama,
-        email: r.kontak || '',
-        posisi: r.posisi || '',
-        stage: 'DISC Test Done',
-        sumber: 'DISC Test Online',
-        discPattern: r.pattern || '',
-        discProfile: r.profileName || '',
-        discScore: r.kpiScore || 0,
-        usia: r.usia || '',
-        jenisKelamin: r.jenisKelamin || '',
-        kontak: r.kontak || '',
-        createdAt: r.createdAt || new Date().toISOString(),
-      });
+    await db.collection('hrd_kandidat').add({
+      nama: r.nama,
+      email: r.kontak || '',
+      posisi: r.posisi || '',
+      stage: 'DISC Test Done',
+      sumber: 'DISC Test Online',
+      discPattern: r.pattern || '',
+      discProfile: r.profileName || '',
+      discScore: r.kpiScore || 0,
+      usia: r.usia || '',
+      jenisKelamin: r.jenisKelamin || '',
+      kontak: r.kontak || '',
+      createdAt: r.createdAt || new Date().toISOString(),
+    });
     existingNames.add(r.nama.toLowerCase());
     count++;
   }
