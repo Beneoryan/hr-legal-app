@@ -14,6 +14,27 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+const storage = firebase.storage();
+
+// ── FILE UPLOAD HELPER — Firebase Storage (max 100MB) ─────────
+async function uploadFileToStorage(file, path) {
+  if (!file) throw new Error('No file provided');
+  if (file.size > 100 * 1024 * 1024) throw new Error('File terlalu besar (max 100MB)');
+  const storageRef = storage.ref(path);
+  const snapshot = await storageRef.put(file);
+  const downloadURL = await snapshot.ref.getDownloadURL();
+  return downloadURL;
+}
+
+async function deleteFileFromStorage(url) {
+  if (!url || !url.includes('firebasestorage')) return;
+  try {
+    const fileRef = storage.refFromURL(url);
+    await fileRef.delete();
+  } catch (e) {
+    console.warn('[Storage] Delete failed:', e.message);
+  }
+}
 
 // ── FCM (Firebase Cloud Messaging) Push Notifications ──────────────────
 // IMPORTANT: Replace this placeholder with your actual VAPID public key.

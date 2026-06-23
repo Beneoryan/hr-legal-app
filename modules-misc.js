@@ -283,10 +283,11 @@ async function renderKontrakList(container) {
     docs.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
     docs.forEach((p) => {
       const expired = p.berakhir && p.berakhir < today;
-      const hasFile = p.fileData
-        ? '<span class="badge badge-success">Ada</span>'
-        : '<span class="badge badge-warning">-</span>';
-      h += `<tr><td class="fw-700">${escHtml(p.namaKaryawan || p.pihak || '-')}</td><td>${p.kontrakKe || '-'}</td><td>${escHtml(p.jenis === 'kerja' ? 'PKWT' : p.jenis === 'tetap' ? 'PKWTT' : p.jenis || '-')}</td><td>${formatDate(p.mulai)}</td><td>${formatDate(p.berakhir)}</td><td><span class="badge badge-${expired ? 'danger' : 'success'}">${expired ? 'Expired' : 'Aktif'}</span></td><td>${hasFile}</td><td><button class="btn btn-xs btn-info" onclick="modalKontrak('${p.id}')">✏️</button>${p.fileData ? ` <button class="btn btn-xs btn-success" onclick="lihatFileKontrak('${p.id}')">👁️</button>` : ''} <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_kontrak','${p.id}','kontrak')">🗑️</button></td></tr>`;
+      const hasFile =
+        p.fileURL || p.fileData
+          ? '<span class="badge badge-success">Ada</span>'
+          : '<span class="badge badge-warning">-</span>';
+      h += `<tr><td class="fw-700">${escHtml(p.namaKaryawan || p.pihak || '-')}</td><td>${p.kontrakKe || '-'}</td><td>${escHtml(p.jenis === 'kerja' ? 'PKWT' : p.jenis === 'tetap' ? 'PKWTT' : p.jenis || '-')}</td><td>${formatDate(p.mulai)}</td><td>${formatDate(p.berakhir)}</td><td><span class="badge badge-${expired ? 'danger' : 'success'}">${expired ? 'Expired' : 'Aktif'}</span></td><td>${hasFile}</td><td><button class="btn btn-xs btn-info" onclick="modalKontrak('${p.id}')">✏️</button>${p.fileURL || p.fileData ? ` <button class="btn btn-xs btn-success" onclick="lihatFileKontrak('${p.id}')">👁️</button>` : ''} <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_kontrak','${p.id}','kontrak')">🗑️</button></td></tr>`;
     });
   }
   document.getElementById('tblKontrak').innerHTML = h;
@@ -328,31 +329,31 @@ async function showKontrakForm(id, p) {
     </div>
     <div class="form-group"><label>Catatan</label><textarea class="form-control" id="ktCatatan" style="min-height:50px">${escHtml(p.catatan || '')}</textarea></div>
     <div class="form-group">
-      <label>Upload Softcopy Kontrak (PDF/Image)</label>
+      <label>Upload Softcopy Kontrak (PDF/Image, max 100MB)</label>
       <input class="form-control" type="file" id="ktFile" accept=".pdf,image/png,image/jpeg,image/jpg" onchange="previewKontrakFile(this)">
-      <div id="ktFilePreview" class="mt-8">${p.fileData ? '<span class="badge badge-success">File sudah ada</span>' : ''}</div>
+      <div id="ktFilePreview" class="mt-8">${p.fileURL ? '<span class="badge badge-success">File sudah ada</span>' : p.fileData ? '<span class="badge badge-success">File sudah ada (legacy)</span>' : ''}</div>
     </div>
     <button class="btn btn-primary" onclick="simpanKontrak('${id || ''}')">💾 Simpan Kontrak</button>`,
     true
   );
-  window._kontrakFileData = p.fileData || null;
+  window._kontrakFile = null;
   window._kontrakFileName = p.fileName || null;
 }
 
 function previewKontrakFile(input) {
   const file = input.files[0];
   if (!file) return;
-  if (file.size > 5 * 1024 * 1024) return toast('File terlalu besar (max 5MB)', 'warning');
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    window._kontrakFileData = e.target.result;
-    window._kontrakFileName = file.name;
-    const ext = file.name.split('.').pop().toLowerCase();
-    const icon = ext === 'pdf' ? '📄' : '🖼️';
-    document.getElementById('ktFilePreview').innerHTML =
-      `<span class="badge badge-success">${icon} ${escHtml(file.name)} (${(file.size / 1024).toFixed(0)} KB) ✅</span>`;
-  };
-  reader.readAsDataURL(file);
+  if (file.size > 100 * 1024 * 1024) return toast('File terlalu besar (max 100MB)', 'warning');
+  window._kontrakFile = file;
+  window._kontrakFileName = file.name;
+  const ext = file.name.split('.').pop().toLowerCase();
+  const icon = ext === 'pdf' ? '📄' : '🖼️';
+  const sizeLabel =
+    file.size > 1024 * 1024
+      ? (file.size / (1024 * 1024)).toFixed(1) + ' MB'
+      : (file.size / 1024).toFixed(0) + ' KB';
+  document.getElementById('ktFilePreview').innerHTML =
+    `<span class="badge badge-success">${icon} ${escHtml(file.name)} (${sizeLabel}) ✅</span>`;
 }
 
 async function simpanKontrak(id) {
@@ -374,13 +375,22 @@ async function simpanKontrak(id) {
   };
   if (!karyawanId) return toast('Pilih karyawan dulu', 'warning');
   if (!data.mulai || !data.berakhir) return toast('Tanggal mulai & berakhir wajib', 'warning');
-  if (window._kontrakFileData) {
-    data.fileData = window._kontrakFileData;
-    data.fileName = window._kontrakFileName;
+  // Upload file to Firebase Storage
+  if (window._kontrakFile) {
+    try {
+      toast('⏳ Mengupload file...', 'info');
+      const path = `kontrak/${karyawanId}/${Date.now()}_${window._kontrakFileName}`;
+      const fileURL = await uploadFileToStorage(window._kontrakFile, path);
+      data.fileURL = fileURL;
+      data.fileName = window._kontrakFileName;
+      data.fileSize = window._kontrakFile.size;
+    } catch (e) {
+      return toast('Gagal upload file: ' + e.message, 'error');
+    }
   }
   if (id) await db.collection('hrd_kontrak').doc(id).update(data);
   else await db.collection('hrd_kontrak').add({ ...data, createdAt: new Date().toISOString() });
-  window._kontrakFileData = null;
+  window._kontrakFile = null;
   window._kontrakFileName = null;
   closeModalDirect();
   toast('Kontrak disimpan', 'success');
@@ -393,13 +403,19 @@ function lihatFileKontrak(id) {
     .get()
     .then((d) => {
       const p = d.data();
-      if (!p || !p.fileData) return toast('File tidak ditemukan', 'warning');
+      const url = p.fileURL || p.fileData;
+      if (!p || !url) return toast('File tidak ditemukan', 'warning');
       const ext = (p.fileName || '').split('.').pop().toLowerCase();
+      const sizeLabel = p.fileSize
+        ? p.fileSize > 1024 * 1024
+          ? (p.fileSize / (1024 * 1024)).toFixed(1) + ' MB'
+          : (p.fileSize / 1024).toFixed(0) + ' KB'
+        : '';
       let content = '';
       if (ext === 'pdf') {
-        content = `<div class="modal-title">📄 ${escHtml(p.fileName || 'Kontrak')}</div><p class="text-sm mb-8">${escHtml(p.namaKaryawan || '')} — Kontrak Ke-${p.kontrakKe || 1}</p><iframe src="${p.fileData}" style="width:100%;height:500px;border:1px solid var(--border);border-radius:8px"></iframe><div class="mt-8"><a href="${p.fileData}" download="${escHtml(p.fileName || 'kontrak.pdf')}" class="btn btn-primary btn-sm">⬇️ Download</a></div>`;
+        content = `<div class="modal-title">📄 ${escHtml(p.fileName || 'Kontrak')}</div><p class="text-sm mb-8">${escHtml(p.namaKaryawan || '')} — Kontrak Ke-${p.kontrakKe || 1} ${sizeLabel ? '(' + sizeLabel + ')' : ''}</p><iframe src="${url}" style="width:100%;height:500px;border:1px solid var(--border);border-radius:8px"></iframe><div class="mt-8"><a href="${url}" target="_blank" class="btn btn-primary btn-sm">⬇️ Download</a></div>`;
       } else {
-        content = `<div class="modal-title">🖼️ ${escHtml(p.fileName || 'Kontrak')}</div><p class="text-sm mb-8">${escHtml(p.namaKaryawan || '')} — Kontrak Ke-${p.kontrakKe || 1}</p><img src="${p.fileData}" style="max-width:100%;border-radius:8px;border:1px solid var(--border)"><div class="mt-8"><a href="${p.fileData}" download="${escHtml(p.fileName || 'kontrak.jpg')}" class="btn btn-primary btn-sm">⬇️ Download</a></div>`;
+        content = `<div class="modal-title">🖼️ ${escHtml(p.fileName || 'Kontrak')}</div><p class="text-sm mb-8">${escHtml(p.namaKaryawan || '')} — Kontrak Ke-${p.kontrakKe || 1} ${sizeLabel ? '(' + sizeLabel + ')' : ''}</p><img src="${url}" style="max-width:100%;border-radius:8px;border:1px solid var(--border)"><div class="mt-8"><a href="${url}" target="_blank" class="btn btn-primary btn-sm">⬇️ Download</a></div>`;
       }
       openModal(content, true);
     });
@@ -465,31 +481,31 @@ async function modalUploadDokumen(preKaryId) {
       <div class="form-group"><label>Keterangan</label><input class="form-control" id="dokKeterangan" placeholder="No. dokumen, catatan, dll"></div>
     </div>
     <div class="form-group">
-      <label>Upload File (PDF/Image, max 5MB) <span style="color:var(--danger)">*</span></label>
+      <label>Upload File (PDF/Image, max 100MB) <span style="color:var(--danger)">*</span></label>
       <input class="form-control" type="file" id="dokFile" accept=".pdf,image/png,image/jpeg,image/jpg" onchange="previewDokumenFile(this)">
       <div id="dokFilePreview" class="mt-8"></div>
     </div>
     <button class="btn btn-primary" onclick="simpanDokumen()">💾 Upload & Simpan</button>`,
     true
   );
-  window._dokFileData = null;
+  window._dokFile = null;
   window._dokFileName = null;
 }
 
 function previewDokumenFile(input) {
   const file = input.files[0];
   if (!file) return;
-  if (file.size > 5 * 1024 * 1024) return toast('File terlalu besar (max 5MB)', 'warning');
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    window._dokFileData = e.target.result;
-    window._dokFileName = file.name;
-    const ext = file.name.split('.').pop().toLowerCase();
-    const icon = ext === 'pdf' ? '📄' : '🖼️';
-    document.getElementById('dokFilePreview').innerHTML =
-      `<span class="badge badge-success">${icon} ${escHtml(file.name)} (${(file.size / 1024).toFixed(0)} KB) ✅</span>`;
-  };
-  reader.readAsDataURL(file);
+  if (file.size > 100 * 1024 * 1024) return toast('File terlalu besar (max 100MB)', 'warning');
+  window._dokFile = file;
+  window._dokFileName = file.name;
+  const ext = file.name.split('.').pop().toLowerCase();
+  const icon = ext === 'pdf' ? '📄' : '🖼️';
+  const sizeLabel =
+    file.size > 1024 * 1024
+      ? (file.size / (1024 * 1024)).toFixed(1) + ' MB'
+      : (file.size / 1024).toFixed(0) + ' KB';
+  document.getElementById('dokFilePreview').innerHTML =
+    `<span class="badge badge-success">${icon} ${escHtml(file.name)} (${sizeLabel}) ✅</span>`;
 }
 
 async function simpanDokumen() {
@@ -501,22 +517,31 @@ async function simpanDokumen() {
   const keterangan = document.getElementById('dokKeterangan').value;
   if (!karyawanId) return toast('Pilih karyawan dulu', 'warning');
   if (!tipeDokumen) return toast('Pilih tipe dokumen', 'warning');
-  if (!window._dokFileData) return toast('Upload file dulu', 'warning');
-  const data = {
-    karyawanId,
-    namaKaryawan,
-    tipeDokumen,
-    keterangan,
-    fileData: window._dokFileData,
-    fileName: window._dokFileName,
-    createdAt: new Date().toISOString(),
-  };
-  await db.collection('hrd_dokumen_karyawan').add(data);
-  window._dokFileData = null;
-  window._dokFileName = null;
-  closeModalDirect();
-  toast(`Dokumen ${tipeDokumen} untuk ${namaKaryawan} berhasil diupload`, 'success');
-  showKontrakTab('dokumen');
+  if (!window._dokFile) return toast('Upload file dulu', 'warning');
+  // Upload to Firebase Storage
+  try {
+    toast('⏳ Mengupload file...', 'info');
+    const path = `dokumen/${karyawanId}/${tipeDokumen}_${Date.now()}_${window._dokFileName}`;
+    const fileURL = await uploadFileToStorage(window._dokFile, path);
+    const data = {
+      karyawanId,
+      namaKaryawan,
+      tipeDokumen,
+      keterangan,
+      fileURL,
+      fileName: window._dokFileName,
+      fileSize: window._dokFile.size,
+      createdAt: new Date().toISOString(),
+    };
+    await db.collection('hrd_dokumen_karyawan').add(data);
+    window._dokFile = null;
+    window._dokFileName = null;
+    closeModalDirect();
+    toast(`Dokumen ${tipeDokumen} untuk ${namaKaryawan} berhasil diupload`, 'success');
+    showKontrakTab('dokumen');
+  } catch (e) {
+    toast('Gagal upload: ' + e.message, 'error');
+  }
 }
 
 function lihatDokumen(id) {
@@ -525,23 +550,37 @@ function lihatDokumen(id) {
     .get()
     .then((d) => {
       const p = d.data();
-      if (!p || !p.fileData) return toast('File tidak ditemukan', 'warning');
+      const url = p.fileURL || p.fileData;
+      if (!p || !url) return toast('File tidak ditemukan', 'warning');
       const ext = (p.fileName || '').split('.').pop().toLowerCase();
+      const sizeLabel = p.fileSize
+        ? p.fileSize > 1024 * 1024
+          ? (p.fileSize / (1024 * 1024)).toFixed(1) + ' MB'
+          : (p.fileSize / 1024).toFixed(0) + ' KB'
+        : '';
       let content = `<div class="modal-title">📁 ${escHtml(p.tipeDokumen || 'Dokumen')} — ${escHtml(p.namaKaryawan || '')}</div>`;
       if (p.keterangan)
-        content += `<p class="text-sm mb-8" style="color:#666">${escHtml(p.keterangan)}</p>`;
+        content += `<p class="text-sm mb-8" style="color:#666">${escHtml(p.keterangan)} ${sizeLabel ? '(' + sizeLabel + ')' : ''}</p>`;
       if (ext === 'pdf') {
-        content += `<iframe src="${p.fileData}" style="width:100%;height:500px;border:1px solid var(--border);border-radius:8px"></iframe>`;
+        content += `<iframe src="${url}" style="width:100%;height:500px;border:1px solid var(--border);border-radius:8px"></iframe>`;
       } else {
-        content += `<img src="${p.fileData}" style="max-width:100%;border-radius:8px;border:1px solid var(--border)">`;
+        content += `<img src="${url}" style="max-width:100%;border-radius:8px;border:1px solid var(--border)">`;
       }
-      content += `<div class="mt-8"><a href="${p.fileData}" download="${escHtml(p.fileName || 'dokumen')}" class="btn btn-primary btn-sm">⬇️ Download</a></div>`;
+      content += `<div class="mt-8"><a href="${url}" target="_blank" class="btn btn-primary btn-sm">⬇️ Download</a></div>`;
       openModal(content, true);
     });
 }
 
 async function hapusDokumen(id) {
   if (!confirm('Hapus dokumen ini?')) return;
+  // Delete file from storage too
+  try {
+    const doc = await db.collection('hrd_dokumen_karyawan').doc(id).get();
+    const data = doc.data();
+    if (data && data.fileURL) await deleteFileFromStorage(data.fileURL);
+  } catch (e) {
+    console.warn('Delete storage file failed:', e);
+  }
   await db.collection('hrd_dokumen_karyawan').doc(id).delete();
   toast('Dokumen dihapus', 'success');
   filterDokumenList();
