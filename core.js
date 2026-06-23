@@ -8,7 +8,7 @@ const firebaseConfig = {
   apiKey: 'AIzaSyAWlNi_iBOWxZBD6E20aHOSrRpPsirDdOM',
   authDomain: 'test-kesehatan-ijef-corp-7c278.firebaseapp.com',
   projectId: 'test-kesehatan-ijef-corp-7c278',
-  storageBucket: 'test-kesehatan-ijef-corp-7c278.appspot.com',
+  storageBucket: 'test-kesehatan-ijef-corp-7c278.firebasestorage.app',
   messagingSenderId: '48180557823',
   appId: '1:48180557823:web:47ea8db8126737dbc0d9ca',
 };
@@ -21,7 +21,8 @@ async function uploadFileToStorage(file, path) {
   if (!file) throw new Error('No file provided');
   if (file.size > 100 * 1024 * 1024) throw new Error('File terlalu besar (max 100MB)');
   const storageRef = storage.ref(path);
-  const snapshot = await storageRef.put(file);
+  const metadata = { contentType: file.type || 'application/octet-stream' };
+  const snapshot = await storageRef.put(file, metadata);
   const downloadURL = await snapshot.ref.getDownloadURL();
   return downloadURL;
 }
