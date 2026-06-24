@@ -1068,9 +1068,12 @@ async function renderApprovalCenter() {
   // Load karyawan for dept mapping
   const karySnap = await db.collection('hrd_karyawan').get();
   const deptMap = {};
+  const gradeMap = {};
   karySnap.forEach((d) => {
     const k = d.data();
-    deptMap[(k.nama || '').toLowerCase()] = k.departemen || '';
+    const namaLower = (k.nama || '').toLowerCase();
+    deptMap[namaLower] = k.departemen || '';
+    gradeMap[namaLower] = (k.gradeJabatan || k.posisi || '').toLowerCase();
   });
   const collections = [
     'hrd_cuti',
@@ -1120,6 +1123,13 @@ async function renderApprovalCenter() {
     const currentApprover = steps[currentStep]?.nama?.toLowerCase() || '';
     const canSee = isAdmin || isGM || item._dept === myDept;
     if (!canSee) return;
+    // Special filter for Misriana: only show submissions from 'head' level
+    const isMisriana = myName === 'misriana';
+    if (isMisriana) {
+      const pengajuGrade = gradeMap[(item.nama || '').toLowerCase()] || '';
+      const isHead = pengajuGrade.includes('head');
+      if (!isHead) return;
+    }
     const isMyTurn = isAdmin || currentApprover === myName;
     const typeLabel = item.collection.replace('hrd_', '').toUpperCase();
     const detail = item.jenis || item.kategori || '';
