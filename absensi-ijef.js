@@ -1189,11 +1189,33 @@ async function doClockOut() {
 
     jamKerjaActual = effectiveWorkMinutes / 60;
 
-    // Check overtime
+    // Check excess working hours (NOT auto-lembur — lembur requires separate approval)
     if (effectiveWorkMinutes > requiredWorkMinutes) {
-      lembur = true;
+      // Only record excess hours, NOT mark as lembur
+      // Lembur flag will only be true if there's an approved overtime request for today
       lemburJam = parseFloat(((effectiveWorkMinutes - requiredWorkMinutes) / 60).toFixed(1));
       statusPulang = 'lengkap';
+      // Check if there's an approved overtime for today
+      try {
+        const otSnap = await db
+          .collection('hrd_overtime')
+          .where('userId', '==', currentUser.id)
+          .get();
+        const todayDate = todayStr();
+        let approvedOT = null;
+        otSnap.forEach((d) => {
+          const ot = d.data();
+          if (ot.tanggal === todayDate && (ot.status === 'approved' || ot.status === 'aktif'))
+            approvedOT = ot;
+        });
+        if (approvedOT) {
+          lembur = true; // Only mark lembur if overtime is approved
+        } else {
+          lembur = false; // Just excess hours, not official overtime
+        }
+      } catch (e) {
+        lembur = false;
+      }
     } else if (effectiveWorkMinutes >= requiredWorkMinutes) {
       statusPulang = 'lengkap';
     } else {
@@ -1249,13 +1271,16 @@ async function doClockOut() {
     flexibleAttendance: flexUser || false,
     jamKerjaActual: jamKerjaActual,
     lembur: lembur,
-    lemburJam: lemburJam,
+    lemburJam: lembur ? lemburJam : 0,
+    kelebihanJam: lemburJam > 0 ? lemburJam : 0,
     coreHoursViolation: coreHoursViolation,
     createdAt: now.toISOString(),
   });
   let msg = '';
   if (flex.enabled) {
-    if (lembur) msg = `(🟣 Lembur ${lemburJam} jam)`;
+    if (lembur) msg = `(🟣 Lembur Disetujui: ${lemburJam} jam)`;
+    else if (lemburJam > 0 && statusPulang === 'lengkap')
+      msg = `(✅ Jam kerja lengkap + kelebihan ${lemburJam} jam tercatat)`;
     else if (statusPulang === 'lengkap') msg = '(✅ Jam kerja lengkap)';
     else msg = `(⚠️ Kurang jam - ${jamKerjaActual.toFixed(1)} jam)`;
   }
@@ -1329,7 +1354,9 @@ async function loadTodayHistory() {
               : 'warning';
     let lemburBadge = '';
     if (p.lembur && p.lemburJam)
-      lemburBadge = ` <span class="badge" style="background:#f3e5f5;color:#7b1fa2">Lembur ${p.lemburJam} jam</span>`;
+      lemburBadge = ` <span class="badge" style="background:#f3e5f5;color:#7b1fa2">Lembur Disetujui ${p.lemburJam} jam</span>`;
+    else if (p.kelebihanJam && p.kelebihanJam > 0)
+      lemburBadge = ` <span class="badge" style="background:#e3f2fd;color:#1565c0">+${p.kelebihanJam} jam tercatat</span>`;
     let coreViolBadge = '';
     if (p.coreHoursViolation)
       coreViolBadge = ' <span class="badge badge-warning">⚠️ Core Hours</span>';
