@@ -51,7 +51,24 @@ async function renderCuti() {
     const items = [];
     cutiSnap.forEach((d) => items.push({ id: d.id, ...d.data() }));
     items.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+    // BOD filter: only show head-level submissions
+    const isBOD = currentUser.role === 'bod';
+    let gradeMapCuti = {};
+    if (isBOD) {
+      karyList.forEach((k) => {
+        gradeMapCuti[(k.nama || '').toLowerCase()] = (
+          k.gradeJabatan ||
+          k.posisi ||
+          ''
+        ).toLowerCase();
+      });
+    }
     items.forEach((p) => {
+      // BOD: skip non-head submissions
+      if (isBOD) {
+        const grade = gradeMapCuti[(p.nama || '').toLowerCase()] || '';
+        if (!grade.includes('head')) return;
+      }
       const badge =
         p.status === 'approved'
           ? 'badge-success'
@@ -68,7 +85,8 @@ async function renderCuti() {
       const quota = kary ? hitungJatahCuti(kary) : 12;
       const used = cutiUsed[uid] || cutiUsed[(p.nama || '').trim().toLowerCase()] || 0;
       const sisa = Math.max(0, quota - used);
-      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.jenis)}</td><td>${formatDate(p.mulai)}-${formatDate(p.selesai)}</td><td>${p.durasi || 1}h</td><td><span class="badge badge-${sisa <= 2 ? 'danger' : sisa <= 5 ? 'warning' : 'success'}">${sisa}/${quota}</span></td><td><span class="badge ${badge}">${p.status}</span></td><td><button class="btn btn-xs btn-info" onclick="viewCutiDetail('${p.id}')" title="Lihat Detail">👁️</button> ${p.status === 'pending' && hasAccess(3) ? `<button class="btn btn-xs btn-success" onclick="approveCuti('${p.id}','approved')">✅</button> <button class="btn btn-xs btn-danger" onclick="approveCuti('${p.id}','rejected')">❌</button>` : ''} ${hasAccess(6) || (p.userId === currentUser.id && p.status === 'pending') ? `<button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_cuti','${p.id}','cuti')">🗑️</button>` : ''}</td></tr>`;
+      const canApprove = p.status === 'pending' && hasAccess(3) && !isBOD;
+      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.jenis)}</td><td>${formatDate(p.mulai)}-${formatDate(p.selesai)}</td><td>${p.durasi || 1}h</td><td><span class="badge badge-${sisa <= 2 ? 'danger' : sisa <= 5 ? 'warning' : 'success'}">${sisa}/${quota}</span></td><td><span class="badge ${badge}">${p.status}</span></td><td><button class="btn btn-xs btn-info" onclick="viewCutiDetail('${p.id}')" title="Lihat Detail">👁️</button> ${canApprove ? `<button class="btn btn-xs btn-success" onclick="approveCuti('${p.id}','approved')">✅</button> <button class="btn btn-xs btn-danger" onclick="approveCuti('${p.id}','rejected')">❌</button>` : ''} ${hasAccess(6) || (p.userId === currentUser.id && p.status === 'pending') ? `<button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_cuti','${p.id}','cuti')">🗑️</button>` : ''}</td></tr>`;
     });
   }
   document.getElementById('tblCuti').innerHTML = h;
@@ -245,18 +263,32 @@ async function renderOvertime() {
   const snap = await (!hasAccess(3)
     ? db.collection('hrd_overtime').where('userId', '==', currentUser.id).get()
     : db.collection('hrd_overtime').get());
+  const isBOD = currentUser.role === 'bod';
+  let gradeMapOT = {};
+  if (isBOD) {
+    const kSnap = await db.collection('hrd_karyawan').get();
+    kSnap.forEach((d) => {
+      const k = d.data();
+      gradeMapOT[(k.nama || '').toLowerCase()] = (k.gradeJabatan || k.posisi || '').toLowerCase();
+    });
+  }
   let h = '';
   if (snap.empty) h = '<tr><td colspan="6" class="text-center">Belum ada</td></tr>';
   else
     snap.forEach((d) => {
       const p = d.data();
+      if (isBOD) {
+        const grade = gradeMapOT[(p.nama || '').toLowerCase()] || '';
+        if (!grade.includes('head')) return;
+      }
       const badge =
         p.status === 'approved'
           ? 'badge-success'
           : p.status === 'rejected'
             ? 'badge-danger'
             : 'badge-warning';
-      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggal)}</td><td>${p.jamMulai || '-'}-${p.jamSelesai || '-'}</td><td>${p.durasi || 0}j</td><td><span class="badge ${badge}">${p.status}</span></td><td><button class="btn btn-xs btn-info" onclick="viewOvertimeDetail('${d.id}')">👁️</button> ${p.status === 'pending' && hasAccess(3) ? `<button class="btn btn-xs btn-success" onclick="approveOT('${d.id}','approved')">✅</button> <button class="btn btn-xs btn-danger" onclick="approveOT('${d.id}','rejected')">❌</button>` : ''} ${hasAccess(6) ? `<button class="btn btn-xs btn-warning" onclick="editOTDoc('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_overtime','${d.id}','overtime')">🗑️</button>` : ''}</td></tr>`;
+      const canApprove = p.status === 'pending' && hasAccess(3) && !isBOD;
+      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggal)}</td><td>${p.jamMulai || '-'}-${p.jamSelesai || '-'}</td><td>${p.durasi || 0}j</td><td><span class="badge ${badge}">${p.status}</span></td><td><button class="btn btn-xs btn-info" onclick="viewOvertimeDetail('${d.id}')">👁️</button> ${canApprove ? `<button class="btn btn-xs btn-success" onclick="approveOT('${d.id}','approved')">✅</button> <button class="btn btn-xs btn-danger" onclick="approveOT('${d.id}','rejected')">❌</button>` : ''} ${hasAccess(6) ? `<button class="btn btn-xs btn-warning" onclick="editOTDoc('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_overtime','${d.id}','overtime')">🗑️</button>` : ''}</td></tr>`;
     });
   document.getElementById('tblOT').innerHTML = h;
 }

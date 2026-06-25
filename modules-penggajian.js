@@ -887,18 +887,36 @@ async function renderReimbursement() {
   const main = document.getElementById('mainContent');
   main.innerHTML = `<div class="page-title"><span>🧾 Reimbursement</span><button class="btn btn-primary btn-sm" onclick="modalReimburse()">+ Pengajuan</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Kategori</th><th>Jumlah</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="tblReimb"></tbody></table></div></div>`;
   const snap = await db.collection('hrd_reimbursement').get();
+  const isBOD = currentUser.role === 'bod';
+  let gradeMapReimb = {};
+  if (isBOD) {
+    const kSnap = await db.collection('hrd_karyawan').get();
+    kSnap.forEach((d) => {
+      const k = d.data();
+      gradeMapReimb[(k.nama || '').toLowerCase()] = (
+        k.gradeJabatan ||
+        k.posisi ||
+        ''
+      ).toLowerCase();
+    });
+  }
   let h = '';
   if (snap.empty) h = '<tr><td colspan="5" class="text-center">Belum ada</td></tr>';
   else
     snap.forEach((d) => {
       const p = d.data();
+      if (isBOD) {
+        const grade = gradeMapReimb[(p.nama || '').toLowerCase()] || '';
+        if (!grade.includes('head')) return;
+      }
       const badge =
         p.status === 'approved'
           ? 'badge-success'
           : p.status === 'rejected'
             ? 'badge-danger'
             : 'badge-warning';
-      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.kategori)}</td><td>${formatCurrency(p.jumlah)}</td><td><span class="badge ${badge}">${p.status}</span></td><td>${p.status === 'pending' && hasAccess(3) ? `<button class="btn btn-xs btn-success" onclick="approveReimb('${d.id}','approved')">✅</button> <button class="btn btn-xs btn-danger" onclick="approveReimb('${d.id}','rejected')">❌</button>` : ''} <button class="btn btn-xs btn-warning" onclick="editReimb('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_reimbursement','${d.id}','reimbursement')">🗑️</button></td></tr>`;
+      const canApprove = p.status === 'pending' && hasAccess(3) && !isBOD;
+      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.kategori)}</td><td>${formatCurrency(p.jumlah)}</td><td><span class="badge ${badge}">${p.status}</span></td><td>${canApprove ? `<button class="btn btn-xs btn-success" onclick="approveReimb('${d.id}','approved')">✅</button> <button class="btn btn-xs btn-danger" onclick="approveReimb('${d.id}','rejected')">❌</button>` : ''} <button class="btn btn-xs btn-warning" onclick="editReimb('${d.id}')">✏️</button> ${hasAccess(6) ? `<button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_reimbursement','${d.id}','reimbursement')">🗑️</button>` : ''}</td></tr>`;
     });
   document.getElementById('tblReimb').innerHTML = h;
 }
@@ -954,8 +972,28 @@ async function renderKasbon() {
   const main = document.getElementById('mainContent');
   main.innerHTML = `<div class="page-title"><span>💳 Kasbon & Loan</span><button class="btn btn-primary btn-sm" onclick="modalKasbon()">+ Pengajuan</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Jenis</th><th>Total Pinjaman</th><th>Angsuran/Bln</th><th>Durasi</th><th>Sudah Bayar</th><th>Sisa</th><th>Sisa Bulan</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="tblKasbon"></tbody></table></div></div>`;
   const snap = await db.collection('hrd_kasbon').get();
+  const isBOD = currentUser.role === 'bod';
+  let gradeMapKasbon = {};
+  if (isBOD) {
+    const kSnap = await db.collection('hrd_karyawan').get();
+    kSnap.forEach((d) => {
+      const k = d.data();
+      gradeMapKasbon[(k.nama || '').toLowerCase()] = (
+        k.gradeJabatan ||
+        k.posisi ||
+        ''
+      ).toLowerCase();
+    });
+  }
   const items = [];
-  snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
+  snap.forEach((d) => {
+    const data = { id: d.id, ...d.data() };
+    if (isBOD) {
+      const grade = gradeMapKasbon[(data.nama || '').toLowerCase()] || '';
+      if (!grade.includes('head')) return;
+    }
+    items.push(data);
+  });
   items.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   let h = '';
   if (!items.length) h = '<tr><td colspan="10" class="text-center">Belum ada</td></tr>';
@@ -975,7 +1013,8 @@ async function renderKasbon() {
             : p.status === 'rejected'
               ? 'badge-danger'
               : 'badge-warning';
-      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.jenis || '-')}</td><td>${formatCurrency(jumlah)}</td><td class="fw-700">${formatCurrency(angsuran)}</td><td>${cicilan} bulan</td><td>${formatCurrency(sudahBayar)}</td><td class="fw-700" style="color:${sisa > 0 ? 'var(--danger)' : 'var(--success)'}">${formatCurrency(sisa)}</td><td>${p.status === 'lunas' ? '✅ Lunas' : sisaBulan + ' bln'}</td><td><span class="badge ${badge}">${p.status || 'pending'}</span></td><td>${p.status === 'pending' && hasAccess(3) ? `<button class="btn btn-xs btn-success" onclick="approveKasbon('${p.id}','aktif')">✅</button> <button class="btn btn-xs btn-danger" onclick="approveKasbon('${p.id}','rejected')">❌</button>` : ''} ${p.status === 'aktif' ? `<button class="btn btn-xs btn-info" onclick="bayarAngsuran('${p.id}')">💰 Bayar</button>` : ''} <button class="btn btn-xs btn-warning" onclick="editKasbonDoc('${p.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_kasbon','${p.id}','kasbon')">🗑️</button></td></tr>`;
+      const canApprove = p.status === 'pending' && hasAccess(3) && !isBOD;
+      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.jenis || '-')}</td><td>${formatCurrency(jumlah)}</td><td class="fw-700">${formatCurrency(angsuran)}</td><td>${cicilan} bulan</td><td>${formatCurrency(sudahBayar)}</td><td class="fw-700" style="color:${sisa > 0 ? 'var(--danger)' : 'var(--success)'}">${formatCurrency(sisa)}</td><td>${p.status === 'lunas' ? '✅ Lunas' : sisaBulan + ' bln'}</td><td><span class="badge ${badge}">${p.status || 'pending'}</span></td><td>${canApprove ? `<button class="btn btn-xs btn-success" onclick="approveKasbon('${p.id}','aktif')">✅</button> <button class="btn btn-xs btn-danger" onclick="approveKasbon('${p.id}','rejected')">❌</button>` : ''} ${p.status === 'aktif' ? `<button class="btn btn-xs btn-info" onclick="bayarAngsuran('${p.id}')">💰 Bayar</button>` : ''} <button class="btn btn-xs btn-warning" onclick="editKasbonDoc('${p.id}')">✏️</button> ${hasAccess(6) ? `<button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_kasbon','${p.id}','kasbon')">🗑️</button>` : ''}</td></tr>`;
     });
   document.getElementById('tblKasbon').innerHTML = h;
 }
