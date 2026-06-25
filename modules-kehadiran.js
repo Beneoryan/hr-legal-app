@@ -1425,6 +1425,21 @@ async function loadDailyTasks(filter) {
     const drTo = document.getElementById('reportDateTo')?.value || '';
     if (drFrom) filtered = filtered.filter((t) => (t.tanggal || '') >= drFrom);
     if (drTo) filtered = filtered.filter((t) => (t.tanggal || '') <= drTo);
+    // Apply division filter (Head/BOD only)
+    if (hasAccess(4) && window._teamReportDivFilter) {
+      filtered = filtered.filter((t) =>
+        (t.departemen || '').toUpperCase().includes(window._teamReportDivFilter)
+      );
+    }
+    // Apply category filter
+    if (window._teamReportCatFilter) {
+      filtered = filtered.filter((t) => {
+        const kat = (t.kategori || '').toLowerCase();
+        const fv = (window._teamReportCatFilter || '').toLowerCase();
+        if (fv === 'tanpa kategori') return !t.kategori || t.kategori.trim() === '';
+        return kat.includes(fv);
+      });
+    }
     // Sort by kategori then date
     filtered.sort(
       (a, b) =>
@@ -1495,6 +1510,44 @@ async function loadDailyTasks(filter) {
       <input type="date" class="form-control" id="reportDateTo" value="${curTo}" style="max-width:160px;padding:6px 10px" onchange="loadDailyTasks('${filter}')">
       <button class="btn btn-xs btn-outline" onclick="document.getElementById('reportDateFrom').value='';document.getElementById('reportDateTo').value='';loadDailyTasks('${filter}')">Reset</button>
     </div>`;
+    if (filter === 'team-report') {
+      // Team report: Head/BOD get division+category, Manager gets category only
+      dateFilterHtml += `<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">`;
+      if (hasAccess(4)) {
+        dateFilterHtml += `<button class="btn btn-xs ${!window._teamReportDivFilter ? 'btn-primary' : 'btn-outline'}" onclick="window._teamReportDivFilter='';window._teamReportCatFilter='';loadDailyTasks('team-report')">Semua</button>
+        <button class="btn btn-xs ${window._teamReportDivFilter === 'ACADEMIC' ? 'btn-primary' : 'btn-outline'}" onclick="window._teamReportDivFilter='ACADEMIC';window._teamReportCatFilter='';loadDailyTasks('team-report')">📚 ACADEMIC</button>
+        <button class="btn btn-xs ${window._teamReportDivFilter === 'OFFICE' ? 'btn-primary' : 'btn-outline'}" onclick="window._teamReportDivFilter='OFFICE';window._teamReportCatFilter='';loadDailyTasks('team-report')">🏢 OFFICE</button>`;
+      }
+      let trCatOpts = '<option value="">Semua Kategori</option>';
+      if (window._teamReportDivFilter === 'ACADEMIC') {
+        ['Siswa', 'Sensei', 'Curriculum', 'TSK-Job', 'Tanpa Kategori'].forEach((c) => {
+          trCatOpts += `<option value="${c}" ${window._teamReportCatFilter === c ? 'selected' : ''}>${c}</option>`;
+        });
+      } else if (window._teamReportDivFilter === 'OFFICE') {
+        ['HR & Legal', 'Document', "Facility's", 'Finance', 'Marketing & Sales', 'Promosi'].forEach(
+          (c) => {
+            trCatOpts += `<option value="${c}" ${window._teamReportCatFilter === c ? 'selected' : ''}>${c}</option>`;
+          }
+        );
+      } else {
+        [
+          'Siswa',
+          'Sensei',
+          'Curriculum',
+          'TSK-Job',
+          'HR & Legal',
+          'Document',
+          "Facility's",
+          'Finance',
+          'Marketing & Sales',
+          'Promosi',
+          'Tanpa Kategori',
+        ].forEach((c) => {
+          trCatOpts += `<option value="${c}" ${window._teamReportCatFilter === c ? 'selected' : ''}>${c}</option>`;
+        });
+      }
+      dateFilterHtml += `<select class="form-control" style="max-width:180px;padding:4px 8px;font-size:.8rem" onchange="window._teamReportCatFilter=this.value;loadDailyTasks('team-report')">${trCatOpts}</select></div>`;
+    }
     if (filter === 'all-report') {
       dateFilterHtml += `<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
         <button class="btn btn-xs ${!window._allReportDivFilter ? 'btn-primary' : 'btn-outline'}" onclick="window._allReportDivFilter='';window._allReportCatFilter='';loadDailyTasks('all-report')">Semua</button>
@@ -1561,7 +1614,14 @@ async function loadDailyTasks(filter) {
         <button class="btn btn-xs ${window._listDivFilter === 'ACADEMIC' ? 'btn-primary' : 'btn-outline'}" onclick="window._listDivFilter='ACADEMIC';window._listCatFilter='';loadDailyTasks('${filter}')">📚 ACADEMIC</button>
         <button class="btn btn-xs ${window._listDivFilter === 'OFFICE' ? 'btn-primary' : 'btn-outline'}" onclick="window._listDivFilter='OFFICE';window._listCatFilter='';loadDailyTasks('${filter}')">🏢 OFFICE</button>`;
     } else {
-      // Manager: only category filter
+      // Manager: periode + category (scoped to own division only)
+      dateFilterHtml += `<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;padding:10px;background:#f8f9ff;border-radius:8px">
+        <span class="text-sm fw-700">📅 Periode:</span>
+        <input type="date" class="form-control" id="listFilterFrom" value="${lfFrom}" style="max-width:150px;padding:5px 8px;font-size:.82rem" onchange="loadDailyTasks('${filter}')">
+        <span class="text-sm">s/d</span>
+        <input type="date" class="form-control" id="listFilterTo" value="${lfTo}" style="max-width:150px;padding:5px 8px;font-size:.82rem" onchange="loadDailyTasks('${filter}')">
+        <button class="btn btn-xs btn-outline" onclick="document.getElementById('listFilterFrom').value='';document.getElementById('listFilterTo').value='';window._listCatFilter='';loadDailyTasks('${filter}')">Reset</button>
+      </div>`;
       dateFilterHtml += `<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">`;
     }
     // Category dropdown
@@ -1576,6 +1636,26 @@ async function loadDailyTasks(filter) {
           listCatOptions += `<option value="${c}" ${window._listCatFilter === c ? 'selected' : ''}>${c}</option>`;
         }
       );
+    } else if (!hasAccess(4)) {
+      // Manager: only own division categories
+      const myDeptUpper = (currentUser.departemen || '').toUpperCase();
+      if (myDeptUpper.includes('ACADEMIC')) {
+        ['Siswa', 'Sensei', 'Curriculum', 'TSK-Job', 'Tanpa Kategori'].forEach((c) => {
+          listCatOptions += `<option value="${c}" ${window._listCatFilter === c ? 'selected' : ''}>${c}</option>`;
+        });
+      } else {
+        [
+          'HR & Legal',
+          'Document',
+          "Facility's",
+          'Finance',
+          'Marketing & Sales',
+          'Promosi',
+          'Tanpa Kategori',
+        ].forEach((c) => {
+          listCatOptions += `<option value="${c}" ${window._listCatFilter === c ? 'selected' : ''}>${c}</option>`;
+        });
+      }
     } else {
       [
         'Siswa',
@@ -3255,6 +3335,15 @@ async function loadWeeklyReports(divFilter) {
       filtered = filtered.filter(function (r) {
         return (r.tanggal || '') <= filterTo;
       });
+    // Apply category filter
+    if (window._wrCatFilter) {
+      filtered = filtered.filter(function (r) {
+        var kat = (r.kategori || '').toLowerCase();
+        var fv = (window._wrCatFilter || '').toLowerCase();
+        if (fv === 'tanpa kategori') return !r.kategori || r.kategori.trim() === '';
+        return kat.includes(fv);
+      });
+    }
     var html = '';
     html +=
       '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">';
@@ -3270,6 +3359,61 @@ async function loadWeeklyReports(divFilter) {
       '<button class="btn btn-xs ' +
       (_weeklyReportFilter === 'manajemen' ? 'btn-primary' : 'btn-outline') +
       '" onclick="loadWeeklyReports(\'manajemen\')">🏢 OFFICE</button>';
+    // Category filter for weekly reports
+    let wrCatOpts = '<option value="">Semua Kategori</option>';
+    const wrDiv = _weeklyReportFilter;
+    if (wrDiv === 'akademik') {
+      ['Siswa', 'Sensei', 'Curriculum', 'TSK-Job', 'Tanpa Kategori'].forEach(function (c) {
+        wrCatOpts +=
+          '<option value="' +
+          c +
+          '" ' +
+          (window._wrCatFilter === c ? 'selected' : '') +
+          '>' +
+          c +
+          '</option>';
+      });
+    } else if (wrDiv === 'manajemen') {
+      ['HR & Legal', 'Document', "Facility's", 'Finance', 'Marketing & Sales', 'Promosi'].forEach(
+        function (c) {
+          wrCatOpts +=
+            '<option value="' +
+            c +
+            '" ' +
+            (window._wrCatFilter === c ? 'selected' : '') +
+            '>' +
+            c +
+            '</option>';
+        }
+      );
+    } else {
+      [
+        'Siswa',
+        'Sensei',
+        'Curriculum',
+        'TSK-Job',
+        'HR & Legal',
+        'Document',
+        "Facility's",
+        'Finance',
+        'Marketing & Sales',
+        'Promosi',
+        'Tanpa Kategori',
+      ].forEach(function (c) {
+        wrCatOpts +=
+          '<option value="' +
+          c +
+          '" ' +
+          (window._wrCatFilter === c ? 'selected' : '') +
+          '>' +
+          c +
+          '</option>';
+      });
+    }
+    html +=
+      '<select class="form-control" style="max-width:180px;padding:4px 8px;font-size:.8rem" onchange="window._wrCatFilter=this.value;loadWeeklyReports()">' +
+      wrCatOpts +
+      '</select>';
     html += '<span style="margin-left:auto"></span>';
     html +=
       '<button class="btn btn-xs btn-danger" onclick="deleteSelectedWeeklyReports()">🗑️ Hapus Terpilih</button> ';
