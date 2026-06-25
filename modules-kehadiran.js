@@ -2464,13 +2464,65 @@ async function getFilesAsBase64(inputId) {
 }
 
 function openCamera(previewId, cameraDataId) {
-  // Use a separate overlay for camera so it doesn't close the parent modal
+  // Detect mobile (Android/iOS)
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  if (isMobile) {
+    // Mobile: use native camera via file input (most reliable on Android & iOS)
+    let camInput = document.getElementById('_mobileCamInput');
+    if (!camInput) {
+      camInput = document.createElement('input');
+      camInput.id = '_mobileCamInput';
+      camInput.type = 'file';
+      camInput.accept = 'image/*';
+      camInput.capture = 'environment';
+      camInput.style.display = 'none';
+      document.body.appendChild(camInput);
+    }
+    camInput.onchange = function () {
+      const file = camInput.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const dataUrl = e.target.result;
+        const fileName =
+          'foto_' + new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19) + '.jpg';
+        // Add to preview
+        const preview = document.getElementById(previewId);
+        if (preview) {
+          preview.innerHTML += `<div style="position:relative;display:inline-block" class="file-preview-item"><img src="${dataUrl}" style="width:70px;height:70px;object-fit:cover;border-radius:8px;border:2px solid #4caf50;cursor:pointer" onclick="window.open(this.src,'_blank')"><div style="position:absolute;top:-6px;right:-6px;background:#c62828;color:#fff;border-radius:50%;width:18px;height:18px;font-size:.65rem;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.3)" onclick="this.parentElement.remove()">✕</div><div style="font-size:.55rem;text-align:center;color:#4caf50;margin-top:2px">📷 Kamera</div></div>`;
+        }
+        // Save to hidden camera data
+        const cameraEl = document.getElementById(cameraDataId);
+        if (cameraEl) {
+          let existing = [];
+          try {
+            existing = JSON.parse(cameraEl.value || '[]');
+          } catch (ex) {}
+          existing.push({
+            name: fileName,
+            type: 'image/jpeg',
+            size: dataUrl.length,
+            data: dataUrl,
+          });
+          cameraEl.value = JSON.stringify(existing);
+        }
+        toast('📷 Foto berhasil diambil!', 'success');
+      };
+      reader.readAsDataURL(file);
+      camInput.value = ''; // reset for next use
+    };
+    camInput.click();
+    return;
+  }
+
+  // Desktop: use overlay with getUserMedia
   const overlay = document.createElement('div');
   overlay.id = 'cameraOverlay';
   overlay.style.cssText =
     'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.9);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px';
   overlay.innerHTML = `<div style="width:100%;max-width:500px;text-align:center">
-    <video id="cameraVideo" autoplay playsinline style="width:100%;border-radius:12px;border:3px solid #fff;background:#000"></video>
+    <video id="cameraVideo" autoplay playsinline muted style="width:100%;border-radius:12px;border:3px solid #fff;background:#000"></video>
     <div style="margin-top:16px;display:flex;gap:12px;justify-content:center">
       <button class="btn btn-primary" onclick="capturePhoto('${previewId}','${cameraDataId}')" style="padding:14px 28px;font-size:1.1rem;border-radius:50px">📸 Ambil Foto</button>
       <button class="btn btn-outline" onclick="stopCamera();document.getElementById('cameraOverlay')?.remove()" style="border-radius:50px;color:#fff;border-color:#fff">✕ Batal</button>
