@@ -1242,13 +1242,13 @@ async function renderDailyTask() {
     // Leader/Manager/Head can assign tasks
     tabs += '<div class="tab" onclick="filterDailyTasks(\'assigned\')">📋 Ditugaskan</div>';
   }
-  if (hasAccess(2)) {
-    // Leader+ can monitor assigned task history
+  if (hasAccess(2) && !hasAccess(5)) {
+    // Leader/Manager/Head can monitor assigned task history (not BOD)
     tabs +=
       '<div class="tab" onclick="filterDailyTasks(\'history-assigned\')">📊 History Tugas</div>';
   }
-  if (hasAccess(2)) {
-    // Leader+ can view weekly reports
+  if (hasAccess(2) && !hasAccess(5)) {
+    // Leader/Manager/Head can view weekly reports (not BOD)
     tabs += '<div class="tab" onclick="loadWeeklyReports()">📈 Laporan Mingguan</div>';
   }
 
