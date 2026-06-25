@@ -243,7 +243,7 @@ async function showSettingSection(section) {
       </div>`;
   } else if (section === 'log') {
     el.innerHTML =
-      '<div class="card"><div class="card-title mb-16">📋 Log Lokasi Absensi</div><div id="logLokasiContent">Loading...</div></div>';
+      '<div class="card"><div class="card-title mb-16">📋 Log Lokasi Absensi</div><div class="mb-16"><button class="btn btn-sm btn-warning" onclick="koreksiHistoryLembur()">🔧 Koreksi Data Lembur (One-Time Fix)</button><span class="text-xs ml-8" style="color:#999">Koreksi record lembur yang tidak memiliki pengajuan approved</span></div><div id="logLokasiContent">Loading...</div></div>';
     const snap = await db.collection('hrd_absensi').get();
     let logHtml = '';
     if (snap.empty) {
@@ -2864,6 +2864,72 @@ async function hapusSatuAbsen(docId) {
   toast('Record dihapus', 'success');
   closeModalDirect();
   setTimeout(() => loadRekapGrid(), 300);
+}
+
+// ── KOREKSI HISTORY LEMBUR — One-time fix ─────────────────────
+async function koreksiHistoryLembur() {
+  if (
+    !confirm(
+      'Ini akan mengecek semua record absensi yang ditandai lembur dan mengkoreksi yang tidak memiliki pengajuan overtime approved. Lanjutkan?'
+    )
+  )
+    return;
+  toast('⏳ Memproses koreksi...', 'info');
+  try {
+    // Load all absensi records with lembur=true
+    const absenSnap = await db.collection('hrd_absensi').get();
+    const lemburRecords = [];
+    absenSnap.forEach((d) => {
+      const data = d.data();
+      if (data.lembur === true && data.tipe === 'pulang') {
+        lemburRecords.push({ id: d.id, ...data });
+      }
+    });
+    if (!lemburRecords.length) {
+      toast('Tidak ada record lembur yang perlu dikoreksi', 'info');
+      return;
+    }
+    // Load all approved overtime
+    const otSnap = await db.collection('hrd_overtime').get();
+    const approvedOT = {};
+    otSnap.forEach((d) => {
+      const ot = d.data();
+      if (ot.status === 'approved' || ot.status === 'aktif') {
+        const key = (ot.userId || '') + '_' + (ot.tanggal || '');
+        const keyNama = (ot.nama || '').toLowerCase() + '_' + (ot.tanggal || '');
+        approvedOT[key] = true;
+        approvedOT[keyNama] = true;
+      }
+    });
+    // Check each lembur record
+    let corrected = 0;
+    for (const rec of lemburRecords) {
+      const keyById = (rec.userId || '') + '_' + (rec.tanggal || '');
+      const keyByNama = (rec.nama || '').toLowerCase() + '_' + (rec.tanggal || '');
+      const hasApprovedOT = approvedOT[keyById] || approvedOT[keyByNama];
+      if (!hasApprovedOT) {
+        // No approved overtime — correct this record
+        await db
+          .collection('hrd_absensi')
+          .doc(rec.id)
+          .update({
+            lembur: false,
+            kelebihanJam: rec.lemburJam || 0,
+            lemburJam: 0,
+            _correctedAt: new Date().toISOString(),
+            _correctedBy: currentUser.nama,
+          });
+        corrected++;
+      }
+    }
+    toast(
+      `✅ Koreksi selesai! ${corrected} record dikoreksi dari ${lemburRecords.length} total record lembur.`,
+      'success'
+    );
+    loadRekapGrid();
+  } catch (e) {
+    toast('Gagal koreksi: ' + e.message, 'error');
+  }
 }
 
 async function hapusAbsenHari() {
