@@ -51,23 +51,31 @@ async function renderCuti() {
     const items = [];
     cutiSnap.forEach((d) => items.push({ id: d.id, ...d.data() }));
     items.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-    // BOD filter: only show head-level submissions
+    // Department and role-based filtering
     const isBOD = currentUser.role === 'bod';
+    const isAdmin = hasAccess(6);
+    const myDept = (currentUser.departemen || '').toLowerCase().trim();
     let gradeMapCuti = {};
-    if (isBOD) {
+    let deptMapCuti = {};
+    if (hasAccess(3) && !isAdmin) {
       karyList.forEach((k) => {
-        gradeMapCuti[(k.nama || '').toLowerCase()] = (
-          k.gradeJabatan ||
-          k.posisi ||
-          ''
-        ).toLowerCase();
+        const namaLow = (k.nama || '').toLowerCase();
+        gradeMapCuti[namaLow] = (k.gradeJabatan || k.posisi || '').toLowerCase();
+        deptMapCuti[namaLow] = (k.departemen || '').toLowerCase().trim();
       });
     }
     items.forEach((p) => {
-      // BOD: skip non-head submissions
-      if (isBOD) {
-        const grade = gradeMapCuti[(p.nama || '').toLowerCase()] || '';
-        if (!grade.includes('head')) return;
+      // Filter based on role
+      if (hasAccess(3) && !isAdmin) {
+        if (isBOD) {
+          // BOD: only head-level
+          const grade = gradeMapCuti[(p.nama || '').toLowerCase()] || '';
+          if (!grade.includes('head')) return;
+        } else {
+          // Manager/Head: only own department
+          const pDept = deptMapCuti[(p.nama || '').toLowerCase()] || '';
+          if (pDept && pDept !== myDept) return;
+        }
       }
       const badge =
         p.status === 'approved'
@@ -260,16 +268,26 @@ async function viewCutiDetail(id) {
 async function renderOvertime() {
   const main = document.getElementById('mainContent');
   main.innerHTML = `<div class="page-title"><span>⏰ Overtime</span><button class="btn btn-primary btn-sm" onclick="modalOvertime()">+ Pengajuan</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Tanggal</th><th>Jam</th><th>Durasi</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="tblOT"></tbody></table></div></div>`;
-  const snap = await (!hasAccess(3)
-    ? db.collection('hrd_overtime').where('userId', '==', currentUser.id).get()
-    : db.collection('hrd_overtime').get());
+  let snap;
+  if (!hasAccess(3)) {
+    // Staff/Leader: only own overtime
+    snap = await db.collection('hrd_overtime').where('userId', '==', currentUser.id).get();
+  } else {
+    snap = await db.collection('hrd_overtime').get();
+  }
   const isBOD = currentUser.role === 'bod';
+  const isAdmin = hasAccess(6);
+  const myDept = (currentUser.departemen || '').toLowerCase().trim();
+  // Build dept map for filtering
+  let deptMapOT = {};
   let gradeMapOT = {};
-  if (isBOD) {
+  if (hasAccess(3) && !isAdmin) {
     const kSnap = await db.collection('hrd_karyawan').get();
     kSnap.forEach((d) => {
       const k = d.data();
-      gradeMapOT[(k.nama || '').toLowerCase()] = (k.gradeJabatan || k.posisi || '').toLowerCase();
+      const namaLow = (k.nama || '').toLowerCase();
+      deptMapOT[namaLow] = (k.departemen || '').toLowerCase().trim();
+      gradeMapOT[namaLow] = (k.gradeJabatan || k.posisi || '').toLowerCase();
     });
   }
   let h = '';
@@ -277,9 +295,18 @@ async function renderOvertime() {
   else
     snap.forEach((d) => {
       const p = d.data();
-      if (isBOD) {
-        const grade = gradeMapOT[(p.nama || '').toLowerCase()] || '';
-        if (!grade.includes('head')) return;
+      // Filter by department for manager/head (not admin)
+      if (hasAccess(3) && !isAdmin) {
+        const pDept =
+          deptMapOT[(p.nama || '').toLowerCase()] || (p.departemen || '').toLowerCase().trim();
+        if (isBOD) {
+          // BOD: only head-level
+          const grade = gradeMapOT[(p.nama || '').toLowerCase()] || '';
+          if (!grade.includes('head')) return;
+        } else {
+          // Manager/Head: only own department
+          if (pDept && pDept !== myDept) return;
+        }
       }
       const badge =
         p.status === 'approved'
