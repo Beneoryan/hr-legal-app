@@ -17,7 +17,46 @@ async function renderDashboard() {
     db.collection('hrd_reimbursement').where('status', '==', 'pending').get(),
     db.collection('hrd_dinas_luar').where('status', '==', 'pending').get(),
   ]);
-  const totalPending = cuti.size + overtime.size + reimburse.size + dinas.size;
+
+  // BOD filter: only show head-level submissions
+  const isBOD = currentUser.role === 'bod';
+  let gradeMapDash = {};
+  if (isBOD) {
+    karyawan.forEach((d) => {
+      const k = d.data();
+      gradeMapDash[(k.nama || '').toLowerCase()] = (k.gradeJabatan || k.posisi || '').toLowerCase();
+    });
+  }
+  function isHeadLevel(nama) {
+    if (!isBOD) return true; // non-BOD sees all
+    const grade = gradeMapDash[(nama || '').toLowerCase()] || '';
+    return grade.includes('head');
+  }
+
+  let cutiCount = 0,
+    overtimeCount = 0,
+    reimburseCount = 0,
+    dinasCount = 0;
+  if (isBOD) {
+    cuti.forEach((d) => {
+      if (isHeadLevel(d.data().nama)) cutiCount++;
+    });
+    overtime.forEach((d) => {
+      if (isHeadLevel(d.data().nama)) overtimeCount++;
+    });
+    reimburse.forEach((d) => {
+      if (isHeadLevel(d.data().nama)) reimburseCount++;
+    });
+    dinas.forEach((d) => {
+      if (isHeadLevel(d.data().nama)) dinasCount++;
+    });
+  } else {
+    cutiCount = cuti.size;
+    overtimeCount = overtime.size;
+    reimburseCount = reimburse.size;
+    dinasCount = dinas.size;
+  }
+  const totalPending = cutiCount + overtimeCount + reimburseCount + dinasCount;
   document.getElementById('dashStats').innerHTML = `
     <div class="stat-card" style="cursor:pointer" onclick="navigateTo('karyawan')"><div class="stat-icon">👥</div><div class="stat-value">${karyawan.size}</div><div class="stat-label">Total Karyawan</div></div>
     <div class="stat-card" style="cursor:pointer" onclick="navigateTo('absensi')"><div class="stat-icon">📍</div><div class="stat-value">${absen.size}</div><div class="stat-label">Hadir Hari Ini</div></div>
@@ -30,14 +69,14 @@ async function renderDashboard() {
     widgetLeft += '<p class="text-sm" style="color:#999">Tidak ada pengajuan pending</p>';
   else {
     widgetLeft += `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">`;
-    if (cuti.size)
-      widgetLeft += `<div style="cursor:pointer;padding:8px 12px;background:#fff3e0;border-radius:8px;font-size:.82rem" onclick="navigateTo('cuti')"><span class="fw-700">${cuti.size}</span> Cuti/Izin</div>`;
-    if (overtime.size)
-      widgetLeft += `<div style="cursor:pointer;padding:8px 12px;background:#e3f2fd;border-radius:8px;font-size:.82rem" onclick="navigateTo('overtime')"><span class="fw-700">${overtime.size}</span> Overtime</div>`;
-    if (reimburse.size)
-      widgetLeft += `<div style="cursor:pointer;padding:8px 12px;background:#e8f5e9;border-radius:8px;font-size:.82rem" onclick="navigateTo('reimbursement')"><span class="fw-700">${reimburse.size}</span> Reimburse</div>`;
-    if (dinas.size)
-      widgetLeft += `<div style="cursor:pointer;padding:8px 12px;background:#fce4ec;border-radius:8px;font-size:.82rem" onclick="navigateTo('absensi')"><span class="fw-700">${dinas.size}</span> Dinas Luar</div>`;
+    if (cutiCount)
+      widgetLeft += `<div style="cursor:pointer;padding:8px 12px;background:#fff3e0;border-radius:8px;font-size:.82rem" onclick="navigateTo('cuti')"><span class="fw-700">${cutiCount}</span> Cuti/Izin</div>`;
+    if (overtimeCount)
+      widgetLeft += `<div style="cursor:pointer;padding:8px 12px;background:#e3f2fd;border-radius:8px;font-size:.82rem" onclick="navigateTo('overtime')"><span class="fw-700">${overtimeCount}</span> Overtime</div>`;
+    if (reimburseCount)
+      widgetLeft += `<div style="cursor:pointer;padding:8px 12px;background:#e8f5e9;border-radius:8px;font-size:.82rem" onclick="navigateTo('reimbursement')"><span class="fw-700">${reimburseCount}</span> Reimburse</div>`;
+    if (dinasCount)
+      widgetLeft += `<div style="cursor:pointer;padding:8px 12px;background:#fce4ec;border-radius:8px;font-size:.82rem" onclick="navigateTo('absensi')"><span class="fw-700">${dinasCount}</span> Dinas Luar</div>`;
     widgetLeft += `</div>`;
   }
   widgetLeft += '</div>';

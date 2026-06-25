@@ -1123,9 +1123,9 @@ async function renderApprovalCenter() {
     const currentApprover = steps[currentStep]?.nama?.toLowerCase() || '';
     const canSee = isAdmin || isGM || item._dept === myDept;
     if (!canSee) return;
-    // Special filter for Misriana: only show submissions from 'head' level
-    const isMisriana = myName === 'misriana';
-    if (isMisriana) {
+    // BOD filter: only show submissions from 'head' level
+    const isBOD = currentUser.role === 'bod';
+    if (isBOD) {
       const pengajuGrade = gradeMap[(item.nama || '').toLowerCase()] || '';
       const isHead = pengajuGrade.includes('head');
       if (!isHead) return;
