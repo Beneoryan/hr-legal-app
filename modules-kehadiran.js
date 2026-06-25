@@ -1247,8 +1247,8 @@ async function renderDailyTask() {
     tabs +=
       '<div class="tab" onclick="filterDailyTasks(\'history-assigned\')">📊 History Tugas</div>';
   }
-  if (hasAccess(2) && !hasAccess(5)) {
-    // Leader/Manager/Head can view weekly reports (not BOD)
+  if (hasAccess(3) && !hasAccess(5)) {
+    // Manager/Head only can view weekly reports (not BOD, not staff/leader)
     tabs += '<div class="tab" onclick="loadWeeklyReports()">📈 Laporan Mingguan</div>';
   }
 
