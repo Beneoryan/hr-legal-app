@@ -1922,7 +1922,7 @@ async function loadDailyTasks(filter) {
       html += `<span class="badge badge-info" style="font-size:.6rem">Hari Ini</span>`;
     html += `</div>`;
     if (t.description)
-      html += `<div style="font-size:.8rem;color:var(--text-light);margin-top:4px;${t.done ? 'text-decoration:line-through' : ''}">${escHtml(t.description)}</div>`;
+      html += `<div style="font-size:.8rem;color:var(--text-light);margin-top:4px;white-space:pre-line;${t.done ? 'text-decoration:line-through' : ''}">${escHtml(t.description)}</div>`;
     html += `<div style="font-size:.7rem;color:#999;margin-top:4px">`;
     if (isAdmin && t.targetUserName)
       html += `👤 Untuk: <strong>${escHtml(t.targetUserName)}</strong> | `;

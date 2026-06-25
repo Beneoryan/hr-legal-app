@@ -2800,6 +2800,16 @@ async function simpanEditAbsen() {
   if (!waktu) return toast('Isi waktu', 'warning');
   const userId = window._editAbsenUserId;
   const nama = window._editAbsenNama || '';
+  // Get employee's department (not admin's)
+  let empDept = '';
+  try {
+    const karyDoc = await db.collection('hrd_karyawan').doc(userId).get();
+    if (karyDoc.exists) empDept = karyDoc.data().departemen || '';
+    if (!empDept) {
+      const kByName = await db.collection('hrd_karyawan').where('nama', '==', nama).limit(1).get();
+      if (!kByName.empty) empDept = kByName.docs[0].data().departemen || '';
+    }
+  } catch (e) {}
   try {
     await db.collection('hrd_absensi').add({
       userId,
@@ -2808,7 +2818,7 @@ async function simpanEditAbsen() {
       waktu,
       tipe,
       status,
-      departemen: currentUser.departemen || '',
+      departemen: empDept,
       manual: true,
       editedBy: currentUser.nama,
       createdAt: new Date().toISOString(),
