@@ -177,7 +177,8 @@ async function renderDashboard() {
 // ── DEPARTEMEN ────────────────────────────────────────────────
 async function renderDepartemen() {
   const main = document.getElementById('mainContent');
-  main.innerHTML = `<div class="page-title"><span>🏢 Departemen</span><div class="flex gap-8"><button class="btn btn-primary btn-sm" onclick="modalDepartemen()">+ Tambah</button><button class="btn btn-info btn-sm" onclick="syncDeptFromKaryawan()">🔄 Sinkron dari Karyawan</button></div></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Nama</th><th>Kode</th><th>Kepala</th><th>Jumlah</th><th>Aksi</th></tr></thead><tbody id="tblDept"></tbody></table></div></div>`;
+  const isBOD = currentUser.role === 'bod';
+  main.innerHTML = `<div class="page-title"><span>🏢 Departemen</span>${!isBOD ? '<div class="flex gap-8"><button class="btn btn-primary btn-sm" onclick="modalDepartemen()">+ Tambah</button><button class="btn btn-info btn-sm" onclick="syncDeptFromKaryawan()">🔄 Sinkron dari Karyawan</button></div>' : ''}</div><div class="card"><div class="table-wrap"><table><thead><tr><th>Nama</th><th>Kode</th><th>Kepala</th><th>Jumlah</th>${!isBOD ? '<th>Aksi</th>' : ''}</tr></thead><tbody id="tblDept"></tbody></table></div></div>`;
   const snap = await db.collection('hrd_departemen').get();
   const karySnap = await db.collection('hrd_karyawan').where('status', '==', 'aktif').get();
   const countMap = {};
@@ -186,11 +187,11 @@ async function renderDepartemen() {
     if (dept) countMap[dept] = (countMap[dept] || 0) + 1;
   });
   let h = '';
-  if (snap.empty) h = '<tr><td colspan="5" class="text-center">Belum ada</td></tr>';
+  if (snap.empty) h = `<tr><td colspan="${isBOD ? 4 : 5}" class="text-center">Belum ada</td></tr>`;
   else
     snap.forEach((d) => {
       const p = d.data();
-      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.kode || '-')}</td><td>${escHtml(p.kepala || '-')}</td><td>${countMap[p.nama] || 0}</td><td><button class="btn btn-xs btn-info" onclick="modalDepartemen('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_departemen','${d.id}','departemen')">🗑️</button></td></tr>`;
+      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.kode || '-')}</td><td>${escHtml(p.kepala || '-')}</td><td>${countMap[p.nama] || 0}</td>${!isBOD ? `<td><button class="btn btn-xs btn-info" onclick="modalDepartemen('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_departemen','${d.id}','departemen')">🗑️</button></td>` : ''}</tr>`;
     });
   document.getElementById('tblDept').innerHTML = h;
 }
@@ -258,14 +259,15 @@ async function syncDeptFromKaryawan() {
 // ── POSISI ────────────────────────────────────────────────────
 async function renderPosisi() {
   const main = document.getElementById('mainContent');
-  main.innerHTML = `<div class="page-title"><span>💼 Posisi</span><div class="flex gap-8"><button class="btn btn-primary btn-sm" onclick="modalPosisi()">+ Tambah</button><button class="btn btn-info btn-sm" onclick="syncPosFromKaryawan()">🔄 Sinkron dari Karyawan</button></div></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Nama</th><th>Departemen</th><th>Level</th><th>Aksi</th></tr></thead><tbody id="tblPos"></tbody></table></div></div>`;
+  const isBOD = currentUser.role === 'bod';
+  main.innerHTML = `<div class="page-title"><span>💼 Posisi</span>${!isBOD ? '<div class="flex gap-8"><button class="btn btn-primary btn-sm" onclick="modalPosisi()">+ Tambah</button><button class="btn btn-info btn-sm" onclick="syncPosFromKaryawan()">🔄 Sinkron dari Karyawan</button></div>' : ''}</div><div class="card"><div class="table-wrap"><table><thead><tr><th>Nama</th><th>Departemen</th><th>Level</th>${!isBOD ? '<th>Aksi</th>' : ''}</tr></thead><tbody id="tblPos"></tbody></table></div></div>`;
   const snap = await db.collection('hrd_posisi').get();
   let h = '';
-  if (snap.empty) h = '<tr><td colspan="4" class="text-center">Belum ada</td></tr>';
+  if (snap.empty) h = `<tr><td colspan="${isBOD ? 3 : 4}" class="text-center">Belum ada</td></tr>`;
   else
     snap.forEach((d) => {
       const p = d.data();
-      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.departemen || '-')}</td><td>${escHtml(p.level || '-')}</td><td><button class="btn btn-xs btn-info" onclick="modalPosisi('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_posisi','${d.id}','posisi')">🗑️</button></td></tr>`;
+      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.departemen || '-')}</td><td>${escHtml(p.level || '-')}</td>${!isBOD ? `<td><button class="btn btn-xs btn-info" onclick="modalPosisi('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_posisi','${d.id}','posisi')">🗑️</button></td>` : ''}</tr>`;
     });
   document.getElementById('tblPos').innerHTML = h;
 }
@@ -369,7 +371,8 @@ async function simpanCabang(id) {
 // ── KARYAWAN ──────────────────────────────────────────────────
 async function renderKaryawan() {
   const main = document.getElementById('mainContent');
-  main.innerHTML = `<div class="page-title"><span>👥 Data Karyawan</span><div><button class="btn btn-primary btn-sm" onclick="modalKaryawan()">+ Tambah</button> <button class="btn btn-secondary btn-sm" onclick="modalImportKaryawan()">⬇️ Import</button></div></div><div class="card"><div class="flex gap-8 mb-16"><input class="form-control" placeholder="🔍 Cari nama/NIP..." id="srcKary" oninput="filterKaryawan()"><select class="form-control" style="max-width:180px" id="filterDept" onchange="filterKaryawan()"><option value="">Semua Dept</option></select></div><div class="table-wrap"><table><thead><tr><th>NIP</th><th>Nama</th><th>Departemen</th><th>Posisi</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="tblKary"></tbody></table></div></div>`;
+  const isBOD = currentUser.role === 'bod';
+  main.innerHTML = `<div class="page-title"><span>👥 Data Karyawan</span>${!isBOD ? '<div><button class="btn btn-primary btn-sm" onclick="modalKaryawan()">+ Tambah</button> <button class="btn btn-secondary btn-sm" onclick="modalImportKaryawan()">⬇️ Import</button></div>' : ''}</div><div class="card"><div class="flex gap-8 mb-16"><input class="form-control" placeholder="🔍 Cari nama/NIP..." id="srcKary" oninput="filterKaryawan()"><select class="form-control" style="max-width:180px" id="filterDept" onchange="filterKaryawan()"><option value="">Semua Dept</option></select></div><div class="table-wrap"><table><thead><tr><th>NIP</th><th>Nama</th><th>Departemen</th><th>Posisi</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="tblKary"></tbody></table></div></div>`;
   const snap = await db.collection('hrd_karyawan').get();
   window._karyawanData = [];
   const depts = new Set();
@@ -387,6 +390,7 @@ async function renderKaryawan() {
 function filterKaryawan() {
   const q = (document.getElementById('srcKary')?.value || '').toLowerCase(),
     dept = document.getElementById('filterDept')?.value || '';
+  const isBOD = currentUser.role === 'bod';
   const filtered = (window._karyawanData || []).filter((k) => {
     if (q && !k.nama?.toLowerCase().includes(q) && !k.nip?.toLowerCase().includes(q)) return false;
     if (dept && k.departemen !== dept) return false;
@@ -396,7 +400,7 @@ function filterKaryawan() {
   if (!filtered.length) h = '<tr><td colspan="6" class="text-center">Tidak ada data</td></tr>';
   else
     filtered.forEach((k) => {
-      h += `<tr><td>${escHtml(k.nip || '-')}</td><td class="fw-700">${escHtml(k.nama)}</td><td>${escHtml(k.departemen || '-')}</td><td>${escHtml(k.posisi || '-')}</td><td><span class="badge badge-${k.status === 'aktif' ? 'success' : 'danger'}">${k.status || 'aktif'}</span></td><td><button class="btn btn-xs btn-info" onclick="modalKaryawan('${k.id}')">✏️</button> <button class="btn btn-xs btn-primary" onclick="detailKaryawan('${k.id}')">👁️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_karyawan','${k.id}','karyawan')">🗑️</button></td></tr>`;
+      h += `<tr><td>${escHtml(k.nip || '-')}</td><td class="fw-700">${escHtml(k.nama)}</td><td>${escHtml(k.departemen || '-')}</td><td>${escHtml(k.posisi || '-')}</td><td><span class="badge badge-${k.status === 'aktif' ? 'success' : 'danger'}">${k.status || 'aktif'}</span></td><td><button class="btn btn-xs btn-primary" onclick="detailKaryawan('${k.id}')">👁️</button>${!isBOD ? ` <button class="btn btn-xs btn-info" onclick="modalKaryawan('${k.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_karyawan','${k.id}','karyawan')">🗑️</button>` : ''}</td></tr>`;
     });
   document.getElementById('tblKary').innerHTML = h;
 }
@@ -1560,7 +1564,8 @@ async function renderJobdeskMgmt() {
     return (document.getElementById('mainContent').innerHTML =
       '<div class="card"><p>Akses ditolak.</p></div>');
   const main = document.getElementById('mainContent');
-  main.innerHTML = `<div class="page-title"><span>📋 Kelola Jobdesk Karyawan</span><button class="btn btn-primary btn-sm" onclick="modalJobdeskPilih()">+ Atur Jobdesk</button></div><div class="card"><p class="text-sm mb-16" style="color:#666">Atur deskripsi pekerjaan, tanggung jawab, dan KPI untuk setiap karyawan. Data diambil dari Data Karyawan.</p><div class="flex gap-8 mb-16"><input class="form-control" placeholder="🔍 Cari nama..." id="srcJobdesk" oninput="filterJobdeskList()"><select class="form-control" style="max-width:180px" id="filterJobdeskDept" onchange="filterJobdeskList()"><option value="">Semua Dept</option></select></div><div class="table-wrap"><table><thead><tr><th>NIP</th><th>Nama</th><th>Departemen</th><th>Posisi</th><th>Jobdesk</th><th>Aksi</th></tr></thead><tbody id="tblJobdesk"></tbody></table></div></div>`;
+  const isBOD = currentUser.role === 'bod';
+  main.innerHTML = `<div class="page-title"><span>📋 Kelola Jobdesk Karyawan</span>${!isBOD ? '<button class="btn btn-primary btn-sm" onclick="modalJobdeskPilih()">+ Atur Jobdesk</button>' : ''}</div><div class="card"><p class="text-sm mb-16" style="color:#666">Atur deskripsi pekerjaan, tanggung jawab, dan KPI untuk setiap karyawan. Data diambil dari Data Karyawan.</p><div class="flex gap-8 mb-16"><input class="form-control" placeholder="🔍 Cari nama..." id="srcJobdesk" oninput="filterJobdeskList()"><select class="form-control" style="max-width:180px" id="filterJobdeskDept" onchange="filterJobdeskList()"><option value="">Semua Dept</option></select></div><div class="table-wrap"><table><thead><tr><th>NIP</th><th>Nama</th><th>Departemen</th><th>Posisi</th><th>Jobdesk</th><th>Aksi</th></tr></thead><tbody id="tblJobdesk"></tbody></table></div></div>`;
   // Get ALL karyawan (no status filter to avoid index issues)
   const [karySnap, jobdeskSnap] = await Promise.all([
     db.collection('hrd_karyawan').get(),
@@ -1622,6 +1627,7 @@ function openJobdeskFromDropdown() {
 function filterJobdeskList() {
   const q = (document.getElementById('srcJobdesk')?.value || '').toLowerCase();
   const dept = document.getElementById('filterJobdeskDept')?.value || '';
+  const isBOD = currentUser.role === 'bod';
   const filtered = (window._jobdeskKaryawan || []).filter((k) => {
     if (q && !k.nama?.toLowerCase().includes(q)) return false;
     if (dept && k.departemen !== dept) return false;
@@ -1632,7 +1638,10 @@ function filterJobdeskList() {
     h = '<tr><td colspan="6" class="text-center">Tidak ada data karyawan</td></tr>';
   else
     filtered.forEach((k) => {
-      h += `<tr><td class="text-xs">${escHtml(k.nip || '-')}</td><td class="fw-700">${escHtml(k.nama)}</td><td>${escHtml(k.departemen || '-')}</td><td>${escHtml(k.posisi || '-')}</td><td><span class="badge badge-${k.hasJobdesk ? 'success' : 'warning'}">${k.hasJobdesk ? '✅ Sudah' : '⚠️ Belum'}</span></td><td><button class="btn btn-xs btn-info" onclick="modalJobdesk('${k.id}','${escHtml(k.nama)}','${escHtml(k.posisi || '')}')">${k.hasJobdesk ? '✏️ Edit' : '+ Atur'}</button></td></tr>`;
+      const actionBtn = isBOD
+        ? `<button class="btn btn-xs btn-info" onclick="modalJobdesk('${k.id}','${escHtml(k.nama)}','${escHtml(k.posisi || '')}')">👁️ Lihat</button>`
+        : `<button class="btn btn-xs btn-info" onclick="modalJobdesk('${k.id}','${escHtml(k.nama)}','${escHtml(k.posisi || '')}')">${k.hasJobdesk ? '✏️ Edit' : '+ Atur'}</button>`;
+      h += `<tr><td class="text-xs">${escHtml(k.nip || '-')}</td><td class="fw-700">${escHtml(k.nama)}</td><td>${escHtml(k.departemen || '-')}</td><td>${escHtml(k.posisi || '-')}</td><td><span class="badge badge-${k.hasJobdesk ? 'success' : 'warning'}">${k.hasJobdesk ? '✅ Sudah' : '⚠️ Belum'}</span></td><td>${actionBtn}</td></tr>`;
     });
   document.getElementById('tblJobdesk').innerHTML = h;
 }

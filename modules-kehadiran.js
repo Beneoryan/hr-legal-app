@@ -850,7 +850,8 @@ async function checkHoliday(dateStr) {
 // ── PENALTY ───────────────────────────────────────────────────
 async function renderPenalty() {
   const main = document.getElementById('mainContent');
-  main.innerHTML = `<div class="page-title"><span>⚠️ Penalty Point</span><div class="flex gap-8">${hasAccess(4) ? '<button class="btn btn-info btn-sm" onclick="syncPenaltyToKPI()">🔄 Sinkronisasi ke KPI</button>' : ''}<button class="btn btn-primary btn-sm" onclick="modalPenalty()">+ Tambah</button></div></div>
+  const isBOD = currentUser.role === 'bod';
+  main.innerHTML = `<div class="page-title"><span>⚠️ Penalty Point</span><div class="flex gap-8">${hasAccess(4) && !isBOD ? '<button class="btn btn-info btn-sm" onclick="syncPenaltyToKPI()">🔄 Sinkronisasi ke KPI</button>' : ''}${!isBOD ? '<button class="btn btn-primary btn-sm" onclick="modalPenalty()">+ Tambah</button>' : ''}</div></div>
     <div class="card mb-16"><div class="card-title mb-8">📊 Ringkasan Poin per Karyawan</div><div id="penaltySummary">Loading...</div></div>
     <div class="card"><div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Tanggal</th><th>Jenis</th><th>Poin</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="tblPenalty"></tbody></table></div></div>`;
   const [penSnap, karyawanSnap] = await Promise.all([
@@ -926,7 +927,7 @@ async function renderPenalty() {
               ? '<span class="badge badge-warning">SP I</span>'
               : '<span class="badge badge-info">Peringatan</span>';
       const jsName = escHtml(s.nama).replace(/'/g, "\\'");
-      sumH += `<tr><td class="fw-700">${escHtml(s.nama)}</td><td>${escHtml(s.departemen)}</td><td><span class="badge ${badgeClass}">${s.poin}</span></td><td>${statusLabel}</td><td><button class="btn btn-xs btn-info" onclick="viewPenaltyDetail('${jsName}')">👁️</button>${hasAccess(2) ? ` <button class="btn btn-xs btn-primary" onclick="modalPenalty('${jsName}')">+ Tambah</button>` : ''}</td></tr>`;
+      sumH += `<tr><td class="fw-700">${escHtml(s.nama)}</td><td>${escHtml(s.departemen)}</td><td><span class="badge ${badgeClass}">${s.poin}</span></td><td>${statusLabel}</td><td><button class="btn btn-xs btn-info" onclick="viewPenaltyDetail('${jsName}')">👁️</button>${hasAccess(2) && !isBOD ? ` <button class="btn btn-xs btn-primary" onclick="modalPenalty('${jsName}')">+ Tambah</button>` : ''}</td></tr>`;
     });
     sumH += '</tbody></table></div>';
   }
@@ -947,7 +948,7 @@ async function renderPenalty() {
               : p.jenis === 'Mangkir'
                 ? '<span class="badge badge-danger">Mangkir</span>'
                 : '<span class="badge badge-info">Ringan</span>';
-      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggal)}</td><td>${escHtml(p.jenis)}</td><td><span class="badge badge-danger">${p.poin}</span></td><td>${statusBadge}</td><td><button class="btn btn-xs btn-info" onclick="viewPenaltyItem('${p.id}')">👁️</button>${hasAccess(2) ? ` <button class="btn btn-xs btn-primary" onclick="editPenalty('${p.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_penalty','${p.id}','penalty')">🗑️</button>` : ''}</td></tr>`;
+      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggal)}</td><td>${escHtml(p.jenis)}</td><td><span class="badge badge-danger">${p.poin}</span></td><td>${statusBadge}</td><td><button class="btn btn-xs btn-info" onclick="viewPenaltyItem('${p.id}')">👁️</button>${hasAccess(2) && !isBOD ? ` <button class="btn btn-xs btn-primary" onclick="editPenalty('${p.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_penalty','${p.id}','penalty')">🗑️</button>` : ''}</td></tr>`;
     });
   }
   document.getElementById('tblPenalty').innerHTML = h;
@@ -1259,9 +1260,8 @@ async function renderDailyTask() {
     addBtn =
       '<button class="btn btn-primary btn-sm" onclick="modalAddTaskChoice()">+ Tambah</button> <button class="btn btn-success btn-sm" onclick="modalImportWeeklyReport()">⬆️ Import Laporan</button>';
   } else if (hasAccess(5)) {
-    // BOD: no task, only view reports + import
-    addBtn =
-      '<button class="btn btn-success btn-sm" onclick="modalImportWeeklyReport()">⬆️ Import Laporan</button>';
+    // BOD: view only, no actions
+    addBtn = '';
   } else if (hasAccess(2)) {
     // Leader/Manager/Head: can add task + report
     addBtn =
