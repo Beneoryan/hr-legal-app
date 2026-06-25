@@ -1415,6 +1415,15 @@ async function loadDailyTasks(filter) {
         return dept.includes(window._allReportDivFilter);
       });
     }
+    // Apply category sub-filter
+    if (window._allReportCatFilter) {
+      filtered = filtered.filter(function (t) {
+        var kat = (t.kategori || '').toLowerCase();
+        var filterVal = (window._allReportCatFilter || '').toLowerCase();
+        if (filterVal === 'tanpa kategori') return !t.kategori || t.kategori.trim() === '';
+        return kat.includes(filterVal);
+      });
+    }
     // Sort by departemen then kategori then date
     filtered.sort(
       (a, b) =>
@@ -1455,11 +1464,49 @@ async function loadDailyTasks(filter) {
       <button class="btn btn-xs btn-outline" onclick="document.getElementById('reportDateFrom').value='';document.getElementById('reportDateTo').value='';loadDailyTasks('${filter}')">Reset</button>
     </div>`;
     if (filter === 'all-report') {
-      dateFilterHtml += `<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-        <button class="btn btn-xs ${!window._allReportDivFilter ? 'btn-primary' : 'btn-outline'}" onclick="window._allReportDivFilter='';loadDailyTasks('all-report')">Semua</button>
-        <button class="btn btn-xs ${window._allReportDivFilter === 'ACADEMIC' ? 'btn-primary' : 'btn-outline'}" onclick="window._allReportDivFilter='ACADEMIC';loadDailyTasks('all-report')">📚 ACADEMIC</button>
-        <button class="btn btn-xs ${window._allReportDivFilter === 'OFFICE' ? 'btn-primary' : 'btn-outline'}" onclick="window._allReportDivFilter='OFFICE';loadDailyTasks('all-report')">🏢 OFFICE</button>
-      </div>`;
+      dateFilterHtml += `<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-xs ${!window._allReportDivFilter ? 'btn-primary' : 'btn-outline'}" onclick="window._allReportDivFilter='';window._allReportCatFilter='';loadDailyTasks('all-report')">Semua</button>
+        <button class="btn btn-xs ${window._allReportDivFilter === 'ACADEMIC' ? 'btn-primary' : 'btn-outline'}" onclick="window._allReportDivFilter='ACADEMIC';window._allReportCatFilter='';loadDailyTasks('all-report')">📚 ACADEMIC</button>
+        <button class="btn btn-xs ${window._allReportDivFilter === 'OFFICE' ? 'btn-primary' : 'btn-outline'}" onclick="window._allReportDivFilter='OFFICE';window._allReportCatFilter='';loadDailyTasks('all-report')">🏢 OFFICE</button>`;
+      // Category sub-filter for manager+ (level 3+)
+      if (hasAccess(3)) {
+        let catOptions = '<option value="">Semua Kategori</option>';
+        if (window._allReportDivFilter === 'ACADEMIC') {
+          ['Siswa', 'Sensei', 'Curriculum', 'TSK-Job', 'Tanpa Kategori'].forEach((c) => {
+            catOptions += `<option value="${c}" ${window._allReportCatFilter === c ? 'selected' : ''}>${c}</option>`;
+          });
+        } else if (window._allReportDivFilter === 'OFFICE') {
+          [
+            'HR & Legal',
+            'Document',
+            "Facility's",
+            'Finance',
+            'Marketing & Sales',
+            'Promosi',
+          ].forEach((c) => {
+            catOptions += `<option value="${c}" ${window._allReportCatFilter === c ? 'selected' : ''}>${c}</option>`;
+          });
+        } else {
+          // Show all categories when no division selected
+          [
+            'Siswa',
+            'Sensei',
+            'Curriculum',
+            'TSK-Job',
+            'HR & Legal',
+            'Document',
+            "Facility's",
+            'Finance',
+            'Marketing & Sales',
+            'Promosi',
+            'Tanpa Kategori',
+          ].forEach((c) => {
+            catOptions += `<option value="${c}" ${window._allReportCatFilter === c ? 'selected' : ''}>${c}</option>`;
+          });
+        }
+        dateFilterHtml += `<select class="form-control" style="max-width:180px;padding:4px 8px;font-size:.8rem" onchange="window._allReportCatFilter=this.value;loadDailyTasks('all-report')">${catOptions}</select>`;
+      }
+      dateFilterHtml += `</div>`;
     }
   }
   if (filter === 'history-assigned') {
