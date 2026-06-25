@@ -2464,16 +2464,20 @@ async function getFilesAsBase64(inputId) {
 }
 
 function openCamera(previewId, cameraDataId) {
-  openModal(`<div class="modal-title">📷 Ambil Foto</div>
-    <div style="text-align:center">
-      <video id="cameraVideo" autoplay playsinline style="width:100%;max-width:480px;border-radius:12px;border:3px solid var(--primary);background:#000"></video>
-      <canvas id="cameraCanvas" style="display:none"></canvas>
-      <div style="margin-top:16px;display:flex;gap:12px;justify-content:center">
-        <button class="btn btn-primary" onclick="capturePhoto('${previewId}','${cameraDataId}')" style="padding:14px 28px;font-size:1.1rem;border-radius:50px">📸 Ambil Foto</button>
-        <button class="btn btn-outline" onclick="stopCamera();closeModalDirect()" style="border-radius:50px">✕ Batal</button>
-      </div>
-      <p class="text-xs mt-8" style="color:#666">Izinkan akses kamera. Pada mobile, otomatis menggunakan kamera belakang.</p>
-    </div>`);
+  // Use a separate overlay for camera so it doesn't close the parent modal
+  const overlay = document.createElement('div');
+  overlay.id = 'cameraOverlay';
+  overlay.style.cssText =
+    'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.9);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px';
+  overlay.innerHTML = `<div style="width:100%;max-width:500px;text-align:center">
+    <video id="cameraVideo" autoplay playsinline style="width:100%;border-radius:12px;border:3px solid #fff;background:#000"></video>
+    <div style="margin-top:16px;display:flex;gap:12px;justify-content:center">
+      <button class="btn btn-primary" onclick="capturePhoto('${previewId}','${cameraDataId}')" style="padding:14px 28px;font-size:1.1rem;border-radius:50px">📸 Ambil Foto</button>
+      <button class="btn btn-outline" onclick="stopCamera();document.getElementById('cameraOverlay')?.remove()" style="border-radius:50px;color:#fff;border-color:#fff">✕ Batal</button>
+    </div>
+    <p class="text-xs mt-8" style="color:#ccc">Izinkan akses kamera.</p>
+  </div>`;
+  document.body.appendChild(overlay);
   setTimeout(() => {
     const video = document.getElementById('cameraVideo');
     if (!video) return;
@@ -2494,7 +2498,7 @@ function openCamera(previewId, cameraDataId) {
           })
           .catch((err) => {
             toast('Gagal akses kamera: ' + err.message, 'error');
-            closeModalDirect();
+            document.getElementById('cameraOverlay')?.remove();
           });
       });
   }, 300);
@@ -2502,8 +2506,8 @@ function openCamera(previewId, cameraDataId) {
 
 function capturePhoto(previewId, cameraDataId) {
   const video = document.getElementById('cameraVideo');
-  const canvas = document.getElementById('cameraCanvas');
-  if (!video || !canvas) return;
+  const canvas = document.createElement('canvas');
+  if (!video) return;
   canvas.width = video.videoWidth || 1280;
   canvas.height = video.videoHeight || 720;
   canvas.getContext('2d').drawImage(video, 0, 0);
@@ -2511,7 +2515,7 @@ function capturePhoto(previewId, cameraDataId) {
   const fileName =
     'foto_' + new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19) + '.jpg';
   stopCamera();
-  closeModalDirect();
+  document.getElementById('cameraOverlay')?.remove();
   // Add to preview
   setTimeout(() => {
     const preview = document.getElementById(previewId);
