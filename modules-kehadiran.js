@@ -1519,17 +1519,18 @@ async function loadDailyTasks(filter) {
         <button class="btn btn-xs ${window._teamReportDivFilter === 'OFFICE' ? 'btn-primary' : 'btn-outline'}" onclick="window._teamReportDivFilter='OFFICE';window._teamReportCatFilter='';loadDailyTasks('team-report')">🏢 OFFICE</button>`;
       }
       let trCatOpts = '<option value="">Semua Kategori</option>';
-      if (window._teamReportDivFilter === 'ACADEMIC') {
+      if (hasAccess(4) && window._teamReportDivFilter === 'ACADEMIC') {
         ['Siswa', 'Sensei', 'Curriculum', 'TSK-Job', 'Tanpa Kategori'].forEach((c) => {
           trCatOpts += `<option value="${c}" ${window._teamReportCatFilter === c ? 'selected' : ''}>${c}</option>`;
         });
-      } else if (window._teamReportDivFilter === 'OFFICE') {
+      } else if (hasAccess(4) && window._teamReportDivFilter === 'OFFICE') {
         ['HR & Legal', 'Document', "Facility's", 'Finance', 'Marketing & Sales', 'Promosi'].forEach(
           (c) => {
             trCatOpts += `<option value="${c}" ${window._teamReportCatFilter === c ? 'selected' : ''}>${c}</option>`;
           }
         );
-      } else {
+      } else if (hasAccess(4)) {
+        // Head/BOD with no division filter: show all
         [
           'Siswa',
           'Sensei',
@@ -1545,6 +1546,26 @@ async function loadDailyTasks(filter) {
         ].forEach((c) => {
           trCatOpts += `<option value="${c}" ${window._teamReportCatFilter === c ? 'selected' : ''}>${c}</option>`;
         });
+      } else {
+        // Manager: only own division categories (no cross-division)
+        const myDeptUp = (currentUser.departemen || '').toUpperCase();
+        if (myDeptUp.includes('ACADEMIC')) {
+          ['Siswa', 'Sensei', 'Curriculum', 'TSK-Job', 'Tanpa Kategori'].forEach((c) => {
+            trCatOpts += `<option value="${c}" ${window._teamReportCatFilter === c ? 'selected' : ''}>${c}</option>`;
+          });
+        } else {
+          [
+            'HR & Legal',
+            'Document',
+            "Facility's",
+            'Finance',
+            'Marketing & Sales',
+            'Promosi',
+            'Tanpa Kategori',
+          ].forEach((c) => {
+            trCatOpts += `<option value="${c}" ${window._teamReportCatFilter === c ? 'selected' : ''}>${c}</option>`;
+          });
+        }
       }
       dateFilterHtml += `<select class="form-control" style="max-width:180px;padding:4px 8px;font-size:.8rem" onchange="window._teamReportCatFilter=this.value;loadDailyTasks('team-report')">${trCatOpts}</select></div>`;
     }
