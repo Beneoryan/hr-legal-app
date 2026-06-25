@@ -1922,7 +1922,7 @@ async function loadDailyTasks(filter) {
       html += `<span class="badge badge-info" style="font-size:.6rem">Hari Ini</span>`;
     html += `</div>`;
     if (t.description)
-      html += `<div style="font-size:.8rem;color:var(--text-light);margin-top:4px;white-space:pre-line;${t.done ? 'text-decoration:line-through' : ''}">${escHtml(t.description)}</div>`;
+      html += `<div style="font-size:.8rem;color:var(--text-light);margin-top:4px;white-space:pre-line;word-break:break-word;${t.done ? 'text-decoration:line-through' : ''}">${escHtml(t.description)}</div>`;
     html += `<div style="font-size:.7rem;color:#999;margin-top:4px">`;
     if (isAdmin && t.targetUserName)
       html += `👤 Untuk: <strong>${escHtml(t.targetUserName)}</strong> | `;
@@ -1979,7 +1979,7 @@ function _showDailyTaskDetail(task) {
   openModal(`<div class="modal-title">📋 Detail Task</div>
     <table style="width:100%;border-collapse:collapse">
       <tr><td style="padding:8px;font-weight:700;width:140px">Judul</td><td style="padding:8px">${escHtml(task.title)}</td></tr>
-      <tr><td style="padding:8px;font-weight:700">Deskripsi</td><td style="padding:8px;white-space:pre-line">${escHtml(task.description || '-')}</td></tr>
+      <tr><td style="padding:8px;font-weight:700;width:140px;vertical-align:top">Deskripsi</td><td style="padding:8px;white-space:pre-line;word-break:break-word">${escHtml(task.description || '-')}</td></tr>
       <tr><td style="padding:8px;font-weight:700">Tanggal</td><td style="padding:8px">${formatDate(task.tanggal)}</td></tr>
       <tr><td style="padding:8px;font-weight:700">Waktu</td><td style="padding:8px">${task.waktu || '-'}</td></tr>
       <tr><td style="padding:8px;font-weight:700">Prioritas</td><td style="padding:8px"><span style="color:${priorityColor};font-weight:600">${priorityLabel}</span></td></tr>
