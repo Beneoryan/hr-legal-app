@@ -1979,7 +1979,7 @@ function _showDailyTaskDetail(task) {
   openModal(`<div class="modal-title">📋 Detail Task</div>
     <table style="width:100%;border-collapse:collapse">
       <tr><td style="padding:8px;font-weight:700;width:140px">Judul</td><td style="padding:8px">${escHtml(task.title)}</td></tr>
-      <tr><td style="padding:8px;font-weight:700">Deskripsi</td><td style="padding:8px">${escHtml(task.description || '-')}</td></tr>
+      <tr><td style="padding:8px;font-weight:700">Deskripsi</td><td style="padding:8px;white-space:pre-line">${escHtml(task.description || '-')}</td></tr>
       <tr><td style="padding:8px;font-weight:700">Tanggal</td><td style="padding:8px">${formatDate(task.tanggal)}</td></tr>
       <tr><td style="padding:8px;font-weight:700">Waktu</td><td style="padding:8px">${task.waktu || '-'}</td></tr>
       <tr><td style="padding:8px;font-weight:700">Prioritas</td><td style="padding:8px"><span style="color:${priorityColor};font-weight:600">${priorityLabel}</span></td></tr>
@@ -2080,7 +2080,7 @@ async function modalAddTask() {
     ${assignHtml}
     ${catHtml}
     <div class="form-group"><label>Judul Task *</label><input class="form-control" id="dtTitle" placeholder="Contoh: Meeting dengan klien"></div>
-    <div class="form-group"><label>Deskripsi</label><textarea class="form-control" id="dtDesc" rows="2" placeholder="Detail task..."></textarea></div>
+    <div class="form-group"><label>Deskripsi</label><textarea class="form-control" id="dtDesc" rows="4" placeholder="Detail task...\n(Tekan Enter untuk baris baru)" style="white-space:pre-wrap"></textarea></div>
     <div class="grid-2"><div class="form-group"><label>Tanggal *</label><input class="form-control" type="date" id="dtDate" value="${todayStr()}"></div><div class="form-group"><label>Waktu</label><input class="form-control" type="time" id="dtTime"></div></div>
     <div class="grid-2"><div class="form-group"><label>Prioritas</label><select class="form-control" id="dtPriority"><option value="medium">Sedang</option><option value="high">Tinggi</option><option value="low">Rendah</option></select></div><div class="form-group"><label>Pengingat</label><select class="form-control" id="dtReminder"><option value="">Tidak ada</option><option value="15 menit">15 menit</option><option value="30 menit">30 menit</option><option value="1 jam">1 jam</option><option value="1 hari">1 hari</option></select></div></div>
     <div class="form-group"><label>Ulangi</label><select class="form-control" id="dtRepeat"><option value="">Tidak</option><option value="daily">Setiap Hari</option><option value="weekly">Setiap Minggu</option><option value="monthly">Setiap Bulan</option></select></div>
@@ -2195,7 +2195,7 @@ async function editDailyTask(id) {
   openModal(`<div class="modal-title">✏️ Edit Task</div>
     ${reassignHtml}
     <div class="form-group"><label>Judul *</label><input class="form-control" id="dtEditTitle" value="${escHtml(task.title)}"></div>
-    <div class="form-group"><label>Deskripsi</label><textarea class="form-control" id="dtEditDesc" rows="2">${escHtml(task.description || '')}</textarea></div>
+    <div class="form-group"><label>Deskripsi</label><textarea class="form-control" id="dtEditDesc" rows="4" style="white-space:pre-wrap">${escHtml(task.description || '')}</textarea></div>
     <div class="grid-2"><div class="form-group"><label>Tanggal *</label><input class="form-control" type="date" id="dtEditDate" value="${task.tanggal}"></div><div class="form-group"><label>Waktu</label><input class="form-control" type="time" id="dtEditTime" value="${task.waktu || ''}"></div></div>
     <div class="grid-2"><div class="form-group"><label>Prioritas</label><select class="form-control" id="dtEditPriority"><option value="medium" ${task.priority === 'medium' ? 'selected' : ''}>Sedang</option><option value="high" ${task.priority === 'high' ? 'selected' : ''}>Tinggi</option><option value="low" ${task.priority === 'low' ? 'selected' : ''}>Rendah</option></select></div><div class="form-group"><label>Pengingat</label><select class="form-control" id="dtEditReminder"><option value="" ${!task.reminder ? 'selected' : ''}>Tidak ada</option><option value="15 menit" ${task.reminder === '15 menit' ? 'selected' : ''}>15 menit</option><option value="30 menit" ${task.reminder === '30 menit' ? 'selected' : ''}>30 menit</option><option value="1 jam" ${task.reminder === '1 jam' ? 'selected' : ''}>1 jam</option><option value="1 hari" ${task.reminder === '1 hari' ? 'selected' : ''}>1 hari</option></select></div></div>
     <div class="form-group"><label>Ulangi</label><select class="form-control" id="dtEditRepeat"><option value="" ${!task.repeat ? 'selected' : ''}>Tidak</option><option value="daily" ${task.repeat === 'daily' ? 'selected' : ''}>Setiap Hari</option><option value="weekly" ${task.repeat === 'weekly' ? 'selected' : ''}>Setiap Minggu</option><option value="monthly" ${task.repeat === 'monthly' ? 'selected' : ''}>Setiap Bulan</option></select></div>

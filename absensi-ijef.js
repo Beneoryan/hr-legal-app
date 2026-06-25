@@ -2407,7 +2407,7 @@ async function loadRekapGrid() {
       let color = '#eee',
         text = '-',
         title = '';
-      if ((isLibur || isWeekend) && (st === 'lembur' || isOT)) {
+      if ((isLibur || isWeekend) && isOT) {
         color = '#7b1fa2';
         text = 'L';
         ut++;
@@ -2425,11 +2425,11 @@ async function loadRekapGrid() {
         color = '#9e9e9e';
         text = '-';
         title = ' title="Weekend"';
-      } else if (isLibur && st && !(st === 'lembur' || isOT)) {
+      } else if (isLibur && st && !isOT) {
         color = '#9e9e9e';
         text = 'H';
         title = ' title="Hari Libur"';
-      } else if (isWeekend && st && !(st === 'lembur' || isOT)) {
+      } else if (isWeekend && st && !isOT) {
         color = '#9e9e9e';
         text = '-';
         title = ' title="Weekend"';
@@ -2470,7 +2470,7 @@ async function loadRekapGrid() {
         title = ' title="Dinas Luar (SPPD)"';
         ut++;
         totalD++;
-      } else if (st === 'lembur' || isOT) {
+      } else if (isOT) {
         color = '#7b1fa2';
         text = 'L';
         ut++;
