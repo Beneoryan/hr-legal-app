@@ -2621,6 +2621,151 @@ function stopCamera() {
   }
 }
 
+// ── EVIDEN ZOOM VIEWER ─────────────────────────────────────────
+var _zoomState = { scale: 1, posX: 0, posY: 0, isDragging: false, startX: 0, startY: 0, lastPosX: 0, lastPosY: 0 };
+
+function initEvidenZoom() {
+  _zoomState = { scale: 1, posX: 0, posY: 0, isDragging: false, startX: 0, startY: 0, lastPosX: 0, lastPosY: 0 };
+  const container = document.getElementById('zoomContainer');
+  const img = document.getElementById('zoomImage');
+  if (!container || !img) return;
+
+  // Wait for image to load then fit
+  img.onload = function() {
+    evidenZoomFit();
+  };
+  // If already loaded (cached)
+  if (img.complete && img.naturalWidth) {
+    evidenZoomFit();
+  }
+
+  // Mouse wheel zoom
+  container.addEventListener('wheel', function(e) {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.15 : 0.15;
+    const newScale = Math.min(5, Math.max(0.2, _zoomState.scale + delta));
+    _zoomState.scale = newScale;
+    updateZoomTransform();
+  }, { passive: false });
+
+  // Mouse drag
+  container.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    _zoomState.isDragging = true;
+    _zoomState.startX = e.clientX - _zoomState.posX;
+    _zoomState.startY = e.clientY - _zoomState.posY;
+    img.classList.add('no-transition');
+  });
+  document.addEventListener('mousemove', handleZoomDrag);
+  document.addEventListener('mouseup', handleZoomDragEnd);
+
+  // Touch support (pinch-to-zoom + drag)
+  var lastTouchDist = 0;
+  container.addEventListener('touchstart', function(e) {
+    if (e.touches.length === 1) {
+      _zoomState.isDragging = true;
+      _zoomState.startX = e.touches[0].clientX - _zoomState.posX;
+      _zoomState.startY = e.touches[0].clientY - _zoomState.posY;
+      img.classList.add('no-transition');
+    } else if (e.touches.length === 2) {
+      lastTouchDist = getTouchDist(e.touches);
+    }
+  }, { passive: true });
+
+  container.addEventListener('touchmove', function(e) {
+    e.preventDefault();
+    if (e.touches.length === 1 && _zoomState.isDragging) {
+      _zoomState.posX = e.touches[0].clientX - _zoomState.startX;
+      _zoomState.posY = e.touches[0].clientY - _zoomState.startY;
+      updateZoomTransform();
+    } else if (e.touches.length === 2) {
+      const dist = getTouchDist(e.touches);
+      if (lastTouchDist > 0) {
+        const pinchDelta = (dist - lastTouchDist) * 0.008;
+        _zoomState.scale = Math.min(5, Math.max(0.2, _zoomState.scale + pinchDelta));
+        updateZoomTransform();
+      }
+      lastTouchDist = dist;
+    }
+  }, { passive: false });
+
+  container.addEventListener('touchend', function(e) {
+    _zoomState.isDragging = false;
+    lastTouchDist = 0;
+    img.classList.remove('no-transition');
+  });
+
+  // Double click/tap to reset
+  container.addEventListener('dblclick', function() {
+    evidenZoomReset();
+  });
+}
+
+function handleZoomDrag(e) {
+  if (!_zoomState.isDragging) return;
+  _zoomState.posX = e.clientX - _zoomState.startX;
+  _zoomState.posY = e.clientY - _zoomState.startY;
+  updateZoomTransform();
+}
+
+function handleZoomDragEnd() {
+  _zoomState.isDragging = false;
+  var img = document.getElementById('zoomImage');
+  if (img) img.classList.remove('no-transition');
+}
+
+function getTouchDist(touches) {
+  var dx = touches[0].clientX - touches[1].clientX;
+  var dy = touches[0].clientY - touches[1].clientY;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function updateZoomTransform() {
+  var img = document.getElementById('zoomImage');
+  var levelText = document.getElementById('zoomLevelText');
+  if (img) {
+    img.style.transform = 'translate(calc(-50% + ' + _zoomState.posX + 'px), calc(-50% + ' + _zoomState.posY + 'px)) scale(' + _zoomState.scale + ')';
+  }
+  if (levelText) {
+    levelText.textContent = Math.round(_zoomState.scale * 100) + '%';
+  }
+}
+
+function evidenZoomIn() {
+  _zoomState.scale = Math.min(5, _zoomState.scale + 0.25);
+  updateZoomTransform();
+}
+
+function evidenZoomOut() {
+  _zoomState.scale = Math.max(0.2, _zoomState.scale - 0.25);
+  updateZoomTransform();
+}
+
+function evidenZoomReset() {
+  _zoomState.scale = 1;
+  _zoomState.posX = 0;
+  _zoomState.posY = 0;
+  updateZoomTransform();
+}
+
+function evidenZoomFit() {
+  var container = document.getElementById('zoomContainer');
+  var img = document.getElementById('zoomImage');
+  if (!container || !img || !img.naturalWidth) {
+    evidenZoomReset();
+    return;
+  }
+  var cw = container.clientWidth;
+  var ch = container.clientHeight;
+  var iw = img.naturalWidth;
+  var ih = img.naturalHeight;
+  var fitScale = Math.min(cw / iw, ch / ih, 1);
+  _zoomState.scale = fitScale;
+  _zoomState.posX = 0;
+  _zoomState.posY = 0;
+  updateZoomTransform();
+}
+
 function viewEviden(encodedData) {
   try {
     const file = JSON.parse(decodeURIComponent(encodedData));
@@ -2630,7 +2775,19 @@ function viewEviden(encodedData) {
       (file.name && file.name.toLowerCase().endsWith('.pdf'));
     let content = '';
     if (isImage) {
-      content = `<img src="${file.data}" style="width:100%;max-height:70vh;object-fit:contain;border-radius:8px">`;
+      content = `<div class="zoom-controls">
+        <button class="zoom-btn" onclick="evidenZoomOut()" title="Zoom Out">➖</button>
+        <button class="zoom-btn" onclick="evidenZoomReset()" title="Reset">🔄</button>
+        <span class="zoom-level" id="zoomLevelText">100%</span>
+        <button class="zoom-btn" onclick="evidenZoomIn()" title="Zoom In">➕</button>
+        <button class="zoom-btn" onclick="evidenZoomFit()" title="Fit">📐</button>
+      </div>
+      <div class="zoom-container" id="zoomContainer">
+        <img id="zoomImage" src="${file.data}" alt="${escHtml(file.name || 'Eviden')}">
+      </div>
+      <div style="text-align:center;margin-top:8px">
+        <span class="text-xs" style="color:#999">💡 Scroll untuk zoom • Drag untuk geser • Double-tap reset</span>
+      </div>`;
     } else if (isPdf) {
       content = `<iframe src="${file.data}" style="width:100%;height:70vh;border:none;border-radius:8px"></iframe>`;
     } else {
@@ -2651,6 +2808,10 @@ function viewEviden(encodedData) {
       `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div class="fw-700" style="font-size:1rem">📎 ${escHtml(file.name || 'Lampiran')}</div><button class="btn btn-xs btn-outline" onclick="closeModalDirect()">✕</button></div>${content}`,
       true
     );
+    // Initialize zoom if image
+    if (isImage) {
+      setTimeout(initEvidenZoom, 100);
+    }
   } catch (e) {
     toast('Gagal membuka file', 'error');
   }

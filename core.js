@@ -631,6 +631,11 @@ function closeModal(e) {
 }
 function closeModalDirect() {
   document.getElementById('modalOverlay').classList.remove('active');
+  // Clean up zoom drag listeners
+  if (typeof handleZoomDrag === 'function') {
+    document.removeEventListener('mousemove', handleZoomDrag);
+    document.removeEventListener('mouseup', handleZoomDragEnd);
+  }
 }
 
 function toast(msg, type = 'info') {
