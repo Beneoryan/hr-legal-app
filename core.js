@@ -433,14 +433,19 @@ function buildNavItems(isPortalUser) {
     ['penalty', '⚠️', 'Penalty Point'],
     ['daily-task', '📋', 'Daily Task'],
   ]);
-  nav += navGroup('💰 Keuangan', [
-    ['penggajian', '💰', 'Penggajian'],
-    ['tax-calc', '🧮', 'Tax & BPJS'],
-    ['insentif', '🏆', 'Insentif'],
-    ['reimbursement', '🧾', 'Reimbursement'],
-    ['kasbon', '💳', 'Kasbon & Loan'],
-    ['tunjangan', '🎁', 'Tunjangan'],
-  ]);
+  nav += navGroup(
+    '💰 Keuangan',
+    currentUser.role === 'bod'
+      ? [['penggajian', '💰', 'Penggajian']]
+      : [
+          ['penggajian', '💰', 'Penggajian'],
+          ['tax-calc', '🧮', 'Tax & BPJS'],
+          ['insentif', '🏆', 'Insentif'],
+          ['reimbursement', '🧾', 'Reimbursement'],
+          ['kasbon', '💳', 'Kasbon & Loan'],
+          ['tunjangan', '🎁', 'Tunjangan'],
+        ]
+  );
   nav += navGroup('📈 Kinerja', [
     ['kpi', '📈', 'KPI & Penilaian'],
     ['pelatihan', '🎓', 'Pelatihan'],
