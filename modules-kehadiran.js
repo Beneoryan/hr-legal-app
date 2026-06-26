@@ -71,11 +71,12 @@ async function renderCuti() {
           // BOD: only head-level
           const grade = gradeMapCuti[(p.nama || '').toLowerCase()] || '';
           if (!grade.includes('head')) return;
-        } else {
-          // Manager/Head: only own department
+        } else if (!hasAccess(4)) {
+          // Manager (level 3): only own department
           const pDept = deptMapCuti[(p.nama || '').toLowerCase()] || '';
           if (pDept && pDept !== myDept) return;
         }
+        // HEAD (level 4) and GM: see all departments
       }
       const badge =
         p.status === 'approved'
@@ -303,10 +304,11 @@ async function renderOvertime() {
           // BOD: only head-level
           const grade = gradeMapOT[(p.nama || '').toLowerCase()] || '';
           if (!grade.includes('head')) return;
-        } else {
-          // Manager/Head: only own department
+        } else if (!hasAccess(4)) {
+          // Manager (level 3): only own department
           if (pDept && pDept !== myDept) return;
         }
+        // HEAD (level 4) and GM: see all departments
       }
       const badge =
         p.status === 'approved'

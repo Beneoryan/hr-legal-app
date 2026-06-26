@@ -1122,7 +1122,7 @@ async function renderApprovalCenter() {
     const steps = flow?.steps || [];
     const currentStep = item.approvalStep || 0;
     const currentApprover = steps[currentStep]?.nama?.toLowerCase() || '';
-    const canSee = isAdmin || isGM || item._dept === myDept;
+    const canSee = isAdmin || isGM || hasAccess(4) || item._dept === myDept;
     if (!canSee) return;
     // BOD filter: only show submissions from 'head' level
     const isBOD = currentUser.role === 'bod';
