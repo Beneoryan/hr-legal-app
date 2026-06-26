@@ -290,10 +290,10 @@ async function renderKontrak() {
   const main = document.getElementById('mainContent');
   const isBOD = currentUser.role === 'bod';
   main.innerHTML = `<div class="page-title"><span>📄 Kontrak Karyawan</span>${!isBOD ? '<button class="btn btn-primary btn-sm" onclick="modalKontrak()">+ Upload Kontrak</button>' : ''}</div>
-    ${!isBOD ? `<div class="tabs mb-16" id="kontrakTabs">
+    <div class="tabs mb-16" id="kontrakTabs">
       <div class="tab active" onclick="showKontrakTab('list')">📋 Daftar Kontrak</div>
       <div class="tab" onclick="showKontrakTab('dokumen')">📁 Dokumen Karyawan</div>
-    </div>` : ''}
+    </div>
     <div id="kontrakContent"></div>`;
   showKontrakTab('list');
 }
@@ -477,8 +477,9 @@ function lihatFileKontrak(id) {
 // ══════════════════════════════════════════════════════════════
 
 async function renderDokumenKaryawan(container) {
+  const isBOD = currentUser.role === 'bod';
   container.innerHTML = `<div class="card">
-    <div class="card-header"><div class="card-title">📁 Dokumen Kelengkapan Karyawan</div><button class="btn btn-primary btn-sm" onclick="modalUploadDokumen()">+ Upload Dokumen</button></div>
+    <div class="card-header"><div class="card-title">📁 Dokumen Kelengkapan Karyawan</div>${!isBOD ? '<button class="btn btn-primary btn-sm" onclick="modalUploadDokumen()">+ Upload Dokumen</button>' : ''}</div>
     <p class="text-sm mb-16" style="color:#666">Dokumen dikelompokkan per karyawan. Klik nama untuk melihat berkas.</p>
     <div class="flex gap-8 mb-16">
       <input class="form-control" placeholder="🔍 Cari nama karyawan..." id="searchDokKary" oninput="renderDokFolders()" style="max-width:300px">
@@ -533,10 +534,11 @@ function renderDokFolders() {
       <div class="table-wrap"><table><thead><tr><th>Tipe</th><th>Nama File</th><th>Keterangan</th><th>Tanggal</th><th>Aksi</th></tr></thead><tbody>`;
     group.docs.sort((a, b) => (a.tipeDokumen || '').localeCompare(b.tipeDokumen || ''));
     group.docs.forEach((p) => {
-      html += `<tr><td><span class="badge badge-info">${escHtml(p.tipeDokumen || '-')}</span></td><td class="text-xs">${escHtml(p.fileName || '-')}</td><td class="text-xs">${escHtml(p.keterangan || '-')}</td><td class="text-xs">${p.createdAt ? new Date(p.createdAt).toLocaleDateString('id-ID') : '-'}</td><td><button class="btn btn-xs btn-success" onclick="event.stopPropagation();lihatDokumen('${p.id}')">👁️</button> <button class="btn btn-xs btn-danger" onclick="event.stopPropagation();hapusDokumen('${p.id}')">🗑️</button></td></tr>`;
+      const isBOD = currentUser.role === 'bod';
+      html += `<tr><td><span class="badge badge-info">${escHtml(p.tipeDokumen || '-')}</span></td><td class="text-xs">${escHtml(p.fileName || '-')}</td><td class="text-xs">${escHtml(p.keterangan || '-')}</td><td class="text-xs">${p.createdAt ? new Date(p.createdAt).toLocaleDateString('id-ID') : '-'}</td><td><button class="btn btn-xs btn-success" onclick="event.stopPropagation();lihatDokumen('${p.id}')">👁️</button>${!isBOD ? ` <button class="btn btn-xs btn-danger" onclick="event.stopPropagation();hapusDokumen('${p.id}')">🗑️</button>` : ''}</td></tr>`;
     });
     html += `</tbody></table></div>
-      <button class="btn btn-xs btn-primary mt-8" onclick="event.stopPropagation();modalUploadDokumen('${karyId}')">+ Upload untuk ${escHtml(group.nama)}</button>
+      ${currentUser.role !== 'bod' ? `<button class="btn btn-xs btn-primary mt-8" onclick="event.stopPropagation();modalUploadDokumen('${karyId}')">+ Upload untuk ${escHtml(group.nama)}</button>` : ''}
     </div>`;
   });
   if (!visibleCount)
