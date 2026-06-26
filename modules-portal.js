@@ -607,7 +607,10 @@ function toggleAccordion(el) {
 async function renderPortalOvertime() {
   const main = document.getElementById('mainContent');
   main.innerHTML = `<div class="page-title"><span>⏰ Overtime Saya</span><button class="btn btn-primary btn-sm" onclick="modalOvertime()">+ Ajukan Overtime</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Jam</th><th>Durasi</th><th>Alasan</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="tblPortalOT"></tbody></table></div></div>`;
-  const snap = await db.collection('hrd_overtime').where('userId', '==', currentUser.id).get();
+  const [snap, flows] = await Promise.all([
+    db.collection('hrd_overtime').where('userId', '==', currentUser.id).get(),
+    loadApprovalFlows(),
+  ]);
   const items = [];
   snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
   items.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
@@ -623,7 +626,8 @@ async function renderPortalOvertime() {
             ? 'badge-danger'
             : 'badge-warning';
       const canEdit = p.status !== 'approved' && p.status !== 'rejected';
-      h += `<tr><td>${formatDate(p.tanggal)}</td><td>${p.jamMulai || '-'} - ${p.jamSelesai || '-'}</td><td class="fw-700">${p.durasi || 0} jam</td><td class="text-sm">${escHtml((p.alasan || '').substring(0, 50))}</td><td><span class="badge ${badge}">${p.status}</span></td><td><button class="btn btn-xs btn-info" onclick="viewOvertimeDetail('${p.id}')">👁️</button>${canEdit ? ' <button class="btn btn-xs btn-primary" onclick="editOvertimePortal(\'' + p.id + '\')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc(\'hrd_overtime\',\'' + p.id + "','portal-overtime')\">🗑️</button>" : ''}</td></tr>`;
+      const pendingInfo = pendingApproverHtml(flows, p.nama, p.status, p.approvalStep);
+      h += `<tr><td>${formatDate(p.tanggal)}</td><td>${p.jamMulai || '-'} - ${p.jamSelesai || '-'}</td><td class="fw-700">${p.durasi || 0} jam</td><td class="text-sm">${escHtml((p.alasan || '').substring(0, 50))}</td><td><span class="badge ${badge}">${p.status}</span>${pendingInfo}</td><td><button class="btn btn-xs btn-info" onclick="viewOvertimeDetail('${p.id}')">👁️</button>${canEdit ? ' <button class="btn btn-xs btn-primary" onclick="editOvertimePortal(\'' + p.id + '\')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc(\'hrd_overtime\',\'' + p.id + "','portal-overtime')\">🗑️</button>" : ''}</td></tr>`;
     });
   document.getElementById('tblPortalOT').innerHTML = h;
 }
@@ -791,6 +795,7 @@ async function renderPortalCuti() {
       <div class="text-xs" style="line-height:1.6"><b>Ketentuan Cuti:</b><br>• Cuti tahunan: ${jatah} hari (berdasarkan masa kerja ${masaKerja})<br>• Minimal 1 tahun kerja untuk jatah penuh 12 hari<br>• Bonus +1 hari per 2 tahun kerja (max 18 hari)<br>• Cuti sakit & melahirkan tidak mengurangi jatah cuti tahunan</div>
     </div>
     <div class="card"><div class="table-wrap"><table><thead><tr><th>Jenis</th><th>Tanggal</th><th>Durasi</th><th>Status</th></tr></thead><tbody id="tblPortalCuti"></tbody></table></div></div>`;
+  const flows = await loadApprovalFlows();
   let h = '';
   if (snap.empty) h = '<tr><td colspan="4" class="text-center">Belum ada</td></tr>';
   else {
@@ -798,7 +803,8 @@ async function renderPortalCuti() {
     snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
     items.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
     items.forEach((p) => {
-      h += `<tr><td>${escHtml(p.jenis)}</td><td>${formatDate(p.mulai)}-${formatDate(p.selesai)}</td><td>${p.durasi || 1} hari</td><td><span class="badge badge-${p.status === 'approved' ? 'success' : p.status === 'rejected' ? 'danger' : 'warning'}">${p.status}</span></td></tr>`;
+      const pendingInfo = pendingApproverHtml(flows, p.nama, p.status, p.approvalStep);
+      h += `<tr><td>${escHtml(p.jenis)}</td><td>${formatDate(p.mulai)}-${formatDate(p.selesai)}</td><td>${p.durasi || 1} hari</td><td><span class="badge badge-${p.status === 'approved' ? 'success' : p.status === 'rejected' ? 'danger' : 'warning'}">${p.status}</span>${pendingInfo}</td></tr>`;
     });
   }
   document.getElementById('tblPortalCuti').innerHTML = h;
@@ -1261,7 +1267,10 @@ async function viewMyDiscDetail(id) {
 async function renderPortalReimburse() {
   const main = document.getElementById('mainContent');
   main.innerHTML = `<div class="page-title"><span>🧾 Reimbursement Saya</span><button class="btn btn-primary btn-sm" onclick="modalReimburse()">+ Ajukan</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Kategori</th><th>Jumlah</th><th>Status</th><th>Tanggal</th></tr></thead><tbody id="tblMyReimb"></tbody></table></div></div>`;
-  const snap = await db.collection('hrd_reimbursement').where('nama', '==', currentUser.nama).get();
+  const [snap, flows] = await Promise.all([
+    db.collection('hrd_reimbursement').where('nama', '==', currentUser.nama).get(),
+    loadApprovalFlows(),
+  ]);
   const items = [];
   snap.forEach((d) => {
     items.push(d.data());
@@ -1270,7 +1279,8 @@ async function renderPortalReimburse() {
   if (!items.length) h = '<tr><td colspan="4" class="text-center">Belum ada</td></tr>';
   else
     items.forEach((p) => {
-      h += `<tr><td>${escHtml(p.kategori || '-')}</td><td>${formatCurrency(p.jumlah)}</td><td><span class="badge badge-${p.status === 'approved' ? 'success' : p.status === 'rejected' ? 'danger' : 'warning'}">${p.status}</span></td><td>${formatDate(p.createdAt)}</td></tr>`;
+      const pendingInfo = pendingApproverHtml(flows, p.nama, p.status, p.approvalStep);
+      h += `<tr><td>${escHtml(p.kategori || '-')}</td><td>${formatCurrency(p.jumlah)}</td><td><span class="badge badge-${p.status === 'approved' ? 'success' : p.status === 'rejected' ? 'danger' : 'warning'}">${p.status}</span>${pendingInfo}</td><td>${formatDate(p.createdAt)}</td></tr>`;
     });
   document.getElementById('tblMyReimb').innerHTML = h;
 }

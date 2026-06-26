@@ -652,6 +652,37 @@ function escHtml(str) {
   d.textContent = str || '';
   return d.innerHTML;
 }
+
+// ── APPROVAL FLOW CACHE — Pending approver visibility ─────────
+var _approvalFlowCache = null;
+async function loadApprovalFlows() {
+  if (_approvalFlowCache) return _approvalFlowCache;
+  const snap = await db.collection('hrd_approval_flow').get();
+  _approvalFlowCache = [];
+  snap.forEach(function (d) {
+    _approvalFlowCache.push({ id: d.id, ...d.data() });
+  });
+  return _approvalFlowCache;
+}
+function invalidateApprovalFlowCache() {
+  _approvalFlowCache = null;
+}
+function getApproverForItem(flows, nama, approvalStep) {
+  if (!flows || !nama) return null;
+  const flow = flows.find(function (f) {
+    return (f.pengaju || '').toLowerCase() === (nama || '').toLowerCase();
+  });
+  if (!flow || !flow.steps || !flow.steps.length) return null;
+  var step = approvalStep || 0;
+  return (flow.steps[step] && flow.steps[step].nama) || null;
+}
+function pendingApproverHtml(flows, nama, status, approvalStep) {
+  var isPending = status === 'pending' || (status && status.indexOf('step') === 0);
+  if (!isPending) return '';
+  var approver = getApproverForItem(flows, nama, approvalStep);
+  if (!approver) return '';
+  return '<div class="text-xs" style="color:#1565c0;margin-top:2px">\u23F3 Menunggu: <b>' + escHtml(approver) + '</b></div>';
+}
 function formatDate(d) {
   if (!d) return '-';
   const dt = typeof d === 'string' ? new Date(d) : d.toDate ? d.toDate() : new Date(d);

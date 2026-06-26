@@ -888,7 +888,10 @@ async function updateGaji(id) {
 async function renderReimbursement() {
   const main = document.getElementById('mainContent');
   main.innerHTML = `<div class="page-title"><span>🧾 Reimbursement</span><button class="btn btn-primary btn-sm" onclick="modalReimburse()">+ Pengajuan</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Kategori</th><th>Jumlah</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="tblReimb"></tbody></table></div></div>`;
-  const snap = await db.collection('hrd_reimbursement').get();
+  const [snap, flows] = await Promise.all([
+    db.collection('hrd_reimbursement').get(),
+    loadApprovalFlows(),
+  ]);
   const isBOD = currentUser.role === 'bod';
   let gradeMapReimb = {};
   if (isBOD) {
@@ -918,7 +921,8 @@ async function renderReimbursement() {
             ? 'badge-danger'
             : 'badge-warning';
       const canApprove = p.status === 'pending' && hasAccess(3) && !isBOD;
-      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.kategori)}</td><td>${formatCurrency(p.jumlah)}</td><td><span class="badge ${badge}">${p.status}</span></td><td>${canApprove ? `<button class="btn btn-xs btn-success" onclick="approveReimb('${d.id}','approved')">✅</button> <button class="btn btn-xs btn-danger" onclick="approveReimb('${d.id}','rejected')">❌</button>` : ''} <button class="btn btn-xs btn-warning" onclick="editReimb('${d.id}')">✏️</button> ${hasAccess(6) ? `<button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_reimbursement','${d.id}','reimbursement')">🗑️</button>` : ''}</td></tr>`;
+      const pendingInfo = pendingApproverHtml(flows, p.nama, p.status, p.approvalStep);
+      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.kategori)}</td><td>${formatCurrency(p.jumlah)}</td><td><span class="badge ${badge}">${p.status}</span>${pendingInfo}</td><td>${canApprove ? `<button class="btn btn-xs btn-success" onclick="approveReimb('${d.id}','approved')">✅</button> <button class="btn btn-xs btn-danger" onclick="approveReimb('${d.id}','rejected')">❌</button>` : ''} <button class="btn btn-xs btn-warning" onclick="editReimb('${d.id}')">✏️</button> ${hasAccess(6) ? `<button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_reimbursement','${d.id}','reimbursement')">🗑️</button>` : ''}</td></tr>`;
     });
   document.getElementById('tblReimb').innerHTML = h;
 }

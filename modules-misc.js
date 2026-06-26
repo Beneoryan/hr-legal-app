@@ -1668,6 +1668,7 @@ async function approveItem(col, id, status, catatan) {
   }
   closeModalDirect();
   toast(status === 'approved' ? 'Disetujui' : 'Ditolak', 'success');
+  invalidateApprovalFlowCache();
   renderApprovalCenter();
 }
 
