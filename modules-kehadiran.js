@@ -880,7 +880,7 @@ async function renderPenalty() {
   const isBOD = currentUser.role === 'bod';
   main.innerHTML = `<div class="page-title"><span>⚠️ Penalty Point</span><div class="flex gap-8">${hasAccess(4) && !isBOD ? '<button class="btn btn-info btn-sm" onclick="syncPenaltyToKPI()">🔄 Sinkronisasi ke KPI</button>' : ''}${!isBOD ? '<button class="btn btn-primary btn-sm" onclick="modalPenalty()">+ Tambah</button>' : ''}</div></div>
     <div class="card mb-16"><div class="card-title mb-8">📊 Ringkasan Poin per Karyawan</div><div id="penaltySummary">Loading...</div></div>
-    <div class="card"><div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Tanggal</th><th>Jenis</th><th>Poin</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="tblPenalty"></tbody></table></div></div>`;
+    <div class="card"><div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Tanggal</th><th>Jenis</th><th>Poin</th><th>Keterangan</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="tblPenalty"></tbody></table></div></div>`;
   const [penSnap, karyawanSnap] = await Promise.all([
     db.collection('hrd_penalty').get(),
     db.collection('hrd_karyawan').where('status', '==', 'aktif').get(),
@@ -975,7 +975,7 @@ async function renderPenalty() {
               : p.jenis === 'Mangkir'
                 ? '<span class="badge badge-danger">Mangkir</span>'
                 : '<span class="badge badge-info">Ringan</span>';
-      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggal)}</td><td>${escHtml(p.jenis)}</td><td><span class="badge badge-danger">${p.poin}</span></td><td>${statusBadge}</td><td><button class="btn btn-xs btn-info" onclick="viewPenaltyItem('${p.id}')">👁️</button>${hasAccess(2) && !isBOD ? ` <button class="btn btn-xs btn-primary" onclick="editPenalty('${p.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_penalty','${p.id}','penalty')">🗑️</button>` : ''}</td></tr>`;
+      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggal)}</td><td>${escHtml(p.jenis)}</td><td><span class="badge badge-danger">${p.poin}</span></td><td class="text-xs" style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escHtml(p.deskripsi || '-')}">${escHtml(p.deskripsi || '-')}</td><td>${statusBadge}</td><td><button class="btn btn-xs btn-info" onclick="viewPenaltyItem('${p.id}')">👁️</button>${hasAccess(2) && !isBOD ? ` <button class="btn btn-xs btn-primary" onclick="editPenalty('${p.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_penalty','${p.id}','penalty')">🗑️</button>` : ''}</td></tr>`;
     });
   }
   document.getElementById('tblPenalty').innerHTML = h;
@@ -1000,15 +1000,21 @@ function viewPenaltyDetail(nama) {
             : totalPoin >= 4
               ? '🟡 SP I - Pelanggaran Ringan'
               : '⚪ Peringatan';
+      const penaltyDeduction = totalPoin * 2;
       let h = `<div class="modal-title">👁️ Detail Penalty - ${escHtml(nama)}</div>
       <div style="background:#f8f9ff;padding:16px;border-radius:8px;margin-bottom:16px;border-left:4px solid var(--accent)">
         <div class="fw-700" style="font-size:1.05rem">${escHtml(nama)}</div>
         <div class="text-sm mt-8">Total Poin: <span class="badge badge-danger">${totalPoin}</span></div>
+        <div class="text-sm mt-4">Pengurangan Skor KPI: <b>-${penaltyDeduction} poin</b></div>
         <div class="text-sm mt-4">Status: <b>${statusLabel}</b></div>
       </div>
-      <div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Jenis</th><th>Poin</th></tr></thead><tbody>`;
+      <div style="background:#fff8e1;padding:10px;border-radius:8px;margin-bottom:12px;font-size:.8rem;color:#555">
+        <b>Panduan Poin:</b> Terlambat=1 | Mangkir=2 | SP I=3 | SP II=5 | SP III=10<br>
+        <b>Dampak KPI:</b> Setiap 1 poin penalty = -2 skor KPI
+      </div>
+      <div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Jenis</th><th>Poin</th><th>Keterangan</th></tr></thead><tbody>`;
       items.forEach((p) => {
-        h += `<tr><td>${formatDate(p.tanggal)}</td><td>${escHtml(p.jenis)}</td><td><span class="badge badge-danger">${p.poin}</span></td></tr>`;
+        h += `<tr><td>${formatDate(p.tanggal)}</td><td>${escHtml(p.jenis)}</td><td><span class="badge badge-danger">${p.poin}</span></td><td class="text-xs">${escHtml(p.deskripsi || '-')}</td></tr>`;
       });
       h += '</tbody></table></div>';
       openModal(h, true);
@@ -1037,6 +1043,8 @@ async function viewPenaltyItem(id) {
         <div><b>Jenis:</b> ${escHtml(p.jenis)}</div>
         <div><b>Poin:</b> <span class="badge badge-danger">${p.poin}</span></div>
         <div><b>Status:</b> ${statusBadge}</div>
+        ${p.deskripsi ? `<div><b>Deskripsi:</b></div><div class="text-xs" style="white-space:pre-line;background:#fff;padding:8px;border-radius:4px;margin-top:4px;border:1px solid #eee">${escHtml(p.deskripsi)}</div>` : ''}
+        <div><b>Dibuat oleh:</b> ${escHtml(p.createdByName || '-')}</div>
         <div><b>Dibuat:</b> ${formatDate(p.createdAt)}</div>
       </div>
     </div>`);
@@ -1052,10 +1060,20 @@ async function editPenalty(id) {
       <div class="form-group"><label>Tanggal</label><input class="form-control" type="date" id="editPenTgl" value="${p.tanggal || ''}"></div>
     </div>
     <div class="grid-2">
-      <div class="form-group"><label>Jenis</label><select class="form-control" id="editPenJenis"><option ${p.jenis === 'Terlambat' ? 'selected' : ''}>Terlambat</option><option ${p.jenis === 'Mangkir' ? 'selected' : ''}>Mangkir</option><option ${p.jenis === 'SP I' ? 'selected' : ''}>SP I</option><option ${p.jenis === 'SP II' ? 'selected' : ''}>SP II</option><option ${p.jenis === 'SP III' ? 'selected' : ''}>SP III</option></select></div>
-      <div class="form-group"><label>Poin</label><input class="form-control" type="number" id="editPenPoin" value="${p.poin || 1}"></div>
+      <div class="form-group"><label>Jenis</label><select class="form-control" id="editPenJenis" onchange="autoFillEditPenaltyPoin()"><option ${p.jenis === 'Terlambat' ? 'selected' : ''} value="Terlambat">Terlambat (1 poin)</option><option ${p.jenis === 'Mangkir' ? 'selected' : ''} value="Mangkir">Mangkir (2 poin)</option><option ${p.jenis === 'SP I' ? 'selected' : ''} value="SP I">SP I - Ringan (3 poin)</option><option ${p.jenis === 'SP II' ? 'selected' : ''} value="SP II">SP II - Sedang (5 poin)</option><option ${p.jenis === 'SP III' ? 'selected' : ''} value="SP III">SP III - Berat (10 poin)</option></select></div>
+      <div class="form-group"><label>Poin</label><input class="form-control" type="number" id="editPenPoin" value="${p.poin || 1}" min="1"></div>
     </div>
+    <div class="form-group"><label>Deskripsi / Keterangan</label><textarea class="form-control" id="editPenDeskripsi" rows="3" placeholder="Jelaskan alasan pemberian penalty...">${escHtml(p.deskripsi || '')}</textarea></div>
     <button class="btn btn-primary" onclick="updatePenalty('${id}')">💾 Simpan</button>`);
+}
+
+function autoFillEditPenaltyPoin() {
+  const jenis = document.getElementById('editPenJenis')?.value || '';
+  const poinMap = { Terlambat: 1, Mangkir: 2, 'SP I': 3, 'SP II': 5, 'SP III': 10 };
+  const poinEl = document.getElementById('editPenPoin');
+  if (poinEl && poinMap[jenis] !== undefined) {
+    poinEl.value = poinMap[jenis];
+  }
 }
 
 async function updatePenalty(id) {
@@ -1064,6 +1082,7 @@ async function updatePenalty(id) {
     tanggal: document.getElementById('editPenTgl').value,
     jenis: document.getElementById('editPenJenis').value,
     poin: parseInt(document.getElementById('editPenPoin').value) || 1,
+    deskripsi: document.getElementById('editPenDeskripsi').value || '',
     updatedAt: new Date().toISOString(),
   };
   if (!data.nama) return toast('Nama wajib', 'warning');
@@ -1165,18 +1184,41 @@ async function modalPenalty(prefillNama) {
     opts += `<option value="${escHtml(k.nama)}"${sel}>${escHtml(k.nama)} — ${escHtml(k.departemen || '-')} (${escHtml(k.posisi || '-')})</option>`;
   });
   openModal(`<div class="modal-title">Tambah Penalty</div>
+    <div style="background:#fff8e1;padding:12px;border-radius:8px;margin-bottom:16px;border-left:4px solid #ff9800">
+      <div class="text-xs fw-700 mb-4">📋 Panduan Perhitungan Poin Penalty:</div>
+      <div class="text-xs" style="line-height:1.8;color:#555">
+        • <b>Terlambat:</b> 1 poin per kejadian<br>
+        • <b>Mangkir:</b> 2 poin per kejadian<br>
+        • <b>SP I (Pelanggaran Ringan):</b> 3 poin<br>
+        • <b>SP II (Pelanggaran Sedang):</b> 5 poin<br>
+        • <b>SP III (Pelanggaran Berat):</b> 10 poin<br>
+        <hr style="margin:6px 0;border-color:#e0e0e0">
+        <b>Dampak ke KPI:</b> Setiap 1 penalty point mengurangi skor akhir KPI sebesar <b>2 poin</b><br>
+        <b>Status:</b> ⚪ &lt;4 poin (Peringatan) | 🟡 4-6 poin (SP I) | 🟠 7-9 poin (SP II) | 🔴 ≥10 poin (SP III)
+      </div>
+    </div>
     <div class="grid-2">
       <div class="form-group"><label>Karyawan</label>
-        <select class="form-control" id="penNamaSelect" onchange="document.getElementById('penNama').value=this.value">${opts}</select>
+        <select class="form-control" id="penNamaSelect" onchange="document.getElementById('penNama').value=this.value;autoFillPenaltyPoin()">${opts}</select>
         <input class="form-control mt-4" id="penNama" placeholder="Atau ketik nama manual..." value="${escHtml(prefillNama || '')}">
       </div>
       <div class="form-group"><label>Tanggal</label><input class="form-control" type="date" id="penTgl" value="${todayStr()}"></div>
     </div>
     <div class="grid-2">
-      <div class="form-group"><label>Jenis</label><select class="form-control" id="penJenis"><option>Terlambat</option><option>Mangkir</option><option>SP I</option><option>SP II</option><option>SP III</option></select></div>
-      <div class="form-group"><label>Poin</label><input class="form-control" type="number" id="penPoin" value="1"></div>
+      <div class="form-group"><label>Jenis</label><select class="form-control" id="penJenis" onchange="autoFillPenaltyPoin()"><option value="Terlambat">Terlambat (1 poin)</option><option value="Mangkir">Mangkir (2 poin)</option><option value="SP I">SP I - Ringan (3 poin)</option><option value="SP II">SP II - Sedang (5 poin)</option><option value="SP III">SP III - Berat (10 poin)</option></select></div>
+      <div class="form-group"><label>Poin</label><input class="form-control" type="number" id="penPoin" value="1" min="1"></div>
     </div>
+    <div class="form-group"><label>Deskripsi / Keterangan</label><textarea class="form-control" id="penDeskripsi" rows="3" placeholder="Jelaskan alasan pemberian penalty...\nContoh: Terlambat masuk 30 menit tanpa keterangan"></textarea></div>
     <button class="btn btn-primary" onclick="simpanPenalty()">Simpan</button>`);
+}
+
+function autoFillPenaltyPoin() {
+  const jenis = document.getElementById('penJenis')?.value || '';
+  const poinMap = { Terlambat: 1, Mangkir: 2, 'SP I': 3, 'SP II': 5, 'SP III': 10 };
+  const poinEl = document.getElementById('penPoin');
+  if (poinEl && poinMap[jenis] !== undefined) {
+    poinEl.value = poinMap[jenis];
+  }
 }
 
 async function simpanPenalty() {
@@ -1200,6 +1242,7 @@ async function simpanPenalty() {
     tanggal: document.getElementById('penTgl').value,
     jenis: document.getElementById('penJenis').value,
     poin: parseInt(document.getElementById('penPoin').value) || 1,
+    deskripsi: document.getElementById('penDeskripsi').value || '',
     createdBy: currentUser.id,
     createdByName: currentUser.nama,
     createdAt: new Date().toISOString(),

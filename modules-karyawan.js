@@ -1614,7 +1614,7 @@ async function renderJobdeskMgmt() {
       '<div class="card"><p>Akses ditolak.</p></div>');
   const main = document.getElementById('mainContent');
   const isBOD = currentUser.role === 'bod';
-  main.innerHTML = `<div class="page-title"><span>📋 Kelola Jobdesk Karyawan</span>${!isBOD ? '<button class="btn btn-primary btn-sm" onclick="modalJobdeskPilih()">+ Atur Jobdesk</button>' : ''}</div><div class="card"><p class="text-sm mb-16" style="color:#666">Atur deskripsi pekerjaan, tanggung jawab, dan KPI untuk setiap karyawan. Data diambil dari Data Karyawan.</p><div class="flex gap-8 mb-16"><input class="form-control" placeholder="🔍 Cari nama..." id="srcJobdesk" oninput="filterJobdeskList()"><select class="form-control" style="max-width:180px" id="filterJobdeskDept" onchange="filterJobdeskList()"><option value="">Semua Dept</option></select></div><div class="table-wrap"><table><thead><tr><th>NIP</th><th>Nama</th><th>Departemen</th><th>Posisi</th><th>Jobdesk</th><th>Aksi</th></tr></thead><tbody id="tblJobdesk"></tbody></table></div></div>`;
+  main.innerHTML = `<div class="page-title"><span>📋 Kelola Jobdesk Karyawan</span>${!isBOD ? '<button class="btn btn-primary btn-sm" onclick="modalJobdeskPilih()">+ Atur Jobdesk</button> <button class="btn btn-warning btn-sm" onclick="modalSinkronKPIBulk()">🔄 Sinkron KPI</button>' : ''}</div><div class="card"><p class="text-sm mb-16" style="color:#666">Atur deskripsi pekerjaan, tanggung jawab, dan KPI untuk setiap karyawan. Data diambil dari Data Karyawan.</p><div class="flex gap-8 mb-16"><input class="form-control" placeholder="🔍 Cari nama..." id="srcJobdesk" oninput="filterJobdeskList()"><select class="form-control" style="max-width:180px" id="filterJobdeskDept" onchange="filterJobdeskList()"><option value="">Semua Dept</option></select></div><div class="table-wrap"><table><thead><tr><th>NIP</th><th>Nama</th><th>Departemen</th><th>Posisi</th><th>Jobdesk</th><th>Aksi</th></tr></thead><tbody id="tblJobdesk"></tbody></table></div></div>`;
   // Get ALL karyawan (no status filter to avoid index issues)
   const [karySnap, jobdeskSnap] = await Promise.all([
     db.collection('hrd_karyawan').get(),
@@ -1712,16 +1712,484 @@ async function modalJobdesk(karyawanId, nama, posisi) {
     }
   }
 
+  const isBOD = currentUser.role === 'bod';
+  const uploadSection = !isBOD
+    ? `<div style="background:#e8f5e9;padding:12px 14px;border-radius:8px;margin-bottom:16px">
+    <div class="text-xs fw-700 mb-8">📄 Upload Dokumen Jobdesk</div>
+    <p class="text-xs" style="color:#555;margin-bottom:8px">Upload file (.txt, .pdf, .docx) untuk otomatis mengisi form. Sistem akan membaca isi dokumen dan mengkonversi menjadi jobdesk.</p>
+    <input type="file" id="jdUploadFile" accept=".txt,.pdf,.docx,.doc" style="display:none" onchange="prosesUploadJobdesk(this)">
+    <button class="btn btn-sm btn-success" onclick="document.getElementById('jdUploadFile').click()">📤 Upload & Baca Dokumen</button>
+    <span id="jdUploadStatus" class="text-xs" style="margin-left:8px;color:#666"></span>
+  </div>`
+    : '';
+
+  const syncKpiSection = !isBOD
+    ? `<button class="btn btn-warning btn-sm" onclick="sinkronJobdeskKPI('${karyawanId}','${escHtml(nama)}')">🔄 Sinkronisasi KPI</button>`
+    : '';
+
   openModal(
     `<div class="modal-title">📋 Jobdesk: ${escHtml(nama)}</div>
     <div style="background:#f0f4ff;padding:10px 14px;border-radius:8px;margin-bottom:16px"><div class="text-xs"><b>Posisi:</b> ${escHtml(posisi || '-')}</div></div>
+    ${uploadSection}
     <div class="form-group"><label>Deskripsi Pekerjaan</label><textarea class="form-control" id="jdDesc" style="min-height:100px" placeholder="Deskripsi umum posisi dan pekerjaan...">${escHtml(p.deskripsi || '')}</textarea></div>
     <div class="form-group"><label>Tanggung Jawab (per baris)</label><textarea class="form-control" id="jdTanggung" style="min-height:120px" placeholder="Mengelola data karyawan\nMembuat laporan bulanan\nKoordinasi dengan tim">${escHtml(p.tanggungJawab || '')}</textarea></div>
     <div class="form-group"><label>Kualifikasi (per baris)</label><textarea class="form-control" id="jdKualifikasi" style="min-height:80px" placeholder="Min. S1 Manajemen\nPengalaman 2 tahun\nMenguasai MS Office">${escHtml(p.kualifikasi || '')}</textarea></div>
-    <div class="form-group"><label>Target KPI</label><textarea class="form-control" id="jdKPI" placeholder="Target yang harus dicapai...">${escHtml(p.kpi || '')}</textarea></div>
-    <div class="flex gap-8"><button class="btn btn-primary" onclick="simpanJobdesk('${karyawanId}','${docId || ''}')">💾 Simpan Jobdesk</button>${docId ? `<button class="btn btn-danger" onclick="hapusDoc('hrd_jobdesk','${docId}','jobdesk-mgmt')">🗑️ Hapus</button>` : ''}</div>`,
+    <div class="form-group"><label>Target KPI</label><textarea class="form-control" id="jdKPI" style="min-height:100px" placeholder="Target yang harus dicapai...\nContoh:\n- Menyelesaikan 90% tugas tepat waktu\n- Kehadiran minimal 95%">${escHtml(p.kpi || '')}</textarea></div>
+    <div class="flex gap-8 flex-wrap"><button class="btn btn-primary" onclick="simpanJobdesk('${karyawanId}','${docId || ''}')">💾 Simpan Jobdesk</button>${syncKpiSection}${docId ? `<button class="btn btn-danger" onclick="hapusDoc('hrd_jobdesk','${docId}','jobdesk-mgmt')">🗑️ Hapus</button>` : ''}</div>`,
     true
   );
+}
+
+// ── Upload dokumen dan konversi ke jobdesk ────────────────────
+async function prosesUploadJobdesk(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const statusEl = document.getElementById('jdUploadStatus');
+  statusEl.textContent = '⏳ Membaca dokumen...';
+  statusEl.style.color = '#1976d2';
+
+  try {
+    let textContent = '';
+    const ext = file.name.split('.').pop().toLowerCase();
+
+    if (ext === 'txt') {
+      // Read plain text file
+      textContent = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = () => reject(new Error('Gagal membaca file'));
+        reader.readAsText(file);
+      });
+    } else if (ext === 'pdf') {
+      // Read PDF - extract text using basic approach
+      textContent = await bacaPDFText(file);
+    } else if (ext === 'docx' || ext === 'doc') {
+      // Read docx - extract text
+      textContent = await bacaDocxText(file);
+    } else {
+      toast('Format file tidak didukung. Gunakan .txt, .pdf, atau .docx', 'warning');
+      statusEl.textContent = '❌ Format tidak didukung';
+      statusEl.style.color = '#c62828';
+      return;
+    }
+
+    if (!textContent || textContent.trim().length < 10) {
+      toast('Dokumen kosong atau tidak bisa dibaca', 'warning');
+      statusEl.textContent = '❌ Dokumen kosong';
+      statusEl.style.color = '#c62828';
+      return;
+    }
+
+    // Parse content into jobdesk fields
+    const parsed = parseJobdeskFromText(textContent);
+
+    // Fill form fields
+    if (parsed.deskripsi) document.getElementById('jdDesc').value = parsed.deskripsi;
+    if (parsed.tanggungJawab) document.getElementById('jdTanggung').value = parsed.tanggungJawab;
+    if (parsed.kualifikasi) document.getElementById('jdKualifikasi').value = parsed.kualifikasi;
+    if (parsed.kpi) document.getElementById('jdKPI').value = parsed.kpi;
+
+    statusEl.textContent = '✅ Dokumen berhasil dibaca dan dikonversi!';
+    statusEl.style.color = '#2e7d32';
+    toast('Dokumen berhasil dibaca! Periksa dan edit form sebelum menyimpan.', 'success');
+  } catch (err) {
+    console.error('Error reading document:', err);
+    statusEl.textContent = '❌ Gagal membaca: ' + err.message;
+    statusEl.style.color = '#c62828';
+    toast('Gagal membaca dokumen: ' + err.message, 'error');
+  }
+  // Reset input
+  input.value = '';
+}
+
+// Parse PDF text (basic approach using FileReader + text extraction)
+async function bacaPDFText(file) {
+  // Use FileReader to get ArrayBuffer, then extract text manually
+  const arrayBuffer = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target.result);
+    reader.onerror = () => reject(new Error('Gagal membaca PDF'));
+    reader.readAsArrayBuffer(file);
+  });
+  // Simple text extraction from PDF binary
+  const uint8Array = new Uint8Array(arrayBuffer);
+  let text = '';
+  // Try to extract readable text from PDF stream
+  const decoder = new TextDecoder('utf-8', { fatal: false });
+  const rawText = decoder.decode(uint8Array);
+  // Extract text between BT and ET markers (basic PDF text extraction)
+  const textMatches = rawText.match(/\(([^)]+)\)/g);
+  if (textMatches) {
+    text = textMatches
+      .map((m) => m.slice(1, -1))
+      .filter((t) => t.trim().length > 1 && !/^[\\\/\d.]+$/.test(t))
+      .join('\n');
+  }
+  // If basic extraction fails, try alternative pattern
+  if (!text || text.trim().length < 20) {
+    // Try stream content extraction
+    const streamMatches = rawText.match(/stream\s*([\s\S]*?)\s*endstream/g);
+    if (streamMatches) {
+      for (const sm of streamMatches) {
+        const inner = sm.replace(/^stream\s*/, '').replace(/\s*endstream$/, '');
+        const innerTexts = inner.match(/\(([^)]+)\)/g);
+        if (innerTexts) {
+          text += innerTexts
+            .map((m) => m.slice(1, -1))
+            .filter((t) => t.trim().length > 1)
+            .join('\n');
+        }
+      }
+    }
+  }
+  if (!text || text.trim().length < 10) {
+    throw new Error('Tidak dapat mengekstrak teks dari PDF. Coba gunakan format .txt atau .docx');
+  }
+  return text;
+}
+
+// Parse DOCX text (basic approach - reads XML inside zip)
+async function bacaDocxText(file) {
+  const arrayBuffer = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target.result);
+    reader.onerror = () => reject(new Error('Gagal membaca DOCX'));
+    reader.readAsArrayBuffer(file);
+  });
+  // DOCX is a ZIP file containing XML
+  // Simple approach: try to read as text and extract content
+  const decoder = new TextDecoder('utf-8', { fatal: false });
+  const rawText = decoder.decode(new Uint8Array(arrayBuffer));
+  // Try to find XML text content (between <w:t> tags)
+  const textMatches = rawText.match(/<w:t[^>]*>([^<]+)<\/w:t>/g);
+  if (textMatches && textMatches.length > 0) {
+    const text = textMatches.map((m) => m.replace(/<[^>]+>/g, '')).join(' ');
+    // Split into lines at reasonable points
+    return text.replace(/\s{2,}/g, '\n').trim();
+  }
+  throw new Error('Tidak dapat mengekstrak teks dari DOCX. Coba gunakan format .txt');
+}
+
+// Parse text content into jobdesk structure
+function parseJobdeskFromText(text) {
+  const result = { deskripsi: '', tanggungJawab: '', kualifikasi: '', kpi: '' };
+  const lines = text
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+
+  // Try to identify sections by keywords
+  const keywords = {
+    deskripsi: [
+      'deskripsi',
+      'description',
+      'pekerjaan',
+      'job description',
+      'uraian pekerjaan',
+      'uraian tugas',
+      'ringkasan',
+    ],
+    tanggungJawab: [
+      'tanggung jawab',
+      'responsibility',
+      'responsibilities',
+      'tugas',
+      'duties',
+      'tugas pokok',
+      'tugas utama',
+    ],
+    kualifikasi: [
+      'kualifikasi',
+      'qualification',
+      'requirements',
+      'persyaratan',
+      'kompetensi',
+      'syarat',
+    ],
+    kpi: [
+      'kpi',
+      'target',
+      'indikator',
+      'performance',
+      'sasaran',
+      'key performance',
+      'indikator kinerja',
+    ],
+  };
+
+  let currentSection = 'deskripsi'; // default to deskripsi
+  const sections = { deskripsi: [], tanggungJawab: [], kualifikasi: [], kpi: [] };
+
+  for (const line of lines) {
+    const lineLower = line.toLowerCase();
+    // Check if this line is a section header
+    let isHeader = false;
+    for (const [section, keys] of Object.entries(keywords)) {
+      if (keys.some((k) => lineLower.includes(k) && line.length < 80)) {
+        currentSection = section;
+        isHeader = true;
+        break;
+      }
+    }
+    if (!isHeader) {
+      // Clean up bullet points and numbering
+      let cleanLine = line
+        .replace(/^[\d]+[.)]\s*/, '')
+        .replace(/^[-•*]\s*/, '')
+        .trim();
+      if (cleanLine.length > 0) {
+        sections[currentSection].push(cleanLine);
+      }
+    }
+  }
+
+  // If no sections detected, distribute content
+  if (
+    sections.deskripsi.length === 0 &&
+    sections.tanggungJawab.length === 0 &&
+    sections.kualifikasi.length === 0 &&
+    sections.kpi.length === 0
+  ) {
+    // Put all content into deskripsi and tanggungJawab
+    const half = Math.ceil(lines.length / 2);
+    sections.deskripsi = lines.slice(0, Math.min(3, lines.length));
+    sections.tanggungJawab = lines.slice(Math.min(3, lines.length));
+  }
+
+  result.deskripsi = sections.deskripsi.join('\n');
+  result.tanggungJawab = sections.tanggungJawab.join('\n');
+  result.kualifikasi = sections.kualifikasi.join('\n');
+  result.kpi = sections.kpi.join('\n');
+
+  return result;
+}
+
+// ── Sinkronisasi Jobdesk dengan KPI ──────────────────────────
+async function sinkronJobdeskKPI(karyawanId, nama) {
+  toast('⏳ Menyinkronkan dengan data KPI...', 'info');
+
+  try {
+    // Get jobdesk data
+    let jobdeskSnap = await db
+      .collection('hrd_jobdesk')
+      .where('karyawanId', '==', karyawanId)
+      .get();
+    if (jobdeskSnap.empty) {
+      jobdeskSnap = await db.collection('hrd_jobdesk').where('userId', '==', karyawanId).get();
+    }
+    if (jobdeskSnap.empty) {
+      toast('Simpan jobdesk terlebih dahulu sebelum sinkronisasi KPI', 'warning');
+      return;
+    }
+    const jobdeskData = jobdeskSnap.docs[0].data();
+    const targetKPI = jobdeskData.kpi || '';
+
+    if (!targetKPI.trim()) {
+      toast('Target KPI belum diisi di jobdesk. Isi target KPI dulu lalu simpan.', 'warning');
+      return;
+    }
+
+    // Get existing KPI scores for this employee
+    const kpiSnap = await db.collection('hrd_kpi').where('nama', '==', nama).get();
+
+    // Get penalty data
+    const penSnap = await db.collection('hrd_penalty').get();
+    let totalPenaltyPoin = 0;
+    const namaLower = nama.toLowerCase().trim();
+    penSnap.forEach((d) => {
+      const pe = d.data();
+      if ((pe.nama || '').toLowerCase().trim() === namaLower)
+        totalPenaltyPoin += parseInt(pe.poin) || 0;
+    });
+
+    // Get karyawan data for additional context
+    const karyDoc = await db.collection('hrd_karyawan').doc(karyawanId).get();
+    const karyData = karyDoc.exists ? karyDoc.data() : {};
+
+    // Calculate performance summary
+    let performanceSummary = '';
+    let latestKPI = null;
+
+    if (!kpiSnap.empty) {
+      // Find latest KPI
+      const kpiItems = [];
+      kpiSnap.forEach((d) => kpiItems.push({ id: d.id, ...d.data() }));
+      kpiItems.sort((a, b) => (b.periode || '').localeCompare(a.periode || ''));
+      latestKPI = kpiItems[0];
+
+      const skorMurni = latestKPI.skorMurni || latestKPI.skor || 0;
+      const penaltyDed = totalPenaltyPoin * 2;
+      const skorAkhir = Math.max(0, skorMurni - penaltyDed);
+      const grade =
+        skorAkhir >= 90
+          ? 'A'
+          : skorAkhir >= 80
+            ? 'B'
+            : skorAkhir >= 70
+              ? 'C'
+              : skorAkhir >= 60
+                ? 'D'
+                : 'E';
+
+      performanceSummary = `
+        <div style="background:#f0f4ff;padding:14px;border-radius:8px;margin-bottom:16px">
+          <div class="fw-700 mb-8">📊 Hasil Sinkronisasi KPI: ${escHtml(nama)}</div>
+          <div class="text-sm" style="line-height:1.8">
+            <div><b>Periode Terakhir:</b> ${escHtml(latestKPI.periode || '-')}</div>
+            <div><b>Produktivitas:</b> ${latestKPI.produktivitas || 0}/100</div>
+            <div><b>Kualitas:</b> ${latestKPI.kualitas || 0}/100</div>
+            <div><b>Kedisiplinan:</b> ${latestKPI.kedisiplinan || 0}/100</div>
+            <div><b>Kerjasama:</b> ${latestKPI.kerjasama || 0}/100</div>
+            <hr style="margin:8px 0;border-color:#ddd">
+            <div><b>Skor Murni:</b> ${skorMurni}/100</div>
+            <div><b>Total Penalty:</b> <span class="badge badge-${totalPenaltyPoin > 0 ? 'danger' : 'success'}">${totalPenaltyPoin} poin (−${penaltyDed})</span></div>
+            <div><b>Skor Akhir:</b> <span class="badge badge-${skorAkhir >= 80 ? 'success' : skorAkhir >= 60 ? 'warning' : 'danger'}">${skorAkhir}/100</span></div>
+            <div><b>Grade:</b> <span class="fw-700" style="font-size:1.1rem;color:${skorAkhir >= 80 ? '#2e7d32' : skorAkhir >= 60 ? '#f57f17' : '#c62828'}">${grade}</span></div>
+          </div>
+        </div>
+        <div style="background:#fff8e1;padding:14px;border-radius:8px;margin-bottom:16px">
+          <div class="fw-700 mb-8">🎯 Target KPI (dari Jobdesk):</div>
+          <div class="text-sm" style="white-space:pre-line;line-height:1.8">${escHtml(targetKPI)}</div>
+        </div>
+        <div style="background:${skorAkhir >= 80 ? '#e8f5e9' : skorAkhir >= 60 ? '#fff3e0' : '#ffebee'};padding:14px;border-radius:8px">
+          <div class="fw-700 mb-8">${skorAkhir >= 80 ? '✅ Status: Memenuhi Target' : skorAkhir >= 60 ? '⚠️ Status: Perlu Peningkatan' : '❌ Status: Di Bawah Target'}</div>
+          <div class="text-xs" style="color:#555">${skorAkhir >= 80 ? 'Karyawan telah mencapai performance yang baik sesuai standar KPI.' : skorAkhir >= 60 ? 'Karyawan perlu meningkatkan performance untuk memenuhi target KPI.' : 'Performance karyawan berada di bawah standar. Diperlukan evaluasi dan coaching intensif.'}</div>
+        </div>`;
+    } else {
+      performanceSummary = `
+        <div style="background:#fff3e0;padding:14px;border-radius:8px">
+          <div class="fw-700 mb-8">⚠️ Belum ada data penilaian KPI</div>
+          <div class="text-sm" style="color:#555">Belum ada penilaian KPI yang dilakukan untuk karyawan ini. Lakukan penilaian KPI terlebih dahulu melalui menu <b>KPI & Penilaian</b>.</div>
+          <div class="text-sm mt-8"><b>Target KPI (dari Jobdesk):</b></div>
+          <div class="text-sm" style="white-space:pre-line;line-height:1.8;margin-top:4px">${escHtml(targetKPI)}</div>
+          ${totalPenaltyPoin > 0 ? `<div class="text-sm mt-8"><b>Total Penalty Saat Ini:</b> <span class="badge badge-danger">${totalPenaltyPoin} poin</span></div>` : ''}
+        </div>`;
+    }
+
+    openModal(
+      `<div class="modal-title">🔄 Sinkronisasi KPI — ${escHtml(nama)}</div>${performanceSummary}<div class="flex gap-8 mt-16"><button class="btn btn-primary btn-sm" onclick="closeModalDirect()">Tutup</button>${!latestKPI ? `<button class="btn btn-success btn-sm" onclick="closeModalDirect();navigateTo('kpi')">→ Buat Penilaian KPI</button>` : ''}</div>`,
+      true
+    );
+  } catch (err) {
+    console.error('Sync KPI error:', err);
+    toast('Gagal sinkronisasi: ' + err.message, 'error');
+  }
+}
+
+// ── Bulk KPI Sync — menampilkan ringkasan performance semua karyawan ──
+async function modalSinkronKPIBulk() {
+  toast('⏳ Memuat data sinkronisasi KPI...', 'info');
+  try {
+    const [jobdeskSnap, kpiSnap, penSnap, karySnap] = await Promise.all([
+      db.collection('hrd_jobdesk').get(),
+      db.collection('hrd_kpi').get(),
+      db.collection('hrd_penalty').get(),
+      db.collection('hrd_karyawan').get(),
+    ]);
+
+    // Build maps
+    const jobdeskMap = {};
+    jobdeskSnap.forEach((d) => {
+      const data = d.data();
+      jobdeskMap[data.karyawanId || data.userId || ''] = data;
+    });
+
+    const penaltyMap = {};
+    penSnap.forEach((d) => {
+      const pe = d.data();
+      const nm = (pe.nama || '').toLowerCase().trim();
+      penaltyMap[nm] = (penaltyMap[nm] || 0) + (parseInt(pe.poin) || 0);
+    });
+
+    // Get latest KPI per employee
+    const kpiMap = {};
+    kpiSnap.forEach((d) => {
+      const data = d.data();
+      const nm = (data.nama || '').toLowerCase().trim();
+      if (!kpiMap[nm] || (data.periode || '') > (kpiMap[nm].periode || '')) {
+        kpiMap[nm] = data;
+      }
+    });
+
+    // Build summary table
+    const karyList = [];
+    karySnap.forEach((d) => {
+      const k = d.data();
+      if ((k.status || '').toLowerCase() === 'nonaktif') return;
+      karyList.push({ id: d.id, ...k });
+    });
+    karyList.sort((a, b) => (a.nama || '').localeCompare(b.nama || ''));
+
+    let tableRows = '';
+    let countMeetTarget = 0,
+      countNeedImprove = 0,
+      countBelowTarget = 0,
+      countNoKPI = 0;
+
+    karyList.forEach((k) => {
+      const jobdesk = jobdeskMap[k.id];
+      const namaLower = (k.nama || '').toLowerCase().trim();
+      const kpi = kpiMap[namaLower];
+      const penalty = penaltyMap[namaLower] || 0;
+
+      if (!jobdesk) return; // Skip if no jobdesk
+
+      let skorAkhir = '-';
+      let grade = '-';
+      let statusBadge = '<span class="badge badge-secondary">Belum Dinilai</span>';
+
+      if (kpi) {
+        const skorMurni = kpi.skorMurni || kpi.skor || 0;
+        const ded = penalty * 2;
+        const skor = Math.max(0, skorMurni - ded);
+        skorAkhir = skor;
+        grade = skor >= 90 ? 'A' : skor >= 80 ? 'B' : skor >= 70 ? 'C' : skor >= 60 ? 'D' : 'E';
+
+        if (skor >= 80) {
+          statusBadge = '<span class="badge badge-success">✅ Memenuhi</span>';
+          countMeetTarget++;
+        } else if (skor >= 60) {
+          statusBadge = '<span class="badge badge-warning">⚠️ Perlu Peningkatan</span>';
+          countNeedImprove++;
+        } else {
+          statusBadge = '<span class="badge badge-danger">❌ Di Bawah Target</span>';
+          countBelowTarget++;
+        }
+      } else {
+        countNoKPI++;
+      }
+
+      tableRows += `<tr>
+        <td class="fw-700 text-sm">${escHtml(k.nama)}</td>
+        <td class="text-xs">${escHtml(k.departemen || '-')}</td>
+        <td class="text-xs">${escHtml(k.posisi || '-')}</td>
+        <td class="text-center">${skorAkhir}</td>
+        <td class="text-center fw-700">${grade}</td>
+        <td>${statusBadge}</td>
+      </tr>`;
+    });
+
+    const totalEvaluated = countMeetTarget + countNeedImprove + countBelowTarget;
+
+    let html = `<div class="modal-title">🔄 Sinkronisasi Jobdesk & KPI</div>
+      <div style="background:#f0f4ff;padding:12px;border-radius:8px;margin-bottom:16px">
+        <div class="grid-2 gap-8" style="grid-template-columns:repeat(4,1fr)">
+          <div class="text-center"><div class="text-xs" style="color:#666">Total Dinilai</div><div class="fw-700" style="font-size:1.2rem">${totalEvaluated}</div></div>
+          <div class="text-center"><div class="text-xs" style="color:#2e7d32">✅ Memenuhi</div><div class="fw-700" style="font-size:1.2rem;color:#2e7d32">${countMeetTarget}</div></div>
+          <div class="text-center"><div class="text-xs" style="color:#f57f17">⚠️ Perlu +</div><div class="fw-700" style="font-size:1.2rem;color:#f57f17">${countNeedImprove}</div></div>
+          <div class="text-center"><div class="text-xs" style="color:#c62828">❌ Di Bawah</div><div class="fw-700" style="font-size:1.2rem;color:#c62828">${countBelowTarget}</div></div>
+        </div>
+        ${countNoKPI > 0 ? `<div class="text-xs text-center mt-8" style="color:#999">${countNoKPI} karyawan belum memiliki penilaian KPI</div>` : ''}
+      </div>
+      <div class="table-wrap" style="max-height:400px;overflow-y:auto"><table><thead><tr><th>Nama</th><th>Dept</th><th>Posisi</th><th>Skor</th><th>Grade</th><th>Status</th></tr></thead><tbody>${tableRows || '<tr><td colspan="6" class="text-center">Tidak ada data jobdesk</td></tr>'}</tbody></table></div>
+      <div class="flex gap-8 mt-16"><button class="btn btn-primary btn-sm" onclick="closeModalDirect()">Tutup</button></div>`;
+
+    openModal(html, true);
+    toast('✅ Data sinkronisasi KPI berhasil dimuat', 'success');
+  } catch (err) {
+    console.error('Bulk KPI sync error:', err);
+    toast('Gagal: ' + err.message, 'error');
+  }
 }
 
 async function simpanJobdesk(karyawanId, docId) {
