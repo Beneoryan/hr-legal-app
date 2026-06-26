@@ -191,9 +191,29 @@ async function renderDepartemen() {
   else
     snap.forEach((d) => {
       const p = d.data();
-      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.kode || '-')}</td><td>${escHtml(p.kepala || '-')}</td><td>${countMap[p.nama] || 0}</td>${!isBOD ? `<td><button class="btn btn-xs btn-info" onclick="modalDepartemen('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_departemen','${d.id}','departemen')">🗑️</button></td>` : ''}</tr>`;
+      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.kode || '-')}</td><td>${escHtml(p.kepala || '-')}</td><td>${countMap[p.nama] || 0}</td>${!isBOD ? `<td><button class="btn btn-xs btn-info" onclick="viewDepartemen('${d.id}')" title="Lihat Detail">👁️</button> <button class="btn btn-xs btn-warning" onclick="modalDepartemen('${d.id}')" title="Edit">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_departemen','${d.id}','departemen')" title="Hapus">🗑️</button></td>` : ''}</tr>`;
     });
   document.getElementById('tblDept').innerHTML = h;
+}
+function viewDepartemen(id) {
+  db.collection('hrd_departemen').doc(id).get().then(function(d) {
+    if (!d.exists) return toast('Data tidak ditemukan', 'warning');
+    const p = d.data();
+    openModal(
+      '<div class="modal-title">🏢 Detail Departemen</div>' +
+      '<table style="width:100%;border-collapse:collapse">' +
+      '<tr><td class="fw-700" style="padding:8px;width:120px">Nama</td><td style="padding:8px">' + escHtml(p.nama || '-') + '</td></tr>' +
+      '<tr><td class="fw-700" style="padding:8px">Kode</td><td style="padding:8px">' + escHtml(p.kode || '-') + '</td></tr>' +
+      '<tr><td class="fw-700" style="padding:8px">Kepala</td><td style="padding:8px">' + escHtml(p.kepala || '-') + '</td></tr>' +
+      (p.createdAt ? '<tr><td class="fw-700" style="padding:8px">Dibuat</td><td style="padding:8px">' + formatDateTime(p.createdAt) + '</td></tr>' : '') +
+      (p.updatedAt ? '<tr><td class="fw-700" style="padding:8px">Diupdate</td><td style="padding:8px">' + formatDateTime(p.updatedAt) + '</td></tr>' : '') +
+      '</table>' +
+      '<div style="margin-top:16px;display:flex;gap:8px">' +
+      '<button class="btn btn-warning btn-sm" onclick="closeModalDirect();modalDepartemen(\'' + id + '\')">✏️ Edit</button>' +
+      '<button class="btn btn-outline btn-sm" onclick="closeModalDirect()">Tutup</button></div>',
+      true
+    );
+  });
 }
 function modalDepartemen(id) {
   if (id)
@@ -267,9 +287,29 @@ async function renderPosisi() {
   else
     snap.forEach((d) => {
       const p = d.data();
-      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.departemen || '-')}</td><td>${escHtml(p.level || '-')}</td>${!isBOD ? `<td><button class="btn btn-xs btn-info" onclick="modalPosisi('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_posisi','${d.id}','posisi')">🗑️</button></td>` : ''}</tr>`;
+      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.departemen || '-')}</td><td>${escHtml(p.level || '-')}</td>${!isBOD ? `<td><button class="btn btn-xs btn-info" onclick="viewPosisi('${d.id}')" title="Lihat Detail">👁️</button> <button class="btn btn-xs btn-warning" onclick="modalPosisi('${d.id}')" title="Edit">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_posisi','${d.id}','posisi')" title="Hapus">🗑️</button></td>` : ''}</tr>`;
     });
   document.getElementById('tblPos').innerHTML = h;
+}
+function viewPosisi(id) {
+  db.collection('hrd_posisi').doc(id).get().then(function(d) {
+    if (!d.exists) return toast('Data tidak ditemukan', 'warning');
+    const p = d.data();
+    openModal(
+      '<div class="modal-title">💼 Detail Posisi</div>' +
+      '<table style="width:100%;border-collapse:collapse">' +
+      '<tr><td class="fw-700" style="padding:8px;width:120px">Nama</td><td style="padding:8px">' + escHtml(p.nama || '-') + '</td></tr>' +
+      '<tr><td class="fw-700" style="padding:8px">Departemen</td><td style="padding:8px">' + escHtml(p.departemen || '-') + '</td></tr>' +
+      '<tr><td class="fw-700" style="padding:8px">Level</td><td style="padding:8px">' + escHtml(p.level || '-') + '</td></tr>' +
+      (p.createdAt ? '<tr><td class="fw-700" style="padding:8px">Dibuat</td><td style="padding:8px">' + formatDateTime(p.createdAt) + '</td></tr>' : '') +
+      (p.updatedAt ? '<tr><td class="fw-700" style="padding:8px">Diupdate</td><td style="padding:8px">' + formatDateTime(p.updatedAt) + '</td></tr>' : '') +
+      '</table>' +
+      '<div style="margin-top:16px;display:flex;gap:8px">' +
+      '<button class="btn btn-warning btn-sm" onclick="closeModalDirect();modalPosisi(\'' + id + '\')">✏️ Edit</button>' +
+      '<button class="btn btn-outline btn-sm" onclick="closeModalDirect()">Tutup</button></div>',
+      true
+    );
+  });
 }
 function modalPosisi(id) {
   if (id)
@@ -334,9 +374,31 @@ async function renderCabang() {
   else
     snap.forEach((d) => {
       const p = d.data();
-      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.kota || '-')}</td><td>${p.lat || 0},${p.lng || 0}</td><td>${p.radius || 10}m</td><td><button class="btn btn-xs btn-info" onclick="modalCabang('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_cabang','${d.id}','cabang')">🗑️</button></td></tr>`;
+      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.kota || '-')}</td><td>${p.lat || 0},${p.lng || 0}</td><td>${p.radius || 10}m</td><td><button class="btn btn-xs btn-info" onclick="viewCabang('${d.id}')" title="Lihat Detail">👁️</button> <button class="btn btn-xs btn-warning" onclick="modalCabang('${d.id}')" title="Edit">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_cabang','${d.id}','cabang')" title="Hapus">🗑️</button></td></tr>`;
     });
   document.getElementById('tblCab').innerHTML = h;
+}
+function viewCabang(id) {
+  db.collection('hrd_cabang').doc(id).get().then(function(d) {
+    if (!d.exists) return toast('Data tidak ditemukan', 'warning');
+    const p = d.data();
+    openModal(
+      '<div class="modal-title">🏛️ Detail Cabang</div>' +
+      '<table style="width:100%;border-collapse:collapse">' +
+      '<tr><td class="fw-700" style="padding:8px;width:120px">Nama</td><td style="padding:8px">' + escHtml(p.nama || '-') + '</td></tr>' +
+      '<tr><td class="fw-700" style="padding:8px">Kota</td><td style="padding:8px">' + escHtml(p.kota || '-') + '</td></tr>' +
+      '<tr><td class="fw-700" style="padding:8px">Latitude</td><td style="padding:8px">' + (p.lat || 0) + '</td></tr>' +
+      '<tr><td class="fw-700" style="padding:8px">Longitude</td><td style="padding:8px">' + (p.lng || 0) + '</td></tr>' +
+      '<tr><td class="fw-700" style="padding:8px">Radius</td><td style="padding:8px">' + (p.radius || 10) + ' meter</td></tr>' +
+      (p.createdAt ? '<tr><td class="fw-700" style="padding:8px">Dibuat</td><td style="padding:8px">' + formatDateTime(p.createdAt) + '</td></tr>' : '') +
+      (p.updatedAt ? '<tr><td class="fw-700" style="padding:8px">Diupdate</td><td style="padding:8px">' + formatDateTime(p.updatedAt) + '</td></tr>' : '') +
+      '</table>' +
+      '<div style="margin-top:16px;display:flex;gap:8px">' +
+      '<button class="btn btn-warning btn-sm" onclick="closeModalDirect();modalCabang(\'' + id + '\')">✏️ Edit</button>' +
+      '<button class="btn btn-outline btn-sm" onclick="closeModalDirect()">Tutup</button></div>',
+      true
+    );
+  });
 }
 function modalCabang(id) {
   if (id)
