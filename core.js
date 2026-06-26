@@ -453,12 +453,14 @@ function buildNavItems(isPortalUser) {
   ]);
   // Manager+ gets Legal & Aset
   if (hasAccess(3))
-    nav += navGroup('📄 Legal & Aset', [
-      ['kontrak', '📄', 'Kontrak'],
-      ['asset', '💻', 'Asset'],
-      ['peraturan', '📜', 'Peraturan'],
-      ['surat', '✉️', 'Generator Surat'],
-    ]);
+    nav += navGroup('📄 Legal & Aset', currentUser.role === 'bod'
+      ? [['kontrak', '📄', 'Kontrak']]
+      : [
+        ['kontrak', '📄', 'Kontrak'],
+        ['asset', '💻', 'Asset'],
+        ['peraturan', '📜', 'Peraturan'],
+        ['surat', '✉️', 'Generator Surat'],
+      ]);
   nav += navGroup('💬 Komunikasi', [
     ['meeting', '📅', 'Meeting & Invite'],
     ['chat', '💬', 'Obrolan Divisi'],

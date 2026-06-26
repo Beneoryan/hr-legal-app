@@ -288,11 +288,12 @@ async function simpanPelatihan(id) {
 // ── KONTRAK ───────────────────────────────────────────────────
 async function renderKontrak() {
   const main = document.getElementById('mainContent');
-  main.innerHTML = `<div class="page-title"><span>📄 Kontrak Karyawan</span><button class="btn btn-primary btn-sm" onclick="modalKontrak()">+ Upload Kontrak</button></div>
-    <div class="tabs mb-16" id="kontrakTabs">
+  const isBOD = currentUser.role === 'bod';
+  main.innerHTML = `<div class="page-title"><span>📄 Kontrak Karyawan</span>${!isBOD ? '<button class="btn btn-primary btn-sm" onclick="modalKontrak()">+ Upload Kontrak</button>' : ''}</div>
+    ${!isBOD ? `<div class="tabs mb-16" id="kontrakTabs">
       <div class="tab active" onclick="showKontrakTab('list')">📋 Daftar Kontrak</div>
       <div class="tab" onclick="showKontrakTab('dokumen')">📁 Dokumen Karyawan</div>
-    </div>
+    </div>` : ''}
     <div id="kontrakContent"></div>`;
   showKontrakTab('list');
 }
@@ -330,7 +331,14 @@ async function renderKontrakList(container) {
         p.fileURL || p.fileData
           ? '<span class="badge badge-success">Ada</span>'
           : '<span class="badge badge-warning">-</span>';
-      h += `<tr><td class="fw-700">${escHtml(p.namaKaryawan || p.pihak || '-')}</td><td>${p.kontrakKe || '-'}</td><td>${escHtml(p.jenis === 'kerja' ? 'PKWT' : p.jenis === 'tetap' ? 'PKWTT' : p.jenis || '-')}</td><td>${formatDate(p.mulai)}</td><td>${formatDate(p.berakhir)}</td><td><span class="badge badge-${expired ? 'danger' : 'success'}">${expired ? 'Expired' : 'Aktif'}</span></td><td>${hasFile}</td><td><button class="btn btn-xs btn-info" onclick="modalKontrak('${p.id}')">✏️</button>${p.fileURL || p.fileData ? ` <button class="btn btn-xs btn-success" onclick="lihatFileKontrak('${p.id}')">👁️</button>` : ''} <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_kontrak','${p.id}','kontrak')">🗑️</button></td></tr>`;
+      const isBOD = currentUser.role === 'bod';
+      let aksiHtml = '';
+      if (isBOD) {
+        aksiHtml = `<button class="btn btn-xs btn-info" onclick="lihatFileKontrak('${p.id}')" title="Lihat">👁️</button>`;
+      } else {
+        aksiHtml = `<button class="btn btn-xs btn-info" onclick="modalKontrak('${p.id}')">✏️</button>${p.fileURL || p.fileData ? ` <button class="btn btn-xs btn-success" onclick="lihatFileKontrak('${p.id}')">👁️</button>` : ''} <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_kontrak','${p.id}','kontrak')">🗑️</button>`;
+      }
+      h += `<tr><td class="fw-700">${escHtml(p.namaKaryawan || p.pihak || '-')}</td><td>${p.kontrakKe || '-'}</td><td>${escHtml(p.jenis === 'kerja' ? 'PKWT' : p.jenis === 'tetap' ? 'PKWTT' : p.jenis || '-')}</td><td>${formatDate(p.mulai)}</td><td>${formatDate(p.berakhir)}</td><td><span class="badge badge-${expired ? 'danger' : 'success'}">${expired ? 'Expired' : 'Aktif'}</span></td><td>${hasFile}</td><td>${aksiHtml}</td></tr>`;
     });
   }
   document.getElementById('tblKontrak').innerHTML = h;
