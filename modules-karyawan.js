@@ -606,18 +606,45 @@ async function simpanKaryawan(id) {
 }
 
 async function lihatHistoryKontrak(karyawanId) {
-  const snap = await db
-    .collection('hrd_kontrak_history')
-    .where('karyawanId', '==', karyawanId)
-    .get();
+  const [snap, kontrakSnap, dokSnap] = await Promise.all([
+    db.collection('hrd_kontrak_history').where('karyawanId', '==', karyawanId).get(),
+    db.collection('hrd_kontrak').where('karyawanId', '==', karyawanId).get(),
+    db.collection('hrd_dokumen_karyawan').where('karyawanId', '==', karyawanId).get(),
+  ]);
   let h = `<div class="modal-title">📋 History Kontrak Kerja</div>`;
-  if (snap.empty) h += '<p class="text-sm" style="color:#999">Belum ada riwayat kontrak</p>';
+  let rows = [];
+  snap.forEach((d) => {
+    const p = d.data();
+    rows.push(p);
+  });
+  kontrakSnap.forEach((d) => {
+    const p = d.data();
+    rows.push({
+      kontrakKe: p.kontrakKe,
+      jenis: p.jenis === 'kerja' ? 'PKWT' : p.jenis === 'tetap' ? 'PKWTT' : p.jenis,
+      mulai: p.mulai,
+      akhir: p.berakhir,
+      durasi: p.durasi,
+    });
+  });
+  dokSnap.forEach((d) => {
+    const p = d.data();
+    if (p.tipeDokumen === 'Kontrak')
+      rows.push({
+        kontrakKe: p.keterangan || '-',
+        jenis: '-',
+        mulai: '-',
+        akhir: '-',
+        durasi: '-',
+        fileName: p.fileName,
+      });
+  });
+  if (!rows.length) h += '<p class="text-sm" style="color:#999">Belum ada riwayat kontrak</p>';
   else {
     h +=
       '<div class="table-wrap"><table><thead><tr><th>Kontrak Ke-</th><th>Jenis</th><th>Mulai</th><th>Berakhir</th><th>Durasi</th></tr></thead><tbody>';
-    snap.forEach((d) => {
-      const p = d.data();
-      h += `<tr><td class="fw-700">${p.kontrakKe || '-'}</td><td>${escHtml(p.jenis || '-')}</td><td>${formatDate(p.mulai)}</td><td>${formatDate(p.akhir)}</td><td>${escHtml(p.durasi || '-')}</td></tr>`;
+    rows.forEach((p) => {
+      h += `<tr><td class="fw-700">${escHtml(String(p.kontrakKe || '-'))}</td><td>${escHtml(p.jenis || '-')}</td><td>${formatDate(p.mulai)}</td><td>${formatDate(p.akhir)}</td><td>${escHtml(p.durasi || p.fileName || '-')}</td></tr>`;
     });
     h += '</tbody></table></div>';
   }
@@ -641,16 +668,38 @@ async function detailKaryawan(id) {
     });
     dokHtml += '</tbody></table></div>';
   }
-  // Load kontrak for this employee
+  // Load kontrak for this employee (from hrd_kontrak AND hrd_dokumen_karyawan with tipeDokumen='Kontrak')
   const kontrakSnap = await db.collection('hrd_kontrak').where('karyawanId', '==', id).get();
+  // Also get contract documents from dokumen collection
+  let kontrakDocs = [];
+  kontrakSnap.forEach((kd) => kontrakDocs.push({ id: kd.id, source: 'kontrak', ...kd.data() }));
+  dokSnap.forEach((dd) => {
+    const doc = dd.data();
+    if (doc.tipeDokumen === 'Kontrak') {
+      kontrakDocs.push({
+        id: dd.id,
+        source: 'dokumen',
+        kontrakKe: doc.keterangan || '-',
+        jenis: 'kerja',
+        fileName: doc.fileName,
+        fileURL: doc.fileURL,
+        fileData: doc.fileData,
+        createdAt: doc.createdAt,
+      });
+    }
+  });
   let kontrakHtml = '';
-  if (!kontrakSnap.empty) {
+  if (kontrakDocs.length) {
     kontrakHtml =
       '<div class="table-wrap"><table><thead><tr><th>Kontrak Ke-</th><th>Jenis</th><th>Mulai</th><th>Berakhir</th><th>File</th><th>Aksi</th></tr></thead><tbody>';
-    kontrakSnap.forEach((kd) => {
-      const k = kd.data();
+    kontrakDocs.forEach((k) => {
       const hasFile = k.fileURL || k.fileData ? '✅' : '-';
-      kontrakHtml += `<tr><td class="fw-700">${k.kontrakKe || '-'}</td><td>${escHtml(k.jenis === 'kerja' ? 'PKWT' : k.jenis === 'tetap' ? 'PKWTT' : k.jenis || '-')}</td><td>${formatDate(k.mulai)}</td><td>${formatDate(k.berakhir)}</td><td>${hasFile}</td><td>${k.fileURL || k.fileData ? `<button class="btn btn-xs btn-success" onclick="lihatFileKontrak('${kd.id}')">👁️</button>` : '—'}</td></tr>`;
+      if (k.source === 'kontrak') {
+        kontrakHtml += `<tr><td class="fw-700">${k.kontrakKe || '-'}</td><td>${escHtml(k.jenis === 'kerja' ? 'PKWT' : k.jenis === 'tetap' ? 'PKWTT' : k.jenis || '-')}</td><td>${formatDate(k.mulai)}</td><td>${formatDate(k.berakhir)}</td><td>${hasFile}</td><td>${k.fileURL || k.fileData ? `<button class="btn btn-xs btn-success" onclick="lihatFileKontrak('${k.id}')">👁️</button>` : '—'}</td></tr>`;
+      } else {
+        // From dokumen collection
+        kontrakHtml += `<tr><td class="fw-700">${escHtml(k.kontrakKe)}</td><td>-</td><td>-</td><td>-</td><td>${hasFile}</td><td>${k.fileURL || k.fileData ? `<button class="btn btn-xs btn-success" onclick="lihatDokumen('${k.id}')">👁️</button>` : '—'}</td></tr>`;
+      }
     });
     kontrakHtml += '</tbody></table></div>';
   } else {
