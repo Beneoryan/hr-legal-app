@@ -1,6 +1,6 @@
 {
   "name": "IMS - IJEF Management System",
-  "short_name": "IMS",
+  "short_name": "IMS IJEF",
   "description": "IJEF Management System — Absensi, Penggajian, Meeting Online, dan lainnya",
   "start_url": "/",
   "display": "standalone",
@@ -10,16 +10,28 @@
   "categories": ["business", "productivity"],
   "icons": [
     {
-      "src": "https://ui-avatars.com/api/?name=IMS&background=1a1a1a&color=c62828&size=192&format=png",
+      "src": "/icon-512.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "https://ui-avatars.com/api/?name=IMS&background=1a1a1a&color=c62828&size=512&format=png",
+      "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "screenshots": [],
