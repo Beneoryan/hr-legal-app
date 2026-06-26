@@ -205,9 +205,51 @@ async function renderPelatihan() {
   else
     snap.forEach((d) => {
       const p = d.data();
-      h += `<tr><td class="fw-700">${escHtml(p.judul)}</td><td>${escHtml(p.jenis)}</td><td>${formatDate(p.tanggal)}</td><td>${(p.peserta || []).length}</td><td><span class="badge badge-${p.status === 'selesai' ? 'success' : 'info'}">${p.status || 'terjadwal'}</span></td><td><button class="btn btn-xs btn-info" onclick="modalPelatihan('${d.id}')">✏️</button></td></tr>`;
+      h += `<tr><td class="fw-700">${escHtml(p.judul)}</td><td>${escHtml(p.jenis)}</td><td>${formatDate(p.tanggal)}</td><td>${(p.peserta || []).length}</td><td><span class="badge badge-${p.status === 'selesai' ? 'success' : 'info'}">${p.status || 'terjadwal'}</span></td><td><button class="btn btn-xs btn-info" onclick="viewPelatihan('${d.id}')" title="Lihat Detail">👁️</button> <button class="btn btn-xs btn-warning" onclick="modalPelatihan('${d.id}')" title="Edit">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusPelatihan('${d.id}')" title="Hapus">🗑️</button></td></tr>`;
     });
   document.getElementById('tblPelatihan').innerHTML = h;
+}
+function viewPelatihan(id) {
+  db.collection('hrd_pelatihan')
+    .doc(id)
+    .get()
+    .then(function (d) {
+      if (!d.exists) return toast('Data tidak ditemukan', 'warning');
+      const p = d.data();
+      const pesertaList = (p.peserta || []).length
+        ? '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">' +
+          (p.peserta || [])
+            .map(function (nama) {
+              return '<span style="padding:4px 10px;background:#e3f2fd;border-radius:6px;font-size:.78rem">' + escHtml(nama) + '</span>';
+            })
+            .join('') +
+          '</div>'
+        : '<span style="color:#999">Belum ada peserta</span>';
+      openModal(
+        '<div class="modal-title">🎓 Detail Pelatihan</div>' +
+          '<table style="width:100%;border-collapse:collapse">' +
+          '<tr><td class="fw-700" style="padding:8px;width:120px;vertical-align:top">Judul</td><td style="padding:8px">' + escHtml(p.judul || '-') + '</td></tr>' +
+          '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Jenis</td><td style="padding:8px"><span class="badge badge-info">' + escHtml(p.jenis || '-') + '</span></td></tr>' +
+          '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Tanggal</td><td style="padding:8px">' + formatDate(p.tanggal) + '</td></tr>' +
+          '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Status</td><td style="padding:8px"><span class="badge badge-' + (p.status === 'selesai' ? 'success' : 'warning') + '">' + escHtml(p.status || 'terjadwal') + '</span></td></tr>' +
+          '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Peserta (' + (p.peserta || []).length + ')</td><td style="padding:8px">' + pesertaList + '</td></tr>' +
+          (p.createdAt ? '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Dibuat</td><td style="padding:8px">' + formatDateTime(p.createdAt) + '</td></tr>' : '') +
+          (p.updatedAt ? '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Diupdate</td><td style="padding:8px">' + formatDateTime(p.updatedAt) + '</td></tr>' : '') +
+          '</table>' +
+          '<div style="margin-top:16px;display:flex;gap:8px">' +
+          '<button class="btn btn-warning btn-sm" onclick="closeModalDirect();modalPelatihan(\'' + id + '\')">✏️ Edit</button>' +
+          '<button class="btn btn-danger btn-sm" onclick="closeModalDirect();hapusPelatihan(\'' + id + '\')">🗑️ Hapus</button>' +
+          '<button class="btn btn-outline btn-sm" onclick="closeModalDirect()">Tutup</button>' +
+          '</div>',
+        true
+      );
+    });
+}
+async function hapusPelatihan(id) {
+  if (!confirm('Yakin hapus pelatihan ini?')) return;
+  await db.collection('hrd_pelatihan').doc(id).delete();
+  toast('Pelatihan dihapus', 'success');
+  renderPelatihan();
 }
 function modalPelatihan(id) {
   if (id)
