@@ -478,6 +478,14 @@ async function loadSPPDDaftar(el) {
       h +=
         '<button class="btn btn-xs btn-primary" onclick="cetakSPPD(\'' + p.id + '\')">🖨️</button> ';
     }
+    if (hasAccess(6)) {
+      h +=
+        '<button class="btn btn-xs btn-warning" onclick="editSPPD(\'' + p.id + '\')">✏️</button> ';
+      h +=
+        '<button class="btn btn-xs btn-danger" onclick="hapusDoc(\'hrd_perjalanan_dinas\',\'' +
+        p.id +
+        "','perjalanan-dinas')\">🗑️</button> ";
+    }
     h += '</td></tr>';
   });
   if (!hasData) h += '<tr><td colspan="8" class="text-center">Belum ada data SPPD</td></tr>';
@@ -1015,6 +1023,67 @@ async function rejectSPPD(id) {
   linkSnap.forEach((d) => d.ref.update({ status: 'rejected' }));
   await sendNotification(p.userId || p.nama, 'SPPD Ditolak', `SPPD ${p.noSPPD} ditolak: ${alasan}`);
   toast('SPPD ditolak', 'info');
+  showSPPDTab('daftar');
+}
+
+async function editSPPD(id) {
+  const doc = await db.collection('hrd_perjalanan_dinas').doc(id).get();
+  const p = doc.data();
+  if (!p) return toast('Data tidak ditemukan', 'error');
+  openModal(
+    `<div class="modal-title">✏️ Edit SPPD — ${escHtml(p.noSPPD || '')}</div>
+    <div class="grid-2">
+      <div class="form-group"><label>Nama Karyawan</label><input class="form-control" id="editSppdNama" value="${escHtml(p.nama || '')}"></div>
+      <div class="form-group"><label>Departemen</label><input class="form-control" id="editSppdDept" value="${escHtml(p.departemen || '')}"></div>
+    </div>
+    <div class="form-group"><label>Tujuan / Kota</label><input class="form-control" id="editSppdTujuan" value="${escHtml(p.tujuan || '')}"></div>
+    <div class="form-group"><label>Klien / Instansi</label><input class="form-control" id="editSppdKlien" value="${escHtml(p.klien || '')}"></div>
+    <div class="grid-2">
+      <div class="form-group"><label>Tanggal Mulai</label><input class="form-control" type="date" id="editSppdMulai" value="${p.tanggalMulai || ''}"></div>
+      <div class="form-group"><label>Tanggal Selesai</label><input class="form-control" type="date" id="editSppdSelesai" value="${p.tanggalSelesai || ''}"></div>
+    </div>
+    <div class="form-group"><label>Keperluan</label><textarea class="form-control" id="editSppdKeperluan" rows="3">${escHtml(p.keperluan || '')}</textarea></div>
+    <div class="grid-2">
+      <div class="form-group"><label>Transportasi</label><select class="form-control" id="editSppdTransport"><option value="Pesawat" ${p.transportasi === 'Pesawat' ? 'selected' : ''}>Pesawat</option><option value="Kereta" ${p.transportasi === 'Kereta' ? 'selected' : ''}>Kereta</option><option value="Bus" ${p.transportasi === 'Bus' ? 'selected' : ''}>Bus</option><option value="Mobil Dinas" ${p.transportasi === 'Mobil Dinas' ? 'selected' : ''}>Mobil Dinas</option><option value="Kendaraan Pribadi" ${p.transportasi === 'Kendaraan Pribadi' ? 'selected' : ''}>Kendaraan Pribadi</option></select></div>
+      <div class="form-group"><label>Akomodasi</label><select class="form-control" id="editSppdAkomodasi"><option value="Hotel" ${p.akomodasi === 'Hotel' ? 'selected' : ''}>Hotel</option><option value="Guest House" ${p.akomodasi === 'Guest House' ? 'selected' : ''}>Guest House</option><option value="Rumah Keluarga" ${p.akomodasi === 'Rumah Keluarga' ? 'selected' : ''}>Rumah Keluarga</option><option value="Tidak Perlu" ${p.akomodasi === 'Tidak Perlu' ? 'selected' : ''}>Tidak Perlu</option></select></div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group"><label>Biaya Transport (Rp)</label><input class="form-control" type="number" id="editSppdBiayaTransport" value="${p.biayaTransport || 0}"></div>
+      <div class="form-group"><label>Biaya Akomodasi (Rp)</label><input class="form-control" type="number" id="editSppdBiayaAkomodasi" value="${p.biayaAkomodasi || 0}"></div>
+      <div class="form-group"><label>Biaya Makan & Saku (Rp)</label><input class="form-control" type="number" id="editSppdBiayaMakan" value="${p.biayaMakan || 0}"></div>
+      <div class="form-group"><label>Biaya Lain (Rp)</label><input class="form-control" type="number" id="editSppdBiayaLain" value="${p.biayaLain || 0}"></div>
+    </div>
+    <div class="form-group"><label>Status</label><select class="form-control" id="editSppdStatus"><option value="pending" ${p.status === 'pending' ? 'selected' : ''}>Pending</option><option value="approved" ${p.status === 'approved' ? 'selected' : ''}>Approved</option><option value="rejected" ${p.status === 'rejected' ? 'selected' : ''}>Rejected</option><option value="selesai" ${p.status === 'selesai' ? 'selected' : ''}>Selesai</option></select></div>
+    <div class="form-group"><label>Catatan</label><textarea class="form-control" id="editSppdCatatan">${escHtml(p.catatan || '')}</textarea></div>
+    <button class="btn btn-primary" onclick="simpanEditSPPD('${id}')">💾 Simpan Perubahan</button>`,
+    true
+  );
+}
+
+async function simpanEditSPPD(id) {
+  const data = {
+    nama: document.getElementById('editSppdNama').value,
+    departemen: document.getElementById('editSppdDept').value,
+    tujuan: document.getElementById('editSppdTujuan').value,
+    klien: document.getElementById('editSppdKlien').value,
+    tanggalMulai: document.getElementById('editSppdMulai').value,
+    tanggalSelesai: document.getElementById('editSppdSelesai').value,
+    keperluan: document.getElementById('editSppdKeperluan').value,
+    transportasi: document.getElementById('editSppdTransport').value,
+    akomodasi: document.getElementById('editSppdAkomodasi').value,
+    biayaTransport: parseInt(document.getElementById('editSppdBiayaTransport').value) || 0,
+    biayaAkomodasi: parseInt(document.getElementById('editSppdBiayaAkomodasi').value) || 0,
+    biayaMakan: parseInt(document.getElementById('editSppdBiayaMakan').value) || 0,
+    biayaLain: parseInt(document.getElementById('editSppdBiayaLain').value) || 0,
+    status: document.getElementById('editSppdStatus').value,
+    catatan: document.getElementById('editSppdCatatan').value,
+    updatedAt: new Date().toISOString(),
+    editedBy: currentUser.nama,
+  };
+  data.totalEstimasi = data.biayaTransport + data.biayaAkomodasi + data.biayaMakan + data.biayaLain;
+  await db.collection('hrd_perjalanan_dinas').doc(id).update(data);
+  closeModalDirect();
+  toast('SPPD berhasil diupdate', 'success');
   showSPPDTab('daftar');
 }
 
