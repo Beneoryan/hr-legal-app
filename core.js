@@ -418,7 +418,7 @@ function buildNavItems(isPortalUser) {
     ['test-kesehatan', '🏥', 'Test Kesehatan'],
   ]);
   // Manager+ gets Rekrutmen
-  if (hasAccess(3))
+  if (hasAccess(3) && currentUser.role !== 'bod')
     nav += navGroup('🔍 Rekrutmen', [
       ['lowongan', '📝', 'Lowongan'],
       ['pipeline', '🔄', 'Pipeline Kanban'],

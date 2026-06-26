@@ -18,13 +18,18 @@ function getStatusBadgeKesehatan(status) {
 // ── ADMIN PAGE: RENDER TEST KESEHATAN ─────────────────────────
 async function renderTestKesehatan() {
   const main = document.getElementById('mainContent');
+  const isBOD = currentUser.role === 'bod';
   main.innerHTML = `
   <div class="page-title">
     <span>🏥 Test Kesehatan</span>
-    <div class="flex gap-8">
+    ${
+      !isBOD
+        ? `<div class="flex gap-8">
       <button class="btn btn-primary btn-sm" onclick="modalJadwalTestKesehatan('calon')">+ Jadwalkan Calon</button>
       <button class="btn btn-info btn-sm" onclick="modalJadwalTestKesehatan('existing')">+ Jadwalkan Karyawan</button>
-    </div>
+    </div>`
+        : ''
+    }
   </div>
   <div class="card">
     <div class="tabs" id="testKesehatanTabs">
@@ -152,9 +157,9 @@ async function showTestKesehatanTab(tab) {
         <td>${kesimpulanStatus}</td>
         <td>
           <button class="btn btn-xs btn-info" onclick="detailTestKesehatan('${p.id}')">&#x1F441;&#xFE0F;</button>
-          <button class="btn btn-xs btn-primary" onclick="modalFormTestKesehatan('${p.id}')">&#x1F4DD;</button>
-          ${p.tipe === 'calon' && p.status !== 'selesai' ? `<button class="btn btn-xs btn-success" onclick="(function(){var url=window.location.origin+'/test-kesehatan?id=${p.id}';if(navigator.clipboard){navigator.clipboard.writeText(url).then(function(){toast('Link disalin ke clipboard','success')}).catch(function(){prompt('Salin link berikut:',url)})}else{prompt('Salin link berikut:',url)}})()">&#x1F4CB; Copy Link</button>` : ''}
-          <button class="btn btn-xs btn-danger" onclick="hapusTestKesehatan('${p.id}')">&#x1F5D1;&#xFE0F;</button>
+          ${currentUser.role !== 'bod' ? `<button class="btn btn-xs btn-primary" onclick="modalFormTestKesehatan('${p.id}')">&#x1F4DD;</button>` : ''}
+          ${currentUser.role !== 'bod' && p.tipe === 'calon' && p.status !== 'selesai' ? `<button class="btn btn-xs btn-success" onclick="(function(){var url=window.location.origin+'/test-kesehatan?id=${p.id}';if(navigator.clipboard){navigator.clipboard.writeText(url).then(function(){toast('Link disalin ke clipboard','success')}).catch(function(){prompt('Salin link berikut:',url)})}else{prompt('Salin link berikut:',url)}})()">&#x1F4CB; Copy Link</button>` : ''}
+          ${currentUser.role !== 'bod' ? `<button class="btn btn-xs btn-danger" onclick="hapusTestKesehatan('${p.id}')">&#x1F5D1;&#xFE0F;</button>` : ''}
         </td>
       </tr>`;
     });

@@ -400,19 +400,26 @@ async function loadSPPDDaftar(el) {
     approveBtn =
       '<button class="btn btn-xs btn-success" onclick="bulkApproveSPPD()">✅ Approve Semua</button>';
   }
+  var isBOD = currentUser.role === 'bod';
   var h = '<div class="card">';
   h +=
     '<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">';
   h += '<div class="card-title">📋 Daftar Surat Perintah Perjalanan Dinas (SPPD)</div>';
-  h += '<div id="sppdBulkActions" style="display:none;gap:8px;align-items:center;flex-wrap:wrap">';
-  h +=
-    '<span id="sppdSelectedCount" class="text-sm fw-700" style="color:var(--primary)">0 dipilih</span>';
-  h += approveBtn;
-  h += '<button class="btn btn-xs btn-danger" onclick="bulkDeleteSPPD()">🗑️ Hapus Semua</button>';
-  h += '</div></div>';
+  if (!isBOD) {
+    h +=
+      '<div id="sppdBulkActions" style="display:none;gap:8px;align-items:center;flex-wrap:wrap">';
+    h +=
+      '<span id="sppdSelectedCount" class="text-sm fw-700" style="color:var(--primary)">0 dipilih</span>';
+    h += approveBtn;
+    h += '<button class="btn btn-xs btn-danger" onclick="bulkDeleteSPPD()">🗑️ Hapus Semua</button>';
+    h += '</div>';
+  }
+  h += '</div>';
   h += '<div class="table-wrap"><table><thead><tr>';
-  h +=
-    '<th style="width:40px;text-align:center"><input type="checkbox" id="sppdCheckAll" onchange="toggleAllSPPDCheckbox(this)"></th>';
+  if (!isBOD) {
+    h +=
+      '<th style="width:40px;text-align:center"><input type="checkbox" id="sppdCheckAll" onchange="toggleAllSPPDCheckbox(this)"></th>';
+  }
   h +=
     '<th>No. SPPD</th><th>Nama</th><th>Tujuan</th><th>Tanggal</th><th>Durasi</th><th>Status</th><th>Aksi</th>';
   h += '</tr></thead><tbody>';
@@ -452,12 +459,14 @@ async function loadSPPDDaftar(el) {
             ? 'badge-info'
             : 'badge-warning';
     h += '<tr>';
-    h +=
-      '<td style="text-align:center"><input type="checkbox" class="sppd-check-item" value="' +
-      p.id +
-      '" data-status="' +
-      (p.status || 'pending') +
-      '" onchange="updateSPPDBulkUI()"></td>';
+    if (!isBOD) {
+      h +=
+        '<td style="text-align:center"><input type="checkbox" class="sppd-check-item" value="' +
+        p.id +
+        '" data-status="' +
+        (p.status || 'pending') +
+        '" onchange="updateSPPDBulkUI()"></td>';
+    }
     h += '<td class="fw-700">' + escHtml(p.noSPPD || '-') + '</td>';
     h += '<td>' + escHtml(p.nama) + '</td>';
     h += '<td>' + escHtml(p.tujuan || '-') + '</td>';
@@ -466,7 +475,7 @@ async function loadSPPDDaftar(el) {
     h += '<td><span class="badge ' + badge + '">' + (p.status || 'pending') + '</span></td>';
     h += '<td>';
     h += '<button class="btn btn-xs btn-info" onclick="viewSPPD(\'' + p.id + '\')">👁️</button> ';
-    if (hasAccess(3) && p.status === 'pending') {
+    if (!isBOD && hasAccess(3) && p.status === 'pending') {
       h +=
         '<button class="btn btn-xs btn-success" onclick="approveSPPD(\'' +
         p.id +
@@ -478,7 +487,7 @@ async function loadSPPDDaftar(el) {
       h +=
         '<button class="btn btn-xs btn-primary" onclick="cetakSPPD(\'' + p.id + '\')">🖨️</button> ';
     }
-    if (hasAccess(6)) {
+    if (!isBOD && hasAccess(6)) {
       h +=
         '<button class="btn btn-xs btn-warning" onclick="editSPPD(\'' + p.id + '\')">✏️</button> ';
       h +=
