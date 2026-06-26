@@ -6,11 +6,12 @@ async function renderCuti() {
     ${hasAccess(3) ? '<div class="card mb-16"><div class="card-title mb-8">📊 Sisa Jatah Cuti Karyawan</div><div id="cutiQuotaList">Loading...</div></div>' : ''}
     <div class="card"><div class="card-title mb-8">📋 Daftar Pengajuan</div><div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Jenis</th><th>Tanggal</th><th>Durasi</th><th>Sisa Cuti</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="tblCuti"></tbody></table></div></div>`;
   // Load data
-  const [cutiSnap, karySnap] = await Promise.all([
+  const [cutiSnap, karySnap, flows] = await Promise.all([
     !hasAccess(3)
       ? db.collection('hrd_cuti').where('userId', '==', currentUser.id).get()
       : db.collection('hrd_cuti').get(),
     db.collection('hrd_karyawan').where('status', '==', 'aktif').get(),
+    loadApprovalFlows(),
   ]);
   // Calculate quota per karyawan
   // Index by both userId AND nama (lowercased) so admin table can match by name
@@ -95,7 +96,8 @@ async function renderCuti() {
       const used = cutiUsed[uid] || cutiUsed[(p.nama || '').trim().toLowerCase()] || 0;
       const sisa = Math.max(0, quota - used);
       const canApprove = p.status === 'pending' && hasAccess(3) && !isBOD;
-      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.jenis)}</td><td>${formatDate(p.mulai)}-${formatDate(p.selesai)}</td><td>${p.durasi || 1}h</td><td><span class="badge badge-${sisa <= 2 ? 'danger' : sisa <= 5 ? 'warning' : 'success'}">${sisa}/${quota}</span></td><td><span class="badge ${badge}">${p.status}</span></td><td><button class="btn btn-xs btn-info" onclick="viewCutiDetail('${p.id}')" title="Lihat Detail">👁️</button> ${canApprove ? `<button class="btn btn-xs btn-success" onclick="approveCuti('${p.id}','approved')">✅</button> <button class="btn btn-xs btn-danger" onclick="approveCuti('${p.id}','rejected')">❌</button>` : ''} ${hasAccess(6) || (p.userId === currentUser.id && p.status === 'pending') ? `<button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_cuti','${p.id}','cuti')">🗑️</button>` : ''}</td></tr>`;
+      const pendingInfo = pendingApproverHtml(flows, p.nama, p.status, p.approvalStep);
+      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.jenis)}</td><td>${formatDate(p.mulai)}-${formatDate(p.selesai)}</td><td>${p.durasi || 1}h</td><td><span class="badge badge-${sisa <= 2 ? 'danger' : sisa <= 5 ? 'warning' : 'success'}">${sisa}/${quota}</span></td><td><span class="badge ${badge}">${p.status}</span>${pendingInfo}</td><td><button class="btn btn-xs btn-info" onclick="viewCutiDetail('${p.id}')" title="Lihat Detail">👁️</button> ${canApprove ? `<button class="btn btn-xs btn-success" onclick="approveCuti('${p.id}','approved')">✅</button> <button class="btn btn-xs btn-danger" onclick="approveCuti('${p.id}','rejected')">❌</button>` : ''} ${hasAccess(6) || (p.userId === currentUser.id && p.status === 'pending') ? `<button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_cuti','${p.id}','cuti')">🗑️</button>` : ''}</td></tr>`;
     });
   }
   document.getElementById('tblCuti').innerHTML = h;
@@ -227,7 +229,10 @@ async function approveCuti(id, status) {
 }
 
 async function viewCutiDetail(id) {
-  const doc = await db.collection('hrd_cuti').doc(id).get();
+  const [doc, flows] = await Promise.all([
+    db.collection('hrd_cuti').doc(id).get(),
+    loadApprovalFlows(),
+  ]);
   if (!doc.exists) return toast('Data tidak ditemukan', 'warning');
   const p = doc.data();
   let attachHtml = '';
@@ -249,6 +254,15 @@ async function viewCutiDetail(id) {
     });
     attachHtml += '</div></td></tr>';
   }
+  // Pending approver row
+  let pendingRow = '';
+  const isPending = p.status === 'pending' || (p.status && p.status.indexOf('step') === 0);
+  if (isPending) {
+    const approver = getApproverForItem(flows, p.nama, p.approvalStep);
+    if (approver) {
+      pendingRow = '<tr><td class="fw-700" style="padding:6px 8px;color:#1565c0">\u23F3 Pending di</td><td style="padding:6px 8px;color:#1565c0;font-weight:700">' + escHtml(approver) + '</td></tr>';
+    }
+  }
   openModal(`<div class="modal-title">Detail Cuti/Izin</div>
     <table style="width:100%;border-collapse:collapse">
       <tr><td class="fw-700" style="padding:6px 8px;width:120px">Nama</td><td style="padding:6px 8px">${escHtml(p.nama || '-')}</td></tr>
@@ -259,6 +273,7 @@ async function viewCutiDetail(id) {
       <tr><td class="fw-700" style="padding:6px 8px">Keterangan</td><td style="padding:6px 8px">${escHtml(p.keterangan || '-')}</td></tr>
       ${attachHtml}
       <tr><td class="fw-700" style="padding:6px 8px">Status</td><td style="padding:6px 8px"><span class="badge badge-${p.status === 'approved' ? 'success' : p.status === 'rejected' ? 'danger' : 'warning'}">${p.status || 'pending'}</span></td></tr>
+      ${pendingRow}
       <tr><td class="fw-700" style="padding:6px 8px">Approved By</td><td style="padding:6px 8px">${escHtml(p.approvedBy || '-')}</td></tr>
       <tr><td class="fw-700" style="padding:6px 8px">Created At</td><td style="padding:6px 8px">${p.createdAt ? formatDate(p.createdAt.split('T')[0]) : '-'}</td></tr>
     </table>
@@ -276,6 +291,7 @@ async function renderOvertime() {
   } else {
     snap = await db.collection('hrd_overtime').get();
   }
+  const flows = await loadApprovalFlows();
   const isBOD = currentUser.role === 'bod';
   const isAdmin = hasAccess(6);
   const myDept = (currentUser.departemen || '').toLowerCase().trim();
@@ -317,7 +333,8 @@ async function renderOvertime() {
             ? 'badge-danger'
             : 'badge-warning';
       const canApprove = p.status === 'pending' && hasAccess(3) && !isBOD;
-      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggal)}</td><td>${p.jamMulai || '-'}-${p.jamSelesai || '-'}</td><td>${p.durasi || 0}j</td><td><span class="badge ${badge}">${p.status}</span></td><td><button class="btn btn-xs btn-info" onclick="viewOvertimeDetail('${d.id}')">👁️</button> ${canApprove ? `<button class="btn btn-xs btn-success" onclick="approveOT('${d.id}','approved')">✅</button> <button class="btn btn-xs btn-danger" onclick="approveOT('${d.id}','rejected')">❌</button>` : ''} ${hasAccess(6) ? `<button class="btn btn-xs btn-warning" onclick="editOTDoc('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_overtime','${d.id}','overtime')">🗑️</button>` : ''}</td></tr>`;
+      const pendingInfo = pendingApproverHtml(flows, p.nama, p.status, p.approvalStep);
+      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${formatDate(p.tanggal)}</td><td>${p.jamMulai || '-'}-${p.jamSelesai || '-'}</td><td>${p.durasi || 0}j</td><td><span class="badge ${badge}">${p.status}</span>${pendingInfo}</td><td><button class="btn btn-xs btn-info" onclick="viewOvertimeDetail('${d.id}')">👁️</button> ${canApprove ? `<button class="btn btn-xs btn-success" onclick="approveOT('${d.id}','approved')">✅</button> <button class="btn btn-xs btn-danger" onclick="approveOT('${d.id}','rejected')">❌</button>` : ''} ${hasAccess(6) ? `<button class="btn btn-xs btn-warning" onclick="editOTDoc('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_overtime','${d.id}','overtime')">🗑️</button>` : ''}</td></tr>`;
     });
   document.getElementById('tblOT').innerHTML = h;
 }
