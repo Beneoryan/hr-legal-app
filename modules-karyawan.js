@@ -1453,9 +1453,32 @@ async function renderLowongan() {
   else
     snap.forEach((d) => {
       const p = d.data();
-      h += `<tr><td class="fw-700">${escHtml(p.posisi)}</td><td>${escHtml(p.departemen || '-')}</td><td><span class="badge badge-${p.status === 'open' ? 'success' : 'danger'}">${p.status}</span></td><td>${formatDate(p.deadline)}</td><td><button class="btn btn-xs btn-info" onclick="modalLowongan('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_lowongan','${d.id}','lowongan')">🗑️</button></td></tr>`;
+      h += `<tr><td class="fw-700">${escHtml(p.posisi)}</td><td>${escHtml(p.departemen || '-')}</td><td><span class="badge badge-${p.status === 'open' ? 'success' : 'danger'}">${p.status}</span></td><td>${formatDate(p.deadline)}</td><td><button class="btn btn-xs btn-info" onclick="viewLowongan('${d.id}')" title="Lihat Detail">👁️</button> <button class="btn btn-xs btn-warning" onclick="modalLowongan('${d.id}')" title="Edit">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_lowongan','${d.id}','lowongan')" title="Hapus">🗑️</button></td></tr>`;
     });
   document.getElementById('tblLow').innerHTML = h;
+}
+function viewLowongan(id) {
+  db.collection('hrd_lowongan').doc(id).get().then(function(d) {
+    if (!d.exists) return toast('Data tidak ditemukan', 'warning');
+    const p = d.data();
+    openModal(
+      '<div class="modal-title">📝 Detail Lowongan</div>' +
+      '<table style="width:100%;border-collapse:collapse">' +
+      '<tr><td class="fw-700" style="padding:8px;width:120px;vertical-align:top">Posisi</td><td style="padding:8px">' + escHtml(p.posisi || '-') + '</td></tr>' +
+      '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Departemen</td><td style="padding:8px">' + escHtml(p.departemen || '-') + '</td></tr>' +
+      '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Status</td><td style="padding:8px"><span class="badge badge-' + (p.status === 'open' ? 'success' : 'danger') + '">' + escHtml(p.status || '-') + '</span></td></tr>' +
+      '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Deadline</td><td style="padding:8px">' + formatDate(p.deadline) + '</td></tr>' +
+      (p.deskripsi ? '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Deskripsi</td><td style="padding:8px;white-space:pre-wrap">' + escHtml(p.deskripsi) + '</td></tr>' : '') +
+      (p.createdAt ? '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Dibuat</td><td style="padding:8px">' + formatDateTime(p.createdAt) + '</td></tr>' : '') +
+      (p.updatedAt ? '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Diupdate</td><td style="padding:8px">' + formatDateTime(p.updatedAt) + '</td></tr>' : '') +
+      '</table>' +
+      '<div style="margin-top:16px;display:flex;gap:8px">' +
+      '<button class="btn btn-warning btn-sm" onclick="closeModalDirect();modalLowongan(\'' + id + '\')">✏️ Edit</button>' +
+      '<button class="btn btn-outline btn-sm" onclick="closeModalDirect()">Tutup</button>' +
+      '</div>',
+      true
+    );
+  });
 }
 async function modalLowongan(id) {
   if (id) {
@@ -1540,9 +1563,39 @@ async function renderKandidat() {
   else
     snap.forEach((d) => {
       const p = d.data();
-      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.posisi || '-')}</td><td><span class="badge badge-info">${p.stage || 'Applied'}</span></td><td>${p.discPattern ? `<span class="badge badge-primary">${escHtml(p.discPattern)}</span>` : '-'}</td><td><button class="btn btn-xs btn-info" onclick="modalKandidat('${d.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_kandidat','${d.id}','kandidat')">🗑️</button></td></tr>`;
+      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.posisi || '-')}</td><td><span class="badge badge-info">${p.stage || 'Applied'}</span></td><td>${p.discPattern ? `<span class="badge badge-primary">${escHtml(p.discPattern)}</span>` : '-'}</td><td><button class="btn btn-xs btn-info" onclick="viewKandidat('${d.id}')" title="Lihat Detail">👁️</button> <button class="btn btn-xs btn-warning" onclick="modalKandidat('${d.id}')" title="Edit">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusDoc('hrd_kandidat','${d.id}','kandidat')" title="Hapus">🗑️</button></td></tr>`;
     });
   document.getElementById('tblKand').innerHTML = h;
+}
+function viewKandidat(id) {
+  db.collection('hrd_kandidat').doc(id).get().then(function(d) {
+    if (!d.exists) return toast('Data tidak ditemukan', 'warning');
+    const p = d.data();
+    const stageColors = { 'Applied': '#1565c0', 'DISC Test Done': '#7b1fa2', 'Screening': '#f57f17', 'Interview': '#6a1b9a', 'Offering': '#e65100', 'Hired': '#2e7d32', 'Rejected': '#c62828' };
+    const stageColor = stageColors[p.stage] || '#1565c0';
+    openModal(
+      '<div class="modal-title">🧑‍💼 Detail Kandidat</div>' +
+      '<table style="width:100%;border-collapse:collapse">' +
+      '<tr><td class="fw-700" style="padding:8px;width:120px;vertical-align:top">Nama</td><td style="padding:8px">' + escHtml(p.nama || '-') + '</td></tr>' +
+      '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Posisi</td><td style="padding:8px">' + escHtml(p.posisi || '-') + '</td></tr>' +
+      '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Stage</td><td style="padding:8px"><span class="badge" style="background:' + stageColor + ';color:#fff">' + escHtml(p.stage || 'Applied') + '</span></td></tr>' +
+      '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Email</td><td style="padding:8px">' + escHtml(p.email || '-') + '</td></tr>' +
+      '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Kontak</td><td style="padding:8px">' + escHtml(p.kontak || '-') + '</td></tr>' +
+      (p.usia ? '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Usia</td><td style="padding:8px">' + escHtml(p.usia) + ' tahun</td></tr>' : '') +
+      (p.jenisKelamin ? '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Jenis Kelamin</td><td style="padding:8px">' + escHtml(p.jenisKelamin) + '</td></tr>' : '') +
+      '<tr><td class="fw-700" style="padding:8px;vertical-align:top">DISC Pattern</td><td style="padding:8px">' + (p.discPattern ? '<span class="badge badge-primary">' + escHtml(p.discPattern) + '</span>' : '-') + '</td></tr>' +
+      (p.discProfile ? '<tr><td class="fw-700" style="padding:8px;vertical-align:top">DISC Profile</td><td style="padding:8px">' + escHtml(p.discProfile) + '</td></tr>' : '') +
+      (p.discScore ? '<tr><td class="fw-700" style="padding:8px;vertical-align:top">DISC Score</td><td style="padding:8px"><b>' + p.discScore + '</b></td></tr>' : '') +
+      (p.sumber ? '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Sumber</td><td style="padding:8px">' + escHtml(p.sumber) + '</td></tr>' : '') +
+      (p.createdAt ? '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Tanggal Masuk</td><td style="padding:8px">' + formatDateTime(p.createdAt) + '</td></tr>' : '') +
+      '</table>' +
+      '<div style="margin-top:16px;display:flex;gap:8px">' +
+      '<button class="btn btn-warning btn-sm" onclick="closeModalDirect();modalKandidat(\'' + id + '\')">✏️ Edit</button>' +
+      '<button class="btn btn-outline btn-sm" onclick="closeModalDirect()">Tutup</button>' +
+      '</div>',
+      true
+    );
+  });
 }
 
 async function syncDiscCalonToKandidat() {
