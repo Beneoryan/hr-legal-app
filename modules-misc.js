@@ -2,7 +2,8 @@
 // ── KPI ───────────────────────────────────────────────────────
 async function renderKPI() {
   const main = document.getElementById('mainContent');
-  main.innerHTML = `<div class="page-title"><span>📈 KPI & Penilaian</span><button class="btn btn-primary btn-sm" onclick="modalKPI()">+ Tambah</button></div><div style="margin-bottom:12px"><button type="button" class="btn btn-sm btn-info" onclick="document.getElementById('kpiInfoPanelAdmin').style.display=document.getElementById('kpiInfoPanelAdmin').style.display==='none'?'block':'none'">ℹ️ Info Formula KPI</button> <button type="button" class="btn btn-sm btn-warning" onclick="sinkronPenaltyKPI()">🔄 Sinkron Penalty</button><div id="kpiInfoPanelAdmin" style="display:none;margin-top:12px;padding:12px;background:#f0f4ff;border-radius:8px;font-size:.82rem;line-height:1.6"><strong>Formula Penilaian KPI:</strong><br>• Produktivitas (25%), Kualitas (25%), Kedisiplinan (25%), Kerjasama (25%)<br>• Skor Murni = Rata-rata 4 komponen<br>• Setiap 1 penalty point mengurangi skor akhir sebesar 2 poin<br>• <strong>Skor Akhir = Skor Murni - (Total Penalty x 2)</strong><br><br><strong>Grade:</strong> A (≥90) | B (≥80) | C (≥70) | D (≥60) | E (&lt;60)</div></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Periode</th><th>Skor Murni</th><th>Penalty</th><th>Skor Akhir</th><th>Grade</th><th>Penilai</th>${currentUser.role === 'admin' ? '<th>Aksi</th>' : ''}</tr></thead><tbody id="tblKPI"></tbody></table></div></div>`;
+  const isBOD = currentUser.role === 'bod';
+  main.innerHTML = `<div class="page-title"><span>📈 KPI & Penilaian</span>${!isBOD ? '<button class="btn btn-primary btn-sm" onclick="modalKPI()">+ Tambah</button>' : '<button class="btn btn-primary btn-sm" onclick="modalKPI()">+ Nilai HEAD</button>'}</div><div style="margin-bottom:12px">${!isBOD ? '<button type="button" class="btn btn-sm btn-info" onclick="document.getElementById(\'kpiInfoPanelAdmin\').style.display=document.getElementById(\'kpiInfoPanelAdmin\').style.display===\'none\'?\'block\':\'none\'">ℹ️ Info Formula KPI</button> <button type="button" class="btn btn-sm btn-warning" onclick="sinkronPenaltyKPI()">🔄 Sinkron Penalty</button>' : ''}<div id="kpiInfoPanelAdmin" style="display:none;margin-top:12px;padding:12px;background:#f0f4ff;border-radius:8px;font-size:.82rem;line-height:1.6"><strong>Formula Penilaian KPI:</strong><br>• Produktivitas (25%), Kualitas (25%), Kedisiplinan (25%), Kerjasama (25%)<br>• Skor Murni = Rata-rata 4 komponen<br>• Setiap 1 penalty point mengurangi skor akhir sebesar 2 poin<br>• <strong>Skor Akhir = Skor Murni - (Total Penalty x 2)</strong><br><br><strong>Grade:</strong> A (≥90) | B (≥80) | C (≥70) | D (≥60) | E (&lt;60)</div></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Periode</th><th>Skor Murni</th><th>Penalty</th><th>Skor Akhir</th><th>Grade</th><th>Penilai</th>${!isBOD ? '<th>Aksi</th>' : ''}</tr></thead><tbody id="tblKPI"></tbody></table></div></div>`;
   const [snap, penSnap, karySnap] = await Promise.all([
     db.collection('hrd_kpi').get(),
     db.collection('hrd_penalty').get(),
@@ -44,7 +45,7 @@ async function renderKPI() {
               : liveSkor >= 60
                 ? 'D'
                 : 'E';
-      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.periode)}</td><td>${skorMurni}/100</td><td>${liveDed > 0 ? '<span class="badge badge-danger">-' + liveDed + '</span>' : '<span class="badge badge-success">0</span>'}</td><td><span class="badge badge-${liveSkor >= 80 ? 'success' : liveSkor >= 60 ? 'warning' : 'danger'}">${liveSkor}/100</span></td><td class="fw-700">${grade}</td><td>${escHtml(p.penilai || '-')}</td>${currentUser.role === 'admin' ? `<td><button class="btn btn-xs btn-primary" onclick="editKPI('${p.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusKPI('${p.id}')">🗑️</button></td>` : ''}</tr>`;
+      h += `<tr><td class="fw-700">${escHtml(p.nama)}</td><td>${escHtml(p.periode)}</td><td>${skorMurni}/100</td><td>${liveDed > 0 ? '<span class="badge badge-danger">-' + liveDed + '</span>' : '<span class="badge badge-success">0</span>'}</td><td><span class="badge badge-${liveSkor >= 80 ? 'success' : liveSkor >= 60 ? 'warning' : 'danger'}">${liveSkor}/100</span></td><td class="fw-700">${grade}</td><td>${escHtml(p.penilai || '-')}</td>${currentUser.role === 'admin' ? `<td><button class="btn btn-xs btn-primary" onclick="editKPI('${p.id}')">✏️</button> <button class="btn btn-xs btn-danger" onclick="hapusKPI('${p.id}')">🗑️</button></td>` : currentUser.role !== 'bod' ? `<td><button class="btn btn-xs btn-primary" onclick="editKPI('${p.id}')">✏️</button></td>` : ''}</tr>`;
     });
   document.getElementById('tblKPI').innerHTML = h;
 }
@@ -2163,14 +2164,19 @@ function renderAbsensiAdmin() {
 // ── DISC TEST PAGE (Admin/HR view with View, Edit, Delete, Sync KPI) ──────────
 function renderDiscTestPage() {
   const main = document.getElementById('mainContent');
+  const isBOD = currentUser.role === 'bod';
   main.innerHTML = `
   <div class="page-title"><span>🧠 DISC Personality Test</span></div>
   <div class="card">
     <div class="card-header"><div class="card-title">Tes Kepribadian DISC</div>
-      <div class="flex gap-8">
+      ${
+        !isBOD
+          ? `<div class="flex gap-8">
         <a href="disc-test.html" target="_blank" class="btn btn-primary btn-sm">🔗 Link Tes (Calon Karyawan)</a>
         <button class="btn btn-warning btn-sm" onclick="modalDiscEvalKaryawan()">📊 Evaluasi Karyawan (Pilih)</button>
-      </div>
+      </div>`
+          : ''
+      }
     </div>
     <div style="background:#e3f2fd;border-radius:8px;padding:14px;margin-bottom:16px;border-left:4px solid var(--info)">
       <p class="text-sm" style="line-height:1.6"><strong>DISC</strong> = Dominance, Influence, Steadiness, Compliance.<br>
@@ -2180,7 +2186,7 @@ function renderDiscTestPage() {
       • <strong>Sinkron KPI:</strong> Hasil DISC bisa disinkronkan ke data KPI karyawan</p>
     </div>
   </div>
-  <div class="card"><div class="card-header"><div class="card-title">📋 Riwayat Hasil Tes</div><div class="flex gap-8"><button class="btn btn-success btn-sm" onclick="syncAllDiscToKPI()">🔄 Sinkron Semua ke KPI</button><button class="btn btn-danger btn-sm" onclick="hapusSemuaDiscResults()">🗑️ Hapus Semua Riwayat</button></div></div>
+  <div class="card"><div class="card-header"><div class="card-title">📋 Riwayat Hasil Tes</div>${!isBOD ? '<div class="flex gap-8"><button class="btn btn-success btn-sm" onclick="syncAllDiscToKPI()">🔄 Sinkron Semua ke KPI</button><button class="btn btn-danger btn-sm" onclick="hapusSemuaDiscResults()">🗑️ Hapus Semua Riwayat</button></div>' : ''}</div>
     <div class="flex gap-8 mb-16"><input class="form-control" placeholder="Cari nama..." id="dSrc" oninput="fltDisc()" style="max-width:250px"><select class="form-control" id="dFlt" onchange="fltDisc()" style="max-width:180px"><option value="">Semua</option><option value="calon">Calon</option><option value="evaluasi">Evaluasi</option></select></div>
     <div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Nama</th><th>Mode</th><th>Posisi</th><th>Tipe</th><th>Profil</th><th>Aksi</th></tr></thead><tbody id="dTbl"><tr><td colspan="7" class="text-center">Memuat...</td></tr></tbody></table></div>
   </div>`;
@@ -2268,7 +2274,8 @@ function fltDisc() {
         r.mode === 'evaluasi'
           ? '<span class="badge badge-warning">Evaluasi</span>'
           : '<span class="badge badge-info">Calon</span>';
-      h += `<tr><td>${dt}</td><td class="fw-700">${escHtml(r.nama)}</td><td>${badge}</td><td>${escHtml(r.posisi || '-')}</td><td class="fw-700" style="color:var(--primary)">${escHtml(r.pattern || '-')}</td><td>${escHtml(r.profileName || '-')}</td><td><button class="btn btn-xs btn-info" onclick="viewDiscResult('${r.id}')">👁️</button> <button class="btn btn-xs btn-warning" onclick="editDiscResult('${r.id}')">✏️</button> <button class="btn btn-xs btn-success" onclick="syncDiscToKPI('${r.id}')">📈</button> <button class="btn btn-xs btn-danger" onclick="deleteDiscResult('${r.id}')">🗑️</button></td></tr>`;
+      const isBOD = currentUser.role === 'bod';
+      h += `<tr><td>${dt}</td><td class="fw-700">${escHtml(r.nama)}</td><td>${badge}</td><td>${escHtml(r.posisi || '-')}</td><td class="fw-700" style="color:var(--primary)">${escHtml(r.pattern || '-')}</td><td>${escHtml(r.profileName || '-')}</td><td><button class="btn btn-xs btn-info" onclick="viewDiscResult('${r.id}')">👁️</button>${!isBOD ? ` <button class="btn btn-xs btn-warning" onclick="editDiscResult('${r.id}')">✏️</button> <button class="btn btn-xs btn-success" onclick="syncDiscToKPI('${r.id}')">📈</button> <button class="btn btn-xs btn-danger" onclick="deleteDiscResult('${r.id}')">🗑️</button>` : ''}</td></tr>`;
     });
   document.getElementById('dTbl').innerHTML = h;
 }
