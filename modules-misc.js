@@ -21,10 +21,118 @@ function renderLaporanKeuangan() {
 }
 
 // ── KPI ───────────────────────────────────────────────────────
+function clampScore(v) {
+  return Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
+}
+function normalizePeriodeKPI(periode) {
+  return (periode || monthStr()).slice(0, 7);
+}
+function pickLatestByDate(items, periodKey) {
+  if (!items.length) return null;
+  const filtered = periodKey
+    ? items.filter((x) => (x.evaluasiPeriode || x.periode || x.tanggalTes || '').startsWith(periodKey))
+    : items;
+  const src = filtered.length ? filtered : items;
+  src.sort((a, b) =>
+    (b.createdAt || b.updatedAt || b.tanggalTes || '').localeCompare(
+      a.createdAt || a.updatedAt || a.tanggalTes || ''
+    )
+  );
+  return src[0] || null;
+}
+async function hitungKPIIntegrasi(nama, periode) {
+  const namaLower = (nama || '').toLowerCase().trim();
+  const periodKey = normalizePeriodeKPI(periode);
+  const [karySnap, jobdeskSnap, absenSnap, penSnap, discSnap] = await Promise.all([
+    db.collection('hrd_karyawan').where('status', '==', 'aktif').get(),
+    db.collection('hrd_jobdesk').get(),
+    db.collection('hrd_absensi').get(),
+    db.collection('hrd_penalty').get(),
+    db.collection('hrd_disc_results').get(),
+  ]);
+  let karyawanId = '';
+  karySnap.forEach((d) => {
+    const k = d.data() || {};
+    if ((k.nama || '').toLowerCase().trim() === namaLower && !karyawanId) karyawanId = d.id;
+  });
+  let jobdeskData = null;
+  jobdeskSnap.forEach((d) => {
+    const jd = d.data() || {};
+    const idMatch = karyawanId && (jd.karyawanId === karyawanId || jd.userId === karyawanId);
+    if (idMatch && !jobdeskData) jobdeskData = jd;
+  });
+  const bidangJobdesk = ['deskripsi', 'tanggungJawab', 'kualifikasi', 'kpi'];
+  const filledJobdesk = jobdeskData
+    ? bidangJobdesk.filter((key) => (jobdeskData[key] || '').toString().trim()).length
+    : 0;
+  const jobdeskScore = clampScore(jobdeskData ? 50 + (filledJobdesk / bidangJobdesk.length) * 50 : 50);
+  const masukPeriode = [];
+  const hariMasuk = new Set();
+  let countTerlambat = 0;
+  let countTepat = 0;
+  absenSnap.forEach((d) => {
+    const a = d.data() || {};
+    const isNama = (a.nama || '').toLowerCase().trim() === namaLower;
+    const isId = karyawanId && a.userId === karyawanId;
+    if (!(isNama || isId)) return;
+    if (a.tipe !== 'masuk') return;
+    if (!(a.tanggal || '').startsWith(periodKey)) return;
+    masukPeriode.push(a);
+    hariMasuk.add(a.tanggal);
+    if ((a.status || '').toLowerCase() === 'terlambat') countTerlambat++;
+    else countTepat++;
+  });
+  const totalHariMasuk = hariMasuk.size;
+  const totalEventMasuk = masukPeriode.length;
+  const ketepatanMasuk = totalEventMasuk ? (countTepat / totalEventMasuk) * 100 : 0;
+  const kehadiranBulanan = Math.min(100, (totalHariMasuk / 22) * 100);
+  const absensiScore = clampScore(
+    totalEventMasuk ? ketepatanMasuk * 0.6 + kehadiranBulanan * 0.4 : 75
+  );
+  let totalPenaltyPoin = 0;
+  penSnap.forEach((d) => {
+    const pe = d.data() || {};
+    if ((pe.nama || '').toLowerCase().trim() === namaLower) totalPenaltyPoin += parseInt(pe.poin) || 0;
+  });
+  const discItems = [];
+  discSnap.forEach((d) => {
+    const r = d.data() || {};
+    if ((r.nama || '').toLowerCase().trim() === namaLower) discItems.push(r);
+  });
+  const latestDisc = pickLatestByDate(discItems, periodKey);
+  const userScore = clampScore(latestDisc?.kpiScore != null ? latestDisc.kpiScore : 80);
+  const produktivitas = clampScore(jobdeskScore * 0.6 + userScore * 0.4);
+  const kualitas = clampScore(jobdeskScore * 0.5 + userScore * 0.5);
+  const kedisiplinan = clampScore(absensiScore);
+  const kerjasama = clampScore(userScore);
+  const skorMurni = clampScore((produktivitas + kualitas + kedisiplinan + kerjasama) / 4);
+  const penaltyDeduction = totalPenaltyPoin * 2;
+  const skorAkhir = Math.max(0, skorMurni - penaltyDeduction);
+  return {
+    periodKey,
+    karyawanId,
+    jobdeskData,
+    jobdeskScore,
+    absensiScore,
+    absensiSummary: { totalHariMasuk, totalEventMasuk, countTerlambat, countTepat },
+    userScore,
+    discSource: latestDisc
+      ? latestDisc.evaluasiPeriode || latestDisc.tanggalTes || latestDisc.createdAt || '-'
+      : '-',
+    produktivitas,
+    kualitas,
+    kedisiplinan,
+    kerjasama,
+    skorMurni,
+    totalPenaltyPoin,
+    penaltyDeduction,
+    skorAkhir,
+  };
+}
 async function renderKPI() {
   const main = document.getElementById('mainContent');
   const isBOD = currentUser.role === 'bod';
-  main.innerHTML = `<div class="page-title"><span>📈 KPI & Penilaian</span>${!isBOD ? '<button class="btn btn-primary btn-sm" onclick="modalKPI()">+ Tambah</button>' : '<button class="btn btn-primary btn-sm" onclick="modalKPI()">+ Nilai HEAD</button>'}</div><div style="margin-bottom:12px">${!isBOD ? '<button type="button" class="btn btn-sm btn-info" onclick="document.getElementById(\'kpiInfoPanelAdmin\').style.display=document.getElementById(\'kpiInfoPanelAdmin\').style.display===\'none\'?\'block\':\'none\'">ℹ️ Info Formula KPI</button> <button type="button" class="btn btn-sm btn-warning" onclick="sinkronPenaltyKPI()">🔄 Sinkron Penalty</button>' : ''}<div id="kpiInfoPanelAdmin" style="display:none;margin-top:12px;padding:12px;background:#f0f4ff;border-radius:8px;font-size:.82rem;line-height:1.6"><strong>Formula Penilaian KPI:</strong><br>• Produktivitas (25%), Kualitas (25%), Kedisiplinan (25%), Kerjasama (25%)<br>• Skor Murni = Rata-rata 4 komponen<br>• Setiap 1 penalty point mengurangi skor akhir sebesar 2 poin<br>• <strong>Skor Akhir = Skor Murni - (Total Penalty x 2)</strong><br><br><strong>Grade:</strong> A (≥90) | B (≥80) | C (≥70) | D (≥60) | E (&lt;60)</div></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Periode</th><th>Skor Murni</th><th>Penalty</th><th>Skor Akhir</th><th>Grade</th><th>Penilai</th>${!isBOD ? '<th>Aksi</th>' : ''}</tr></thead><tbody id="tblKPI"></tbody></table></div></div>`;
+  main.innerHTML = `<div class="page-title"><span>📈 KPI & Penilaian</span>${!isBOD ? '<button class="btn btn-primary btn-sm" onclick="modalKPI()">+ Tambah</button>' : '<button class="btn btn-primary btn-sm" onclick="modalKPI()">+ Nilai HEAD</button>'}</div><div style="margin-bottom:12px">${!isBOD ? '<button type="button" class="btn btn-sm btn-info" onclick="document.getElementById(\'kpiInfoPanelAdmin\').style.display=document.getElementById(\'kpiInfoPanelAdmin\').style.display===\'none\'?\'block\':\'none\'">ℹ️ Info Formula KPI</button> <button type="button" class="btn btn-sm btn-warning" onclick="sinkronPenaltyKPI()">🔄 Sinkron Penalty</button>' : ''}<div id="kpiInfoPanelAdmin" style="display:none;margin-top:12px;padding:12px;background:#f0f4ff;border-radius:8px;font-size:.82rem;line-height:1.6"><strong>Metode Penilaian Terintegrasi:</strong><br>• Sumber data: Jobdesk, Absensi, Penalty, dan penilaian user (DISC)<br>• Nilai komponen dibentuk dari data terintegrasi lalu bisa disesuaikan penilai<br>• Skor Murni = Rata-rata Produktivitas, Kualitas, Kedisiplinan, Kerjasama<br>• Setiap 1 penalty point mengurangi skor akhir sebesar 2 poin<br>• <strong>Skor Akhir = Skor Murni - (Total Penalty x 2)</strong><br><br><strong>Grade:</strong> A (≥90) | B (≥80) | C (≥70) | D (≥60) | E (&lt;60)</div></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Karyawan</th><th>Periode</th><th>Skor Murni</th><th>Penalty</th><th>Skor Akhir</th><th>Grade</th><th>Penilai</th>${!isBOD ? '<th>Aksi</th>' : ''}</tr></thead><tbody id="tblKPI"></tbody></table></div></div>`;
   const [snap, penSnap, karySnap] = await Promise.all([
     db.collection('hrd_kpi').get(),
     db.collection('hrd_penalty').get(),
@@ -88,47 +196,52 @@ async function modalKPI() {
     opts += `<option value="${escHtml(k.nama)}">${escHtml(k.nama)} — ${escHtml(k.departemen || '-')}</option>`;
   });
   openModal(
-    `<div class="modal-title">Tambah Penilaian KPI</div><div class="grid-2"><div class="form-group"><label>Karyawan</label><select class="form-control" id="kpiNama" onchange="kpiLoadPenalty()">${opts}</select></div><div class="form-group"><label>Periode</label><input class="form-control" id="kpiPeriode" value="${monthStr()}"></div></div><div id="kpiPenaltyPreview" style="margin-bottom:12px"></div><div class="grid-2"><div class="form-group"><label>Produktivitas (0-100)</label><input class="form-control" type="number" id="kpiProd" value="80"></div><div class="form-group"><label>Kualitas (0-100)</label><input class="form-control" type="number" id="kpiQual" value="80"></div></div><div class="grid-2"><div class="form-group"><label>Kedisiplinan (0-100)</label><input class="form-control" type="number" id="kpiDisc" value="80"></div><div class="form-group"><label>Kerjasama (0-100)</label><input class="form-control" type="number" id="kpiTeam" value="80"></div></div><div class="form-group"><label>Catatan</label><textarea class="form-control" id="kpiNote"></textarea></div><button class="btn btn-primary" onclick="simpanKPI()">Simpan</button><div style="margin-top:16px"><button type="button" class="btn btn-sm btn-info" onclick="document.getElementById('kpiInfoPanel').style.display=document.getElementById('kpiInfoPanel').style.display==='none'?'block':'none'">ℹ️ Info Faktor Penilaian</button><div id="kpiInfoPanel" style="display:none;margin-top:12px;padding:12px;background:#f0f4ff;border-radius:8px;font-size:.82rem;line-height:1.6"><strong>Formula Penilaian KPI:</strong><br>• Produktivitas (25%), Kualitas (25%), Kedisiplinan (25%), Kerjasama (25%)<br>• Skor Murni = Rata-rata 4 komponen<br>• Setiap 1 penalty point mengurangi skor akhir sebesar 2 poin<br>• <strong>Skor Akhir = Skor Murni - (Total Penalty x 2)</strong><br><br><strong>Grade:</strong> A (≥90) | B (≥80) | C (≥70) | D (≥60) | E (&lt;60)</div></div>`
+    `<div class="modal-title">Tambah Penilaian KPI</div><div class="grid-2"><div class="form-group"><label>Karyawan</label><select class="form-control" id="kpiNama" onchange="kpiLoadIntegratedPreview()">${opts}</select></div><div class="form-group"><label>Periode</label><input class="form-control" id="kpiPeriode" value="${monthStr()}" onchange="kpiLoadIntegratedPreview()"></div></div><div id="kpiIntegratedPreview" style="margin-bottom:12px"></div><div class="grid-2"><div class="form-group"><label>Produktivitas (0-100)</label><input class="form-control" type="number" id="kpiProd" value="80"></div><div class="form-group"><label>Kualitas (0-100)</label><input class="form-control" type="number" id="kpiQual" value="80"></div></div><div class="grid-2"><div class="form-group"><label>Kedisiplinan (0-100)</label><input class="form-control" type="number" id="kpiDisc" value="80"></div><div class="form-group"><label>Kerjasama (0-100)</label><input class="form-control" type="number" id="kpiTeam" value="80"></div></div><div class="form-group"><label>Catatan</label><textarea class="form-control" id="kpiNote"></textarea></div><div class="flex gap-8 mb-12"><button type="button" class="btn btn-info btn-sm" onclick="kpiLoadIntegratedPreview()">🔄 Hitung Otomatis Terintegrasi</button></div><button class="btn btn-primary" onclick="simpanKPI()">Simpan</button><div style="margin-top:16px"><button type="button" class="btn btn-sm btn-info" onclick="document.getElementById('kpiInfoPanel').style.display=document.getElementById('kpiInfoPanel').style.display==='none'?'block':'none'">ℹ️ Info Faktor Penilaian</button><div id="kpiInfoPanel" style="display:none;margin-top:12px;padding:12px;background:#f0f4ff;border-radius:8px;font-size:.82rem;line-height:1.6"><strong>Formula Penilaian KPI:</strong><br>• Nilai diambil dari integrasi Jobdesk, Absensi, Penalty, dan penilaian user (DISC)<br>• Penilai dapat menyesuaikan nilai sebelum simpan<br>• Skor Murni = Rata-rata 4 komponen<br>• Setiap 1 penalty point mengurangi skor akhir sebesar 2 poin<br>• <strong>Skor Akhir = Skor Murni - (Total Penalty x 2)</strong><br><br><strong>Grade:</strong> A (≥90) | B (≥80) | C (≥70) | D (≥60) | E (&lt;60)</div></div>`
   );
 }
-async function kpiLoadPenalty() {
+async function kpiLoadIntegratedPreview() {
   const nama = document.getElementById('kpiNama').value;
-  const preview = document.getElementById('kpiPenaltyPreview');
+  const periode = document.getElementById('kpiPeriode').value;
+  const preview = document.getElementById('kpiIntegratedPreview');
   if (!nama) {
     preview.innerHTML = '';
     return;
   }
-  const snap = await db.collection('hrd_penalty').get();
-  let total = 0;
-  const namaLower = nama.toLowerCase().trim();
-  snap.forEach((d) => {
-    const pe = d.data();
-    if ((pe.nama || '').toLowerCase().trim() === namaLower) total += parseInt(pe.poin) || 0;
-  });
-  const ded = total * 2;
-  preview.innerHTML = `<div style="padding:10px;background:${total > 0 ? '#fff3f3' : '#f0fff0'};border-radius:8px;font-size:.85rem">📋 <strong>${escHtml(nama)}</strong>: Total Penalty = <span class="badge badge-${total > 0 ? 'danger' : 'success'}">${total} poin</span> → Pengurangan skor: <strong>-${ded}</strong></div>`;
+  const hasil = await hitungKPIIntegrasi(nama, periode);
+  document.getElementById('kpiProd').value = hasil.produktivitas;
+  document.getElementById('kpiQual').value = hasil.kualitas;
+  document.getElementById('kpiDisc').value = hasil.kedisiplinan;
+  document.getElementById('kpiTeam').value = hasil.kerjasama;
+  preview.innerHTML = `<div style="padding:10px;background:#f0f7ff;border-radius:8px;font-size:.82rem;line-height:1.65">
+    <div class="fw-700 mb-6">📊 Rekomendasi nilai terintegrasi — ${escHtml(nama)} (${escHtml(
+      hasil.periodKey
+    )})</div>
+    <div>• Jobdesk: <b>${hasil.jobdeskScore}</b> (kelengkapan: ${hasil.jobdeskData ? 'tersedia' : 'belum ada'})</div>
+    <div>• Absensi: <b>${hasil.absensiScore}</b> (hari masuk: ${hasil.absensiSummary.totalHariMasuk}, terlambat: ${hasil.absensiSummary.countTerlambat})</div>
+    <div>• Penilaian user/DISC: <b>${hasil.userScore}</b> (sumber: ${escHtml(hasil.discSource)})</div>
+    <div>• Penalty: <span class="badge badge-${hasil.totalPenaltyPoin > 0 ? 'danger' : 'success'}">${hasil.totalPenaltyPoin} poin</span> → Potongan <b>-${hasil.penaltyDeduction}</b></div>
+    <hr style="margin:8px 0;border-color:#d7e3ff">
+    <div>Rekomendasi komponen: Produktivitas <b>${hasil.produktivitas}</b>, Kualitas <b>${hasil.kualitas}</b>, Kedisiplinan <b>${hasil.kedisiplinan}</b>, Kerjasama <b>${hasil.kerjasama}</b></div>
+    <div>Skor murni estimasi: <b>${hasil.skorMurni}</b> | Skor akhir estimasi: <b>${hasil.skorAkhir}</b></div>
+  </div>`;
 }
 async function simpanKPI() {
   const nama = document.getElementById('kpiNama').value;
   if (!nama) return toast('Pilih karyawan', 'warning');
+  const periode = document.getElementById('kpiPeriode').value;
   const prod = Number(document.getElementById('kpiProd').value) || 0,
     qual = Number(document.getElementById('kpiQual').value) || 0,
     disc = Number(document.getElementById('kpiDisc').value) || 0,
     team = Number(document.getElementById('kpiTeam').value) || 0;
-  const skorMurni = Math.round((prod + qual + disc + team) / 4);
-  const penSnap = await db.collection('hrd_penalty').get();
-  let totalPenaltyPoin = 0;
-  const namaLower = nama.toLowerCase().trim();
-  penSnap.forEach((d) => {
-    const pe = d.data();
-    if ((pe.nama || '').toLowerCase().trim() === namaLower)
-      totalPenaltyPoin += parseInt(pe.poin) || 0;
-  });
-  const penaltyDeduction = totalPenaltyPoin * 2;
+  const skorMurni = clampScore((prod + qual + disc + team) / 4);
+  const hasilIntegrasi = await hitungKPIIntegrasi(nama, periode);
+  const totalPenaltyPoin = hasilIntegrasi.totalPenaltyPoin;
+  const penaltyDeduction = hasilIntegrasi.penaltyDeduction;
   const skor = Math.max(0, skorMurni - penaltyDeduction);
   await db.collection('hrd_kpi').add({
     nama,
-    periode: document.getElementById('kpiPeriode').value,
+    periode,
+    karyawanId: hasilIntegrasi.karyawanId || '',
     produktivitas: prod,
     kualitas: qual,
     kedisiplinan: disc,
@@ -139,6 +252,15 @@ async function simpanKPI() {
     skor,
     catatan: document.getElementById('kpiNote').value,
     penilai: currentUser.nama,
+    metodePenilaian: 'integrated_v1',
+    sumberPenilaian: {
+      periodeReferensi: hasilIntegrasi.periodKey,
+      jobdeskScore: hasilIntegrasi.jobdeskScore,
+      absensiScore: hasilIntegrasi.absensiScore,
+      userScore: hasilIntegrasi.userScore,
+      penaltyPoin: hasilIntegrasi.totalPenaltyPoin,
+      discSource: hasilIntegrasi.discSource,
+    },
     createdAt: new Date().toISOString(),
   });
   closeModalDirect();
@@ -171,27 +293,21 @@ async function updateKPI(id) {
   const doc = await db.collection('hrd_kpi').doc(id).get();
   const existing = doc.data() || {};
   const nama = existing.nama || '';
+  const periode = document.getElementById('editKpiPeriode').value;
   const prod = Number(document.getElementById('editKpiProd').value) || 0;
   const qual = Number(document.getElementById('editKpiQual').value) || 0;
   const disc = Number(document.getElementById('editKpiDisc').value) || 0;
   const team = Number(document.getElementById('editKpiTeam').value) || 0;
-  const skorMurni = Math.round((prod + qual + disc + team) / 4);
-  // Recalculate penalty
-  const penSnap = await db.collection('hrd_penalty').get();
-  let totalPenaltyPoin = 0;
-  const namaLower = nama.toLowerCase().trim();
-  penSnap.forEach((d) => {
-    const pe = d.data();
-    if ((pe.nama || '').toLowerCase().trim() === namaLower)
-      totalPenaltyPoin += parseInt(pe.poin) || 0;
-  });
-  const penaltyDeduction = totalPenaltyPoin * 2;
+  const skorMurni = clampScore((prod + qual + disc + team) / 4);
+  const hasilIntegrasi = await hitungKPIIntegrasi(nama, periode);
+  const totalPenaltyPoin = hasilIntegrasi.totalPenaltyPoin;
+  const penaltyDeduction = hasilIntegrasi.penaltyDeduction;
   const skor = Math.max(0, skorMurni - penaltyDeduction);
   await db
     .collection('hrd_kpi')
     .doc(id)
     .update({
-      periode: document.getElementById('editKpiPeriode').value,
+      periode,
       produktivitas: prod,
       kualitas: qual,
       kedisiplinan: disc,
@@ -201,6 +317,15 @@ async function updateKPI(id) {
       penaltyDeduction,
       skor,
       catatan: document.getElementById('editKpiNote').value,
+      metodePenilaian: 'integrated_v1',
+      sumberPenilaian: {
+        periodeReferensi: hasilIntegrasi.periodKey,
+        jobdeskScore: hasilIntegrasi.jobdeskScore,
+        absensiScore: hasilIntegrasi.absensiScore,
+        userScore: hasilIntegrasi.userScore,
+        penaltyPoin: hasilIntegrasi.totalPenaltyPoin,
+        discSource: hasilIntegrasi.discSource,
+      },
       updatedAt: new Date().toISOString(),
       updatedBy: currentUser.nama,
     });
