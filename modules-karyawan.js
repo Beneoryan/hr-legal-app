@@ -1823,7 +1823,11 @@ function filterJobdeskList() {
       const manageBtn = isBOD
         ? ''
         : `<button class="btn btn-xs btn-${k.hasJobdesk ? 'warning' : 'success'}" onclick="modalJobdesk('${k.id}','${escHtml(k.nama)}','${escHtml(k.posisi || '')}')">${k.hasJobdesk ? '✏️ Edit' : '+ Atur'}</button>`;
-      const actionBtn = `<div class="flex gap-6 flex-wrap">${viewBtn}${manageBtn || (!viewBtn ? '<span class="text-xs" style="color:#888">-</span>' : '')}</div>`;
+      const actionContent =
+        viewBtn || manageBtn
+          ? `${viewBtn}${manageBtn}`
+          : '<span class="text-xs" style="color:#888">-</span>';
+      const actionBtn = `<div class="flex gap-6 flex-wrap">${actionContent}</div>`;
       h += `<tr><td class="text-xs">${escHtml(k.nip || '-')}</td><td class="fw-700">${escHtml(k.nama)}</td><td>${escHtml(k.departemen || '-')}</td><td>${escHtml(k.posisi || '-')}</td><td><span class="badge badge-${k.hasJobdesk ? 'success' : 'warning'}">${k.hasJobdesk ? '✅ Sudah' : '⚠️ Belum'}</span></td><td>${actionBtn}</td></tr>`;
     });
   document.getElementById('tblJobdesk').innerHTML = h;
@@ -1860,16 +1864,23 @@ async function modalJobdesk(karyawanId, nama, posisi, readOnly = false) {
   const syncKpiSection = !isBOD && !readOnly
     ? `<button class="btn btn-warning btn-sm" onclick="sinkronJobdeskKPI('${karyawanId}','${escHtml(nama)}')">🔄 Sinkronisasi KPI</button>`
     : '';
+  const readonlyAttr = readOnly ? 'readonly' : '';
+  const deleteBtn = docId
+    ? `<button class="btn btn-danger" onclick="hapusDoc('hrd_jobdesk','${docId}','jobdesk-mgmt')">🗑️ Hapus</button>`
+    : '';
+  const actionButtons = readOnly
+    ? '<button class="btn btn-outline" onclick="closeModalDirect()">Tutup</button>'
+    : `<button class="btn btn-primary" onclick="simpanJobdesk('${karyawanId}','${docId || ''}')">💾 Simpan Jobdesk</button>${syncKpiSection}${deleteBtn}`;
 
   openModal(
     `<div class="modal-title">📋 ${readOnly ? 'View Jobdesk' : 'Jobdesk'}: ${escHtml(nama)}</div>
     <div style="background:#f0f4ff;padding:10px 14px;border-radius:8px;margin-bottom:16px"><div class="text-xs"><b>Posisi:</b> ${escHtml(posisi || '-')}</div></div>
     ${uploadSection}
-    <div class="form-group"><label>Deskripsi Pekerjaan</label><textarea class="form-control" id="jdDesc" style="min-height:100px" placeholder="Deskripsi umum posisi dan pekerjaan..." ${readOnly ? 'readonly' : ''}>${escHtml(p.deskripsi || '')}</textarea></div>
-    <div class="form-group"><label>Tanggung Jawab (per baris)</label><textarea class="form-control" id="jdTanggung" style="min-height:120px" placeholder="Mengelola data karyawan\nMembuat laporan bulanan\nKoordinasi dengan tim" ${readOnly ? 'readonly' : ''}>${escHtml(p.tanggungJawab || '')}</textarea></div>
-    <div class="form-group"><label>Kualifikasi (per baris)</label><textarea class="form-control" id="jdKualifikasi" style="min-height:80px" placeholder="Min. S1 Manajemen\nPengalaman 2 tahun\nMenguasai MS Office" ${readOnly ? 'readonly' : ''}>${escHtml(p.kualifikasi || '')}</textarea></div>
-    <div class="form-group"><label>Target KPI</label><textarea class="form-control" id="jdKPI" style="min-height:100px" placeholder="Target yang harus dicapai...\nContoh:\n- Menyelesaikan 90% tugas tepat waktu\n- Kehadiran minimal 95%" ${readOnly ? 'readonly' : ''}>${escHtml(p.kpi || '')}</textarea></div>
-    <div class="flex gap-8 flex-wrap">${readOnly ? '<button class="btn btn-outline" onclick="closeModalDirect()">Tutup</button>' : `<button class="btn btn-primary" onclick="simpanJobdesk('${karyawanId}','${docId || ''}')">💾 Simpan Jobdesk</button>${syncKpiSection}${docId ? `<button class="btn btn-danger" onclick="hapusDoc('hrd_jobdesk','${docId}','jobdesk-mgmt')">🗑️ Hapus</button>` : ''}`}</div>`,
+    <div class="form-group"><label>Deskripsi Pekerjaan</label><textarea class="form-control" id="jdDesc" style="min-height:100px" placeholder="Deskripsi umum posisi dan pekerjaan..." ${readonlyAttr}>${escHtml(p.deskripsi || '')}</textarea></div>
+    <div class="form-group"><label>Tanggung Jawab (per baris)</label><textarea class="form-control" id="jdTanggung" style="min-height:120px" placeholder="Mengelola data karyawan\nMembuat laporan bulanan\nKoordinasi dengan tim" ${readonlyAttr}>${escHtml(p.tanggungJawab || '')}</textarea></div>
+    <div class="form-group"><label>Kualifikasi (per baris)</label><textarea class="form-control" id="jdKualifikasi" style="min-height:80px" placeholder="Min. S1 Manajemen\nPengalaman 2 tahun\nMenguasai MS Office" ${readonlyAttr}>${escHtml(p.kualifikasi || '')}</textarea></div>
+    <div class="form-group"><label>Target KPI</label><textarea class="form-control" id="jdKPI" style="min-height:100px" placeholder="Target yang harus dicapai...\nContoh:\n- Menyelesaikan 90% tugas tepat waktu\n- Kehadiran minimal 95%" ${readonlyAttr}>${escHtml(p.kpi || '')}</textarea></div>
+    <div class="flex gap-8 flex-wrap">${actionButtons}</div>`,
     true
   );
 }
