@@ -2976,7 +2976,10 @@ async function _loadReportSummaryForDate(dateVal) {
   var htmlContent = '';
   var totalDone = 0;
   var totalProgress = 0;
+  var totalOnTrack = 0;
+  var totalNeedAttention = 0;
   var totalKendala = 0;
+  var totalTanpaKendala = 0;
   var totalProgressValue = 0;
 
   if (!reports.length) {
@@ -2990,7 +2993,11 @@ async function _loadReportSummaryForDate(dateVal) {
         var icon = dept.includes('ACADEMIC') ? '\ud83d\udcda' : '\ud83c\udfe2';
         var deptDone = 0;
         var deptProgress = 0;
+        var deptOnTrack = 0;
+        var deptNeedAttention = 0;
         var deptKendala = 0;
+        var deptTanpaKendala = 0;
+        var deptKendalaNotes = [];
         waText += icon + ' ' + dept + ' (' + items.length + ' report)\n';
         htmlContent +=
           '<div class="card mb-8"><div class="fw-700 mb-8">' +
@@ -3005,7 +3012,9 @@ async function _loadReportSummaryForDate(dateVal) {
           var nama = (r.targetUserName || r.nama || '-').toUpperCase();
           var aktivitasRaw = (r.aktivitas || '-').trim();
           var aktivitasFirst = aktivitasRaw.split('\n')[0].substring(0, 80);
-          var prog = r.progress || 0;
+          var prog = parseInt(r.progress, 10);
+          if (isNaN(prog)) prog = 0;
+          prog = Math.max(0, Math.min(100, prog));
           var status = prog >= 100 ? '\u2705' : prog + '%';
           var hasil = (r.hasil || '').trim();
           var kendala = (r.kendala || '').trim();
@@ -3065,28 +3074,98 @@ async function _loadReportSummaryForDate(dateVal) {
           } else {
             totalProgress++;
             deptProgress++;
+            if (prog >= 70) {
+              totalOnTrack++;
+              deptOnTrack++;
+            } else {
+              totalNeedAttention++;
+              deptNeedAttention++;
+            }
           }
           if (kendala) {
             totalKendala++;
             deptKendala++;
+            deptKendalaNotes.push('• ' + nama + ': ' + kendala.split('\n')[0].substring(0, 80));
+          } else {
+            totalTanpaKendala++;
+            deptTanpaKendala++;
           }
           totalProgressValue += prog;
         });
 
-        waText += '  \ud83d\udcca Dept: \u2705 ' + deptDone + ' | \u23f3 ' + deptProgress + ' | \u26a0 ' + deptKendala + '\n\n';
+        var deptAvg = items.length
+          ? Math.round(
+              items.reduce(function (acc, it) {
+                var p = parseInt(it.progress, 10);
+                if (isNaN(p)) p = 0;
+                return acc + Math.max(0, Math.min(100, p));
+              }, 0) / items.length
+            )
+          : 0;
+        waText +=
+          '  \ud83d\udcca Dept: \u2705 ' +
+          deptDone +
+          ' | \ud83d\udfe1 On Track ' +
+          deptOnTrack +
+          ' | \ud83d\udd34 Perlu Atensi ' +
+          deptNeedAttention +
+          ' | \u26a0 ' +
+          deptKendala +
+          ' | \ud83d\udcc8 ' +
+          deptAvg +
+          '%\n';
+        if (deptKendalaNotes.length) {
+          waText += '  \ud83d\udea7 Kendala Utama:\n';
+          deptKendalaNotes.slice(0, 3).forEach(function (k) {
+            waText += '   ' + k + '\n';
+          });
+        }
+        waText += '\n';
         htmlContent +=
           '<div style="padding-top:8px;font-size:.75rem;color:#666;display:flex;gap:10px;flex-wrap:wrap"><span>\u2705 Done: <b>' +
           deptDone +
+          '</b></span><span>\ud83d\udfe1 On Track: <b>' +
+          deptOnTrack +
+          '</b></span><span>\ud83d\udd34 Perlu Atensi: <b>' +
+          deptNeedAttention +
           '</b></span><span>\u23f3 Progress: <b>' +
           deptProgress +
           '</b></span><span>\u26a0 Kendala: <b>' +
           deptKendala +
-          '</b></span></div>';
-        waText += '\n';
+          '</b></span><span>\u2705 Tanpa Kendala: <b>' +
+          deptTanpaKendala +
+          '</b></span><span>\ud83d\udcc8 Rata-rata: <b>' +
+          deptAvg +
+          '%</b></span></div>';
+        if (deptKendalaNotes.length) {
+          htmlContent +=
+            '<div style="margin-top:6px;padding:8px 10px;background:#fff7f7;border:1px solid #ffd7d7;border-radius:8px;font-size:.74rem;color:#a13d3d"><div style="font-weight:700;margin-bottom:4px">\ud83d\udea7 Kendala Utama</div><ul style="margin:0;padding-left:16px">' +
+            deptKendalaNotes
+              .slice(0, 3)
+              .map(function (k) {
+                return '<li>' + escHtml(k.replace(/^•\s*/, '')) + '</li>';
+              })
+              .join('') +
+            '</ul></div>';
+        }
+        htmlContent +=
+          '<div style="padding-top:6px;font-size:.72rem;color:#777">Coverage kendala: <b>' +
+          (items.length ? Math.round((deptKendala / items.length) * 100) : 0) +
+          '%</b> report punya hambatan</div>';
+        htmlContent +=
+          '<div style="padding-top:4px;font-size:.72rem;color:#777">Coverage progres tinggi (Done + On Track): <b>' +
+          (items.length ? Math.round(((deptDone + deptOnTrack) / items.length) * 100) : 0) +
+          '%</b></div>';
+        htmlContent +=
+          '<div style="padding-top:2px;font-size:.72rem;color:#777">Coverage progres rendah (Perlu Atensi): <b>' +
+          (items.length ? Math.round((deptNeedAttention / items.length) * 100) : 0) +
+          '%</b></div>';
         htmlContent += '</div>';
       });
 
     var avgProgress = reports.length ? Math.round(totalProgressValue / reports.length) : 0;
+    var highCoverage = reports.length ? Math.round(((totalDone + totalOnTrack) / reports.length) * 100) : 0;
+    var kendalaCoverage = reports.length ? Math.round((totalKendala / reports.length) * 100) : 0;
     waText +=
       '\ud83d\udcca Total: ' +
       reports.length +
@@ -3094,10 +3173,22 @@ async function _loadReportSummaryForDate(dateVal) {
       totalDone +
       ' done | \u23f3 ' +
       totalProgress +
-      ' progress | \u26a0 ' +
+      ' progress | \ud83d\udfe1 ' +
+      totalOnTrack +
+      ' on track | \ud83d\udd34 ' +
+      totalNeedAttention +
+      ' perlu atensi | \u26a0 ' +
       totalKendala +
-      ' kendala | \ud83d\udcc8 rata-rata ' +
+      ' kendala | \u2705 ' +
+      totalTanpaKendala +
+      ' tanpa kendala | \ud83d\udcc8 rata-rata ' +
       avgProgress +
+      '%\n';
+    waText +=
+      '\ud83d\udcca Coverage: Progres tinggi ' +
+      highCoverage +
+      '% | Report dengan kendala ' +
+      kendalaCoverage +
       '%';
   }
 
@@ -3116,10 +3207,20 @@ async function _loadReportSummaryForDate(dateVal) {
     totalDone +
     ' done | \u23f3 ' +
     totalProgress +
-    ' progress | \u26a0 ' +
+    ' progress | \ud83d\udfe1 ' +
+    totalOnTrack +
+    ' on track | \ud83d\udd34 ' +
+    totalNeedAttention +
+    ' perlu atensi | \u26a0 ' +
     totalKendala +
-    ' kendala | \ud83d\udcc8 rata-rata ' +
+    ' kendala | \u2705 ' +
+    totalTanpaKendala +
+    ' tanpa kendala | \ud83d\udcc8 rata-rata ' +
     (reports.length ? Math.round(totalProgressValue / reports.length) : 0) +
+    '% | coverage progres tinggi ' +
+    (reports.length ? Math.round(((totalDone + totalOnTrack) / reports.length) * 100) : 0) +
+    '% | coverage kendala ' +
+    (reports.length ? Math.round((totalKendala / reports.length) * 100) : 0) +
     '%</div>' +
     '</div>' +
     '<div style="display:flex;gap:8px;align-items:center">' +
