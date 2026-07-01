@@ -2978,6 +2978,8 @@ async function _loadReportSummaryForDate(dateVal) {
   var totalProgress = 0;
   var totalKendala = 0;
   var totalProgressValue = 0;
+  var WA_TEXT_LIMIT = 100;
+  var HTML_TEXT_LIMIT = 180;
 
   if (!reports.length) {
     waText += '\u26a0\ufe0f 0 report hari ini.\n';
@@ -3003,26 +3005,27 @@ async function _loadReportSummaryForDate(dateVal) {
 
         items.forEach(function (r) {
           var nama = (r.targetUserName || r.nama || '-').toUpperCase();
-          var aktivitasRaw = (r.aktivitas || '-').trim();
+          var aktivitasRaw = r.aktivitas ? r.aktivitas.trim() : '-';
           var aktivitasFirst = aktivitasRaw.split('\n')[0].substring(0, 80);
           var prog = r.progress || 0;
           var status = prog >= 100 ? '\u2705' : prog + '%';
           var hasil = (r.hasil || '').trim();
           var kendala = (r.kendala || '').trim();
           var solusi = (r.solusi || '').trim();
-          var aktivitasDisplay = aktivitasRaw.substring(0, 180);
-          var hasilDisplay = hasil.substring(0, 180);
-          var kendalaDisplay = kendala.substring(0, 180);
-          var solusiDisplay = solusi.substring(0, 180);
+          var aktivitasDisplay = aktivitasRaw.substring(0, HTML_TEXT_LIMIT);
+          var hasilDisplay = hasil.substring(0, HTML_TEXT_LIMIT);
+          var kendalaDisplay = kendala.substring(0, HTML_TEXT_LIMIT);
+          var solusiDisplay = solusi.substring(0, HTML_TEXT_LIMIT);
           var progressColor = prog >= 100 ? '#2e7d32' : prog >= 50 ? '#f57f17' : '#c62828';
+          var clampedProgress = Math.min(100, Math.max(0, prog));
 
           // WA text with detail
           waText += '\u2022 ' + nama + '\n';
           waText += '  \ud83d\udcc8 Progress: ' + prog + '%\n';
           waText += '  \ud83d\udccb Aktivitas: ' + aktivitasFirst + '\n';
-          if (hasil) waText += '  \u2714 Hasil: ' + hasil.split('\n')[0].substring(0, 100) + '\n';
-          if (kendala) waText += '  \u26a0 Kendala: ' + kendala.split('\n')[0].substring(0, 100) + '\n';
-          if (solusi) waText += '  \ud83d\udca1 Tindak Lanjut: ' + solusi.split('\n')[0].substring(0, 100) + '\n';
+          if (hasil) waText += '  \u2714 Hasil: ' + hasil.split('\n')[0].substring(0, WA_TEXT_LIMIT) + '\n';
+          if (kendala) waText += '  \u26a0 Kendala: ' + kendala.split('\n')[0].substring(0, WA_TEXT_LIMIT) + '\n';
+          if (solusi) waText += '  \ud83d\udca1 Tindak Lanjut: ' + solusi.split('\n')[0].substring(0, WA_TEXT_LIMIT) + '\n';
 
           // HTML display with detail
           htmlContent +=
@@ -3036,7 +3039,7 @@ async function _loadReportSummaryForDate(dateVal) {
             '</div></div>';
           htmlContent +=
             '<div style="padding-left:16px;font-size:.78rem;margin-top:4px"><div style="height:6px;background:#eee;border-radius:999px;overflow:hidden"><div style="height:100%;width:' +
-            Math.min(100, Math.max(0, prog)) +
+            clampedProgress +
             '%;background:' +
             progressColor +
             '"></div></div><div style="margin-top:4px;color:#333">\ud83d\udccb Aktivitas: ' +
