@@ -2978,6 +2978,7 @@ async function _loadReportSummaryForDate(dateVal) {
   var totalProgress = 0;
   var totalKendala = 0;
   var totalProgressValue = 0;
+  var avgProgress = 0;
   var WA_TEXT_LIMIT = 100;
   var HTML_TEXT_LIMIT = 180;
 
@@ -3089,7 +3090,7 @@ async function _loadReportSummaryForDate(dateVal) {
         htmlContent += '</div>';
       });
 
-    var avgProgress = reports.length ? Math.round(totalProgressValue / reports.length) : 0;
+    avgProgress = reports.length ? Math.round(totalProgressValue / reports.length) : 0;
     waText +=
       '\ud83d\udcca Total: ' +
       reports.length +
@@ -3122,7 +3123,7 @@ async function _loadReportSummaryForDate(dateVal) {
     ' progress | \u26a0 ' +
     totalKendala +
     ' kendala | \ud83d\udcc8 rata-rata ' +
-    (reports.length ? Math.round(totalProgressValue / reports.length) : 0) +
+    avgProgress +
     '%</div>' +
     '</div>' +
     '<div style="display:flex;gap:8px;align-items:center">' +
