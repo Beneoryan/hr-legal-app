@@ -1328,8 +1328,8 @@ async function renderDailyTask() {
     // Head+ sees all divisions
     tabs += '<div class="tab" onclick="filterDailyTasks(\'all-report\')">🏢 Semua Divisi</div>';
   }
-  if (hasAccess(4)) {
-    // Head/BOD can access report summary
+  if (hasAccess(3)) {
+    // Manager/Head/BOD can access report summary
     tabs += '<div class="tab" onclick="navigateTo(\'report-summary\')">📋 Rangkuman Report</div>';
   }
   if (hasAccess(2) && !hasAccess(5)) {
@@ -2902,8 +2902,8 @@ function startReportSummaryScheduler() {
 }
 
 function checkReportSummaryTime() {
-  // Only for Head (level 4) and BOD (level 5)
-  if (!hasAccess(4)) return;
+  // Only for Manager (level 3), Head (level 4) and BOD (level 5)
+  if (!hasAccess(3)) return;
 
   const now = new Date();
   // Skip Sunday (0 = Sunday)
@@ -2998,21 +2998,29 @@ async function _loadReportSummaryForDate(dateVal) {
 
         items.forEach(function (r) {
           var nama = (r.targetUserName || r.nama || '-').toUpperCase();
-          var aktivitas = (r.aktivitas || '').split('\n')[0].substring(0, 60);
+          var aktivitasRaw = (r.aktivitas || '-');
+          var aktivitasFirst = aktivitasRaw.split('\n')[0].substring(0, 80);
           var prog = r.progress || 0;
           var status = prog >= 100 ? '\u2705' : prog + '%';
+          var hasil = (r.hasil || '').trim();
+          var kendala = (r.kendala || '').trim();
+          var solusi = (r.solusi || '').trim();
 
-          waText += '\u2022 ' + nama + ' \u2014 ' + aktivitas + ' ' + status + '\n';
+          // WA text with detail
+          waText += '\u2022 ' + nama + ' — ' + aktivitasFirst + ' ' + status + '\n';
+          if (hasil) waText += '  \u2714 Hasil: ' + hasil.split('\n')[0].substring(0, 80) + '\n';
+          if (kendala) waText += '  \u26a0 Kendala: ' + kendala.split('\n')[0].substring(0, 80) + '\n';
+          if (solusi) waText += '  \ud83d\udca1 Solusi: ' + solusi.split('\n')[0].substring(0, 80) + '\n';
+
+          // HTML display with detail
           htmlContent +=
-            '<div style="padding:6px 0;border-bottom:1px solid #eee;font-size:.85rem">\u2022 <b>' +
-            escHtml(nama) +
-            '</b> \u2014 ' +
-            escHtml(aktivitas) +
-            ' <span style="color:' +
-            (prog >= 100 ? '#2e7d32' : '#f57f17') +
-            '">' +
-            status +
-            '</span></div>';
+            '<div style="padding:8px 0;border-bottom:1px solid #eee;font-size:.85rem">' +
+            '<div>\u2022 <b>' + escHtml(nama) + '</b> — ' + escHtml(aktivitasFirst) +
+            ' <span style="color:' + (prog >= 100 ? '#2e7d32' : '#f57f17') + '">' + status + '</span></div>';
+          if (hasil) htmlContent += '<div style="padding-left:16px;font-size:.78rem;color:#2e7d32;margin-top:2px">\u2714 Hasil: ' + escHtml(hasil.split('\n')[0].substring(0, 100)) + '</div>';
+          if (kendala) htmlContent += '<div style="padding-left:16px;font-size:.78rem;color:#c62828;margin-top:2px">\u26a0 Kendala: ' + escHtml(kendala.split('\n')[0].substring(0, 100)) + '</div>';
+          if (solusi) htmlContent += '<div style="padding-left:16px;font-size:.78rem;color:#e65100;margin-top:2px">\ud83d\udca1 Solusi: ' + escHtml(solusi.split('\n')[0].substring(0, 100)) + '</div>';
+          htmlContent += '</div>';
 
           if (prog >= 100) totalDone++;
           else totalProgress++;
