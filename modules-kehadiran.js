@@ -2976,6 +2976,8 @@ async function _loadReportSummaryForDate(dateVal) {
   var htmlContent = '';
   var totalDone = 0;
   var totalProgress = 0;
+  var totalKendala = 0;
+  var totalProgressValue = 0;
 
   if (!reports.length) {
     waText += '\u26a0\ufe0f 0 report hari ini.\n';
@@ -2986,6 +2988,9 @@ async function _loadReportSummaryForDate(dateVal) {
       .forEach(function (dept) {
         var items = byDept[dept];
         var icon = dept.includes('ACADEMIC') ? '\ud83d\udcda' : '\ud83c\udfe2';
+        var deptDone = 0;
+        var deptProgress = 0;
+        var deptKendala = 0;
         waText += icon + ' ' + dept + ' (' + items.length + ' report)\n';
         htmlContent +=
           '<div class="card mb-8"><div class="fw-700 mb-8">' +
@@ -2998,38 +3003,90 @@ async function _loadReportSummaryForDate(dateVal) {
 
         items.forEach(function (r) {
           var nama = (r.targetUserName || r.nama || '-').toUpperCase();
-          var aktivitasRaw = (r.aktivitas || '-');
+          var aktivitasRaw = (r.aktivitas || '-').trim();
           var aktivitasFirst = aktivitasRaw.split('\n')[0].substring(0, 80);
           var prog = r.progress || 0;
           var status = prog >= 100 ? '\u2705' : prog + '%';
           var hasil = (r.hasil || '').trim();
           var kendala = (r.kendala || '').trim();
           var solusi = (r.solusi || '').trim();
+          var aktivitasDisplay = aktivitasRaw.substring(0, 180);
+          var hasilDisplay = hasil.substring(0, 180);
+          var kendalaDisplay = kendala.substring(0, 180);
+          var solusiDisplay = solusi.substring(0, 180);
+          var progressColor = prog >= 100 ? '#2e7d32' : prog >= 50 ? '#f57f17' : '#c62828';
 
           // WA text with detail
-          waText += '\u2022 ' + nama + ' — ' + aktivitasFirst + ' ' + status + '\n';
-          if (hasil) waText += '  \u2714 Hasil: ' + hasil.split('\n')[0].substring(0, 80) + '\n';
-          if (kendala) waText += '  \u26a0 Kendala: ' + kendala.split('\n')[0].substring(0, 80) + '\n';
-          if (solusi) waText += '  \ud83d\udca1 Solusi: ' + solusi.split('\n')[0].substring(0, 80) + '\n';
+          waText += '\u2022 ' + nama + '\n';
+          waText += '  \ud83d\udcc8 Progress: ' + prog + '%\n';
+          waText += '  \ud83d\udccb Aktivitas: ' + aktivitasFirst + '\n';
+          if (hasil) waText += '  \u2714 Hasil: ' + hasil.split('\n')[0].substring(0, 100) + '\n';
+          if (kendala) waText += '  \u26a0 Kendala: ' + kendala.split('\n')[0].substring(0, 100) + '\n';
+          if (solusi) waText += '  \ud83d\udca1 Tindak Lanjut: ' + solusi.split('\n')[0].substring(0, 100) + '\n';
 
           // HTML display with detail
           htmlContent +=
             '<div style="padding:8px 0;border-bottom:1px solid #eee;font-size:.85rem">' +
-            '<div>\u2022 <b>' + escHtml(nama) + '</b> — ' + escHtml(aktivitasFirst) +
-            ' <span style="color:' + (prog >= 100 ? '#2e7d32' : '#f57f17') + '">' + status + '</span></div>';
-          if (hasil) htmlContent += '<div style="padding-left:16px;font-size:.78rem;color:#2e7d32;margin-top:2px">\u2714 Hasil: ' + escHtml(hasil.split('\n')[0].substring(0, 100)) + '</div>';
-          if (kendala) htmlContent += '<div style="padding-left:16px;font-size:.78rem;color:#c62828;margin-top:2px">\u26a0 Kendala: ' + escHtml(kendala.split('\n')[0].substring(0, 100)) + '</div>';
-          if (solusi) htmlContent += '<div style="padding-left:16px;font-size:.78rem;color:#e65100;margin-top:2px">\ud83d\udca1 Solusi: ' + escHtml(solusi.split('\n')[0].substring(0, 100)) + '</div>';
+            '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap"><div>\u2022 <b>' +
+            escHtml(nama) +
+            '</b></div><div style="font-weight:700;color:' +
+            progressColor +
+            '">' +
+            status +
+            '</div></div>';
+          htmlContent +=
+            '<div style="padding-left:16px;font-size:.78rem;margin-top:4px"><div style="height:6px;background:#eee;border-radius:999px;overflow:hidden"><div style="height:100%;width:' +
+            Math.min(100, Math.max(0, prog)) +
+            '%;background:' +
+            progressColor +
+            '"></div></div><div style="margin-top:4px;color:#333">\ud83d\udccb Aktivitas: ' +
+            escHtml(aktivitasDisplay || '-') +
+            '</div></div>';
+          if (hasil)
+            htmlContent +=
+              '<div style="padding-left:16px;font-size:.78rem;color:#2e7d32;margin-top:2px">\u2714 Hasil: ' +
+              escHtml(hasilDisplay) +
+              '</div>';
+          if (kendala)
+            htmlContent +=
+              '<div style="padding-left:16px;font-size:.78rem;color:#c62828;margin-top:2px">\u26a0 Kendala: ' +
+              escHtml(kendalaDisplay) +
+              '</div>';
+          if (solusi)
+            htmlContent +=
+              '<div style="padding-left:16px;font-size:.78rem;color:#e65100;margin-top:2px">\ud83d\udca1 Tindak Lanjut: ' +
+              escHtml(solusiDisplay) +
+              '</div>';
           htmlContent += '</div>';
 
-          if (prog >= 100) totalDone++;
-          else totalProgress++;
+          if (prog >= 100) {
+            totalDone++;
+            deptDone++;
+          } else {
+            totalProgress++;
+            deptProgress++;
+          }
+          if (kendala) {
+            totalKendala++;
+            deptKendala++;
+          }
+          totalProgressValue += prog;
         });
 
+        waText += '  \ud83d\udcca Dept: \u2705 ' + deptDone + ' | \u23f3 ' + deptProgress + ' | \u26a0 ' + deptKendala + '\n\n';
+        htmlContent +=
+          '<div style="padding-top:8px;font-size:.75rem;color:#666;display:flex;gap:10px;flex-wrap:wrap"><span>\u2705 Done: <b>' +
+          deptDone +
+          '</b></span><span>\u23f3 Progress: <b>' +
+          deptProgress +
+          '</b></span><span>\u26a0 Kendala: <b>' +
+          deptKendala +
+          '</b></span></div>';
         waText += '\n';
         htmlContent += '</div>';
       });
 
+    var avgProgress = reports.length ? Math.round(totalProgressValue / reports.length) : 0;
     waText +=
       '\ud83d\udcca Total: ' +
       reports.length +
@@ -3037,7 +3094,11 @@ async function _loadReportSummaryForDate(dateVal) {
       totalDone +
       ' done | \u23f3 ' +
       totalProgress +
-      ' progress';
+      ' progress | \u26a0 ' +
+      totalKendala +
+      ' kendala | \ud83d\udcc8 rata-rata ' +
+      avgProgress +
+      '%';
   }
 
   var summaryPage =
@@ -3051,7 +3112,15 @@ async function _loadReportSummaryForDate(dateVal) {
     '</div>' +
     '<div class="text-sm" style="color:#666">Total: ' +
     reports.length +
-    ' report</div>' +
+    ' report | \u2705 ' +
+    totalDone +
+    ' done | \u23f3 ' +
+    totalProgress +
+    ' progress | \u26a0 ' +
+    totalKendala +
+    ' kendala | \ud83d\udcc8 rata-rata ' +
+    (reports.length ? Math.round(totalProgressValue / reports.length) : 0) +
+    '%</div>' +
     '</div>' +
     '<div style="display:flex;gap:8px;align-items:center">' +
     '<input type="date" class="form-control" id="summaryDate" value="' +
