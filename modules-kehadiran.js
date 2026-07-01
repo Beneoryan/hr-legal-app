@@ -2981,6 +2981,14 @@ async function _loadReportSummaryForDate(dateVal) {
   var avgProgress = 0;
   var WA_TEXT_LIMIT = 100;
   var HTML_TEXT_LIMIT = 180;
+  var COLOR_DONE = '#2e7d32';
+  var COLOR_IN_PROGRESS = '#f57f17';
+  var COLOR_BLOCKED = '#c62828';
+
+  function truncateWithEllipsis(text, maxLength) {
+    if (!text) return '';
+    return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+  }
 
   if (!reports.length) {
     waText += '\u26a0\ufe0f 0 report hari ini.\n';
@@ -3013,11 +3021,11 @@ async function _loadReportSummaryForDate(dateVal) {
           var hasil = (r.hasil || '').trim();
           var kendala = (r.kendala || '').trim();
           var solusi = (r.solusi || '').trim();
-          var aktivitasDisplay = aktivitasRaw.substring(0, HTML_TEXT_LIMIT);
-          var hasilDisplay = hasil.substring(0, HTML_TEXT_LIMIT);
-          var kendalaDisplay = kendala.substring(0, HTML_TEXT_LIMIT);
-          var solusiDisplay = solusi.substring(0, HTML_TEXT_LIMIT);
-          var progressColor = prog >= 100 ? '#2e7d32' : prog >= 50 ? '#f57f17' : '#c62828';
+          var aktivitasDisplay = truncateWithEllipsis(aktivitasRaw, HTML_TEXT_LIMIT);
+          var hasilDisplay = truncateWithEllipsis(hasil, HTML_TEXT_LIMIT);
+          var kendalaDisplay = truncateWithEllipsis(kendala, HTML_TEXT_LIMIT);
+          var solusiDisplay = truncateWithEllipsis(solusi, HTML_TEXT_LIMIT);
+          var progressColor = prog >= 100 ? COLOR_DONE : prog >= 50 ? COLOR_IN_PROGRESS : COLOR_BLOCKED;
           var clampedProgress = Math.min(100, Math.max(0, prog));
 
           // WA text with detail
