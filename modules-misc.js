@@ -1,4 +1,25 @@
 'use strict';
+// ── LAPORAN KEUANGAN ──────────────────────────────────────────
+function renderLaporanKeuangan() {
+  const main = document.getElementById('mainContent');
+  main.innerHTML = `<div class="page-title"><span>📊 Laporan Keuangan</span></div>
+    <div class="card" style="border-left:4px solid #2e7d32">
+      <div class="card-title mb-12">💰 Portal Laporan Keuangan IJEF</div>
+      <p class="text-sm mb-16" style="color:#666;line-height:1.6">Akses portal laporan keuangan perusahaan. Data keuangan terintegrasi langsung dengan akun Anda.</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+        <a href="https://laporankeuanganijef.netlify.app/" target="_blank" class="btn btn-sm" style="background:#2e7d32;color:#fff;text-decoration:none;display:inline-flex;align-items:center;gap:6px;padding:10px 20px;font-size:.9rem">📊 Buka Laporan Keuangan</a>
+      </div>
+      <div style="margin-top:20px;padding:14px;background:#f0f7f0;border-radius:8px">
+        <div class="fw-700 mb-8" style="font-size:.85rem">ℹ️ Informasi</div>
+        <div class="text-xs" style="line-height:1.8;color:#555">
+          • Portal ini menampilkan data laporan keuangan perusahaan secara real-time<br>
+          • Akses menggunakan kredensial yang sama dengan akun IMS Anda<br>
+          • Data bersifat rahasia — hanya bisa diakses oleh user yang berwenang
+        </div>
+      </div>
+    </div>`;
+}
+
 // ── KPI ───────────────────────────────────────────────────────
 async function renderKPI() {
   const main = document.getElementById('mainContent');

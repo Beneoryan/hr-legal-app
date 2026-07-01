@@ -60,7 +60,7 @@ async function renderPortal() {
       <button class="btn btn-sm" style="background:#c62828;color:#fff" onclick="navigateTo('notifikasi')">🔔 Notifikasi</button>
     </div>
   </div>
-  ${['muhammad agus ryanda', 'siti sofuroh', 'irsan janwar wibawa'].includes((u.nama || '').toLowerCase()) ? '<div class="card" style="border-left:4px solid #2e7d32"><div class="card-title mb-8">💰 Keuangan</div><a href="https://laporankeuanganijef.netlify.app/" target="_blank" class="btn btn-sm" style="background:#2e7d32;color:#fff;text-decoration:none;display:inline-flex;align-items:center;gap:6px">📊 Laporan Keuangan IJEF</a><p class="text-xs mt-8" style="color:#999">Klik untuk membuka portal laporan keuangan</p></div>' : ''}
+  ${['muhammad agus ryanda', 'siti sofuroh', 'irsan janwar wibawa', 'misriana'].includes((u.nama || '').toLowerCase()) ? '<div class="card" style="border-left:4px solid #2e7d32"><div class="card-title mb-8">💰 Keuangan</div><a href="https://laporankeuanganijef.netlify.app/" target="_blank" class="btn btn-sm" style="background:#2e7d32;color:#fff;text-decoration:none;display:inline-flex;align-items:center;gap:6px">📊 Laporan Keuangan IJEF</a><p class="text-xs mt-8" style="color:#999">Klik untuk membuka portal laporan keuangan</p></div>' : ''}
   <div class="card"><div class="card-title">📲 Download / Install Aplikasi</div><p class="text-sm mb-8" style="color:#666">Install aplikasi ini di perangkat Anda untuk akses lebih cepat.</p>${renderDownloadAppSection()}</div>`;
   // Load data (using .where() queries to only fetch current user's data for privacy)
   let absenCount = 0,

@@ -433,18 +433,30 @@ function buildNavItems(isPortalUser) {
     ['penalty', '⚠️', 'Penalty Point'],
     ['daily-task', '📋', 'Daily Task'],
   ]);
+  const _lkSidebarUsers = ['muhammad agus ryanda', 'siti sofuroh', 'irsan janwar wibawa', 'misriana'];
+  const _showLaporanKeuangan = _lkSidebarUsers.includes((currentUser.nama || '').toLowerCase());
   nav += navGroup(
     '💰 Keuangan',
     currentUser.role === 'bod'
-      ? [['penggajian', '💰', 'Penggajian']]
-      : [
-          ['penggajian', '💰', 'Penggajian'],
-          ['tax-calc', '🧮', 'Tax & BPJS'],
-          ['insentif', '🏆', 'Insentif'],
-          ['reimbursement', '🧾', 'Reimbursement'],
-          ['kasbon', '💳', 'Kasbon & Loan'],
-          ['tunjangan', '🎁', 'Tunjangan'],
-        ]
+      ? [['penggajian', '💰', 'Penggajian'], ['laporan-keuangan', '📊', 'Laporan Keuangan']]
+      : _showLaporanKeuangan
+        ? [
+            ['penggajian', '💰', 'Penggajian'],
+            ['tax-calc', '🧮', 'Tax & BPJS'],
+            ['insentif', '🏆', 'Insentif'],
+            ['reimbursement', '🧾', 'Reimbursement'],
+            ['kasbon', '💳', 'Kasbon & Loan'],
+            ['tunjangan', '🎁', 'Tunjangan'],
+            ['laporan-keuangan', '📊', 'Laporan Keuangan'],
+          ]
+        : [
+            ['penggajian', '💰', 'Penggajian'],
+            ['tax-calc', '🧮', 'Tax & BPJS'],
+            ['insentif', '🏆', 'Insentif'],
+            ['reimbursement', '🧾', 'Reimbursement'],
+            ['kasbon', '💳', 'Kasbon & Loan'],
+            ['tunjangan', '🎁', 'Tunjangan'],
+          ]
   );
   nav += navGroup('📈 Kinerja', [
     ['kpi', '📈', 'KPI & Penilaian'],
@@ -543,6 +555,7 @@ function navigateTo(page) {
     'hari-libur': renderHariLibur,
     penalty: renderPenalty,
     penggajian: renderPenggajian,
+    'laporan-keuangan': renderLaporanKeuangan,
     'tax-calc': renderTaxCalc,
     insentif: renderInsentif,
     'system-admin': renderSystemAdmin,
