@@ -348,6 +348,8 @@ function renderApp() {
   autoLoadHariLiburNasional().catch(() => {});
   // Start task reminder checker
   if (typeof startTaskReminderCheck === 'function') startTaskReminderCheck();
+  // Start report summary scheduler (for Head/BOD)
+  if (typeof startReportSummaryScheduler === 'function') startReportSummaryScheduler();
 }
 
 function buildNavItems(isPortalUser) {
@@ -604,6 +606,7 @@ function navigateTo(page) {
     'test-kesehatan': renderTestKesehatan,
     'portal-test-kesehatan': renderPortalTestKesehatan,
     'daily-task': renderDailyTask,
+    'report-summary': renderReportSummary,
     panduan: renderPanduan,
   };
   const fn = routes[page];

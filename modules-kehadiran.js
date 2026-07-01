@@ -1328,6 +1328,10 @@ async function renderDailyTask() {
     // Head+ sees all divisions
     tabs += '<div class="tab" onclick="filterDailyTasks(\'all-report\')">🏢 Semua Divisi</div>';
   }
+  if (hasAccess(4)) {
+    // Head/BOD can access report summary
+    tabs += '<div class="tab" onclick="navigateTo(\'report-summary\')">📋 Rangkuman Report</div>';
+  }
   if (hasAccess(2) && !hasAccess(5)) {
     // Leader/Manager/Head can assign tasks
     tabs += '<div class="tab" onclick="filterDailyTasks(\'assigned\')">📋 Ditugaskan</div>';
@@ -2885,6 +2889,193 @@ function startTaskReminderCheck() {
   // Check immediately then every 2 minutes
   checkTaskReminders();
   _reminderCheckInterval = setInterval(checkTaskReminders, 2 * 60 * 1000);
+}
+
+// ── DAILY REPORT AUTO-SUMMARY & WA SHARE ──────────────────────
+let _reportSummaryInterval = null;
+
+function startReportSummaryScheduler() {
+  if (_reportSummaryInterval) clearInterval(_reportSummaryInterval);
+  // Check immediately then every minute
+  checkReportSummaryTime();
+  _reportSummaryInterval = setInterval(checkReportSummaryTime, 60 * 1000);
+}
+
+function checkReportSummaryTime() {
+  // Only for Head (level 4) and BOD (level 5)
+  if (!hasAccess(4)) return;
+
+  const now = new Date();
+  // Skip Sunday (0 = Sunday)
+  if (now.getDay() === 0) return;
+
+  const hour = now.getHours();
+  const minute = now.getMinutes();
+
+  // Trigger at 20:00 (8 PM) WIB - check within first minute
+  if (hour === 20 && minute === 0) {
+    const todayKey = 'report_summary_sent_' + todayStr();
+    if (!localStorage.getItem(todayKey)) {
+      localStorage.setItem(todayKey, '1');
+      generateAndNotifyReportSummary();
+    }
+  }
+}
+
+async function generateAndNotifyReportSummary() {
+  // Send notification to current user (Head/BOD)
+  await sendNotification(
+    currentUser.id,
+    '\ud83d\udccb Rangkuman Daily Report',
+    'Rangkuman report hari ini siap di-share via WhatsApp',
+    'report-summary'
+  );
+  toast('\ud83d\udccb Rangkuman Daily Report siap! Klik notifikasi untuk share.', 'info');
+}
+
+async function renderReportSummary() {
+  const main = document.getElementById('mainContent');
+  main.innerHTML =
+    '<div class="page-title"><span>\ud83d\udccb Rangkuman Daily Report</span></div><div id="reportSummaryContent"><div class="loading-spinner"></div> Loading...</div>';
+
+  const today = todayStr();
+  await _loadReportSummaryForDate(today);
+}
+
+async function _loadReportSummaryForDate(dateVal) {
+  const container = document.getElementById('reportSummaryContent');
+  if (!container) return;
+  container.innerHTML = '<div class="loading-spinner"></div> Loading...';
+
+  const snap = await db.collection('hrd_daily_tasks').get();
+
+  // Filter reports for selected date
+  const reports = [];
+  snap.forEach(function (d) {
+    var t = d.data();
+    if (t.type === 'report' && t.tanggal === dateVal) {
+      reports.push(t);
+    }
+  });
+
+  // Group by department
+  var byDept = {};
+  reports.forEach(function (r) {
+    var dept = r.departemen || 'LAINNYA';
+    if (!byDept[dept]) byDept[dept] = [];
+    byDept[dept].push(r);
+  });
+
+  // Build display + WA text
+  var dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  var dObj = new Date(dateVal + 'T00:00:00');
+  var dayName = dayNames[dObj.getDay()];
+  var dateStr = dObj.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+
+  var waText = '\ud83d\udccb REPORT HARIAN IJEF\n\ud83d\udcc5 ' + dayName + ', ' + dateStr + '\n\n';
+  var htmlContent = '';
+  var totalDone = 0;
+  var totalProgress = 0;
+
+  if (!reports.length) {
+    waText += '\u26a0\ufe0f 0 report hari ini.\n';
+    htmlContent = '<div class="card"><p>\u26a0\ufe0f Tidak ada report masuk pada tanggal ini.</p></div>';
+  } else {
+    Object.keys(byDept)
+      .sort()
+      .forEach(function (dept) {
+        var items = byDept[dept];
+        var icon = dept.includes('ACADEMIC') ? '\ud83d\udcda' : '\ud83c\udfe2';
+        waText += icon + ' ' + dept + ' (' + items.length + ' report)\n';
+        htmlContent +=
+          '<div class="card mb-8"><div class="fw-700 mb-8">' +
+          icon +
+          ' ' +
+          escHtml(dept) +
+          ' (' +
+          items.length +
+          ')</div>';
+
+        items.forEach(function (r) {
+          var nama = (r.targetUserName || r.nama || '-').toUpperCase();
+          var aktivitas = (r.aktivitas || '').split('\n')[0].substring(0, 60);
+          var prog = r.progress || 0;
+          var status = prog >= 100 ? '\u2705' : prog + '%';
+
+          waText += '\u2022 ' + nama + ' \u2014 ' + aktivitas + ' ' + status + '\n';
+          htmlContent +=
+            '<div style="padding:6px 0;border-bottom:1px solid #eee;font-size:.85rem">\u2022 <b>' +
+            escHtml(nama) +
+            '</b> \u2014 ' +
+            escHtml(aktivitas) +
+            ' <span style="color:' +
+            (prog >= 100 ? '#2e7d32' : '#f57f17') +
+            '">' +
+            status +
+            '</span></div>';
+
+          if (prog >= 100) totalDone++;
+          else totalProgress++;
+        });
+
+        waText += '\n';
+        htmlContent += '</div>';
+      });
+
+    waText +=
+      '\ud83d\udcca Total: ' +
+      reports.length +
+      ' report | \u2705 ' +
+      totalDone +
+      ' done | \u23f3 ' +
+      totalProgress +
+      ' progress';
+  }
+
+  var summaryPage =
+    '<div class="card mb-16">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">' +
+    '<div>' +
+    '<div class="fw-700" style="font-size:1.1rem">\ud83d\udccb Rangkuman ' +
+    dayName +
+    ', ' +
+    dateStr +
+    '</div>' +
+    '<div class="text-sm" style="color:#666">Total: ' +
+    reports.length +
+    ' report</div>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px;align-items:center">' +
+    '<input type="date" class="form-control" id="summaryDate" value="' +
+    dateVal +
+    '" onchange="loadReportSummaryByDate(this.value)" style="max-width:160px">' +
+    '<button class="btn btn-sm" style="background:#25D366;color:#fff" onclick="shareReportWA()">\ud83d\udce4 Share WA</button>' +
+    '</div>' +
+    '</div>' +
+    '</div>' +
+    htmlContent +
+    '<textarea id="waShareText" style="display:none">' +
+    escHtml(waText) +
+    '</textarea>';
+
+  container.innerHTML = summaryPage;
+  // Store raw waText for sharing (textarea has escaped HTML, we need raw)
+  container.setAttribute('data-wa-text', waText);
+}
+
+function shareReportWA() {
+  var container = document.getElementById('reportSummaryContent');
+  var text = container ? container.getAttribute('data-wa-text') : '';
+  if (!text) {
+    toast('Tidak ada data untuk di-share', 'warning');
+    return;
+  }
+  window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+}
+
+async function loadReportSummaryByDate(dateVal) {
+  if (!dateVal) return;
+  await _loadReportSummaryForDate(dateVal);
 }
 
 // ── DAILY REPORT ──────────────────────────────────────────────
