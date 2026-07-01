@@ -1103,7 +1103,7 @@ function parseCsvRows(text) {
 // ── STRUKTUR ORG ──────────────────────────────────────────────
 async function renderStrukturOrg() {
   const main = document.getElementById('mainContent');
-  main.innerHTML = `<div class="page-title"><span>🌳 Struktur Organisasi</span></div><div class="card" id="orgChart" style="overflow-x:auto;padding:30px 20px">Loading...</div>`;
+  main.innerHTML = `<div class="page-title"><span>🌳 Struktur Organisasi</span></div><div class="card" id="orgChart" style="padding:clamp(12px,2.4vw,30px) clamp(8px,2vw,20px)">Loading...</div>`;
   const snap = await db.collection('hrd_karyawan').where('status', '!=', 'nonaktif').get();
   const karyawan = [];
   snap.forEach((d) => karyawan.push({ id: d.id, ...d.data() }));
@@ -1130,19 +1130,29 @@ async function renderStrukturOrg() {
   );
 
   let html = `<style>
-.org{text-align:center;min-width:900px}
-.org h2{font-size:1.2rem;font-weight:700;color:var(--accent);margin:0}.org .sub{font-size:.8rem;color:#666;margin-bottom:24px}
-.org .box{border:2px solid var(--accent);border-radius:10px;padding:10px 14px;display:inline-block;text-align:center;background:#fff;min-width:110px;box-shadow:0 2px 8px rgba(198,40,40,.08);margin:4px;vertical-align:top}
-.org .box .n{font-weight:700;font-size:.7rem;color:#1a1a1a}.org .box .p{font-size:.58rem;color:#666;margin-top:2px;text-transform:uppercase}
-.org .sbox{border:1.5px solid #ddd;border-radius:8px;padding:8px 10px;display:inline-block;text-align:center;background:#fff;min-width:90px;margin:4px;vertical-align:top}
-.org .sbox .n{font-weight:600;font-size:.65rem;color:#333}.org .sbox .p{font-size:.55rem;color:#888;margin-top:1px}
-.org .line-v{width:2px;height:24px;background:var(--accent);margin:0 auto}
-.org .line-h{height:2px;background:var(--accent);margin:0 auto}
-.org .level{display:flex;justify-content:center;align-items:flex-start;flex-wrap:wrap;gap:6px;position:relative;padding-top:16px}
-.org .level::before{content:'';position:absolute;top:0;left:20%;right:20%;height:2px;background:var(--accent)}
-.org .node{display:inline-flex;flex-direction:column;align-items:center}
-.org .node::before{content:'';width:2px;height:16px;background:var(--accent);display:block}
-.org .sub-level{display:flex;justify-content:center;gap:4px;margin-top:8px;padding-top:8px;border-top:1.5px solid #ddd}
+.org{text-align:center;width:100%;max-width:100%}
+.org h2{font-size:clamp(1rem,2.4vw,1.2rem);font-weight:700;color:var(--accent);margin:0}
+.org .sub{font-size:clamp(.68rem,1.9vw,.8rem);color:#666;margin-bottom:18px}
+.org .box,.org .sbox{display:inline-flex;flex-direction:column;align-items:center;text-align:center;background:#fff;margin:4px;vertical-align:top;max-width:100%}
+.org .box{border:2px solid var(--accent);border-radius:10px;padding:10px 12px;min-width:clamp(110px,20vw,150px);box-shadow:0 2px 8px rgba(198,40,40,.08)}
+.org .box .n{font-weight:700;font-size:clamp(.62rem,1.7vw,.74rem);color:#1a1a1a}
+.org .box .p{font-size:clamp(.52rem,1.4vw,.6rem);color:#666;margin-top:2px;text-transform:uppercase;line-height:1.3}
+.org .sbox{border:1.5px solid #ddd;border-radius:8px;padding:8px 10px;min-width:clamp(92px,18vw,130px)}
+.org .sbox .n{font-weight:600;font-size:clamp(.58rem,1.6vw,.66rem);color:#333}
+.org .sbox .p{font-size:clamp(.5rem,1.3vw,.56rem);color:#888;margin-top:1px;line-height:1.3}
+.org .line-v{width:2px;height:20px;background:var(--accent);margin:0 auto}
+.org .line-h{height:2px;background:var(--accent);margin:0 auto;max-width:100%}
+.org .level{display:flex;justify-content:center;align-items:flex-start;flex-wrap:wrap;gap:6px;position:relative;padding-top:14px}
+.org .level::before{content:'';position:absolute;top:0;left:8%;right:8%;height:2px;background:var(--accent)}
+.org .node{display:inline-flex;flex-direction:column;align-items:center;max-width:100%}
+.org .node::before{content:'';width:2px;height:14px;background:var(--accent);display:block}
+.org .sub-level{display:flex;justify-content:center;gap:4px;margin-top:8px;padding-top:8px;border-top:1.5px solid #ddd;flex-wrap:wrap;max-width:100%}
+@media (max-width: 768px){
+  .org .line-v{height:14px}
+  .org .level{padding-top:10px;gap:2px}
+  .org .level::before{left:2%;right:2%}
+  .org .sub-level{gap:2px;padding-top:6px;margin-top:6px}
+}
 </style><div class="org"><h2>STRUKTUR ORGANISASI</h2><div class="sub">LPK IJEF CORP — IMS</div>`;
 
   // Row 1: Founders
@@ -1807,15 +1817,19 @@ function filterJobdeskList() {
     h = '<tr><td colspan="6" class="text-center">Tidak ada data karyawan</td></tr>';
   else
     filtered.forEach((k) => {
-      const actionBtn = isBOD
-        ? `<button class="btn btn-xs btn-info" onclick="modalJobdesk('${k.id}','${escHtml(k.nama)}','${escHtml(k.posisi || '')}')">👁️ Lihat</button>`
-        : `<button class="btn btn-xs btn-info" onclick="modalJobdesk('${k.id}','${escHtml(k.nama)}','${escHtml(k.posisi || '')}')">${k.hasJobdesk ? '✏️ Edit' : '+ Atur'}</button>`;
+      const viewBtn = k.hasJobdesk
+        ? `<button class="btn btn-xs btn-info" onclick="modalJobdesk('${k.id}','${escHtml(k.nama)}','${escHtml(k.posisi || '')}',true)">👁️ View</button>`
+        : '';
+      const manageBtn = isBOD
+        ? ''
+        : `<button class="btn btn-xs btn-${k.hasJobdesk ? 'warning' : 'success'}" onclick="modalJobdesk('${k.id}','${escHtml(k.nama)}','${escHtml(k.posisi || '')}')">${k.hasJobdesk ? '✏️ Edit' : '+ Atur'}</button>`;
+      const actionBtn = `<div class="flex gap-6 flex-wrap">${viewBtn}${manageBtn || (!viewBtn ? '<span class="text-xs" style="color:#888">-</span>' : '')}</div>`;
       h += `<tr><td class="text-xs">${escHtml(k.nip || '-')}</td><td class="fw-700">${escHtml(k.nama)}</td><td>${escHtml(k.departemen || '-')}</td><td>${escHtml(k.posisi || '-')}</td><td><span class="badge badge-${k.hasJobdesk ? 'success' : 'warning'}">${k.hasJobdesk ? '✅ Sudah' : '⚠️ Belum'}</span></td><td>${actionBtn}</td></tr>`;
     });
   document.getElementById('tblJobdesk').innerHTML = h;
 }
 
-async function modalJobdesk(karyawanId, nama, posisi) {
+async function modalJobdesk(karyawanId, nama, posisi, readOnly = false) {
   // Load existing jobdesk by karyawanId
   const snap = await db.collection('hrd_jobdesk').where('karyawanId', '==', karyawanId).get();
   let p = {},
@@ -1833,7 +1847,7 @@ async function modalJobdesk(karyawanId, nama, posisi) {
   }
 
   const isBOD = currentUser.role === 'bod';
-  const uploadSection = !isBOD
+  const uploadSection = !isBOD && !readOnly
     ? `<div style="background:#e8f5e9;padding:12px 14px;border-radius:8px;margin-bottom:16px">
     <div class="text-xs fw-700 mb-8">📄 Upload Dokumen Jobdesk</div>
     <p class="text-xs" style="color:#555;margin-bottom:8px">Upload file (.txt, .pdf, .docx) untuk otomatis mengisi form. Sistem akan membaca isi dokumen dan mengkonversi menjadi jobdesk.</p>
@@ -1843,19 +1857,19 @@ async function modalJobdesk(karyawanId, nama, posisi) {
   </div>`
     : '';
 
-  const syncKpiSection = !isBOD
+  const syncKpiSection = !isBOD && !readOnly
     ? `<button class="btn btn-warning btn-sm" onclick="sinkronJobdeskKPI('${karyawanId}','${escHtml(nama)}')">🔄 Sinkronisasi KPI</button>`
     : '';
 
   openModal(
-    `<div class="modal-title">📋 Jobdesk: ${escHtml(nama)}</div>
+    `<div class="modal-title">📋 ${readOnly ? 'View Jobdesk' : 'Jobdesk'}: ${escHtml(nama)}</div>
     <div style="background:#f0f4ff;padding:10px 14px;border-radius:8px;margin-bottom:16px"><div class="text-xs"><b>Posisi:</b> ${escHtml(posisi || '-')}</div></div>
     ${uploadSection}
-    <div class="form-group"><label>Deskripsi Pekerjaan</label><textarea class="form-control" id="jdDesc" style="min-height:100px" placeholder="Deskripsi umum posisi dan pekerjaan...">${escHtml(p.deskripsi || '')}</textarea></div>
-    <div class="form-group"><label>Tanggung Jawab (per baris)</label><textarea class="form-control" id="jdTanggung" style="min-height:120px" placeholder="Mengelola data karyawan\nMembuat laporan bulanan\nKoordinasi dengan tim">${escHtml(p.tanggungJawab || '')}</textarea></div>
-    <div class="form-group"><label>Kualifikasi (per baris)</label><textarea class="form-control" id="jdKualifikasi" style="min-height:80px" placeholder="Min. S1 Manajemen\nPengalaman 2 tahun\nMenguasai MS Office">${escHtml(p.kualifikasi || '')}</textarea></div>
-    <div class="form-group"><label>Target KPI</label><textarea class="form-control" id="jdKPI" style="min-height:100px" placeholder="Target yang harus dicapai...\nContoh:\n- Menyelesaikan 90% tugas tepat waktu\n- Kehadiran minimal 95%">${escHtml(p.kpi || '')}</textarea></div>
-    <div class="flex gap-8 flex-wrap"><button class="btn btn-primary" onclick="simpanJobdesk('${karyawanId}','${docId || ''}')">💾 Simpan Jobdesk</button>${syncKpiSection}${docId ? `<button class="btn btn-danger" onclick="hapusDoc('hrd_jobdesk','${docId}','jobdesk-mgmt')">🗑️ Hapus</button>` : ''}</div>`,
+    <div class="form-group"><label>Deskripsi Pekerjaan</label><textarea class="form-control" id="jdDesc" style="min-height:100px" placeholder="Deskripsi umum posisi dan pekerjaan..." ${readOnly ? 'readonly' : ''}>${escHtml(p.deskripsi || '')}</textarea></div>
+    <div class="form-group"><label>Tanggung Jawab (per baris)</label><textarea class="form-control" id="jdTanggung" style="min-height:120px" placeholder="Mengelola data karyawan\nMembuat laporan bulanan\nKoordinasi dengan tim" ${readOnly ? 'readonly' : ''}>${escHtml(p.tanggungJawab || '')}</textarea></div>
+    <div class="form-group"><label>Kualifikasi (per baris)</label><textarea class="form-control" id="jdKualifikasi" style="min-height:80px" placeholder="Min. S1 Manajemen\nPengalaman 2 tahun\nMenguasai MS Office" ${readOnly ? 'readonly' : ''}>${escHtml(p.kualifikasi || '')}</textarea></div>
+    <div class="form-group"><label>Target KPI</label><textarea class="form-control" id="jdKPI" style="min-height:100px" placeholder="Target yang harus dicapai...\nContoh:\n- Menyelesaikan 90% tugas tepat waktu\n- Kehadiran minimal 95%" ${readOnly ? 'readonly' : ''}>${escHtml(p.kpi || '')}</textarea></div>
+    <div class="flex gap-8 flex-wrap">${readOnly ? '<button class="btn btn-outline" onclick="closeModalDirect()">Tutup</button>' : `<button class="btn btn-primary" onclick="simpanJobdesk('${karyawanId}','${docId || ''}')">💾 Simpan Jobdesk</button>${syncKpiSection}${docId ? `<button class="btn btn-danger" onclick="hapusDoc('hrd_jobdesk','${docId}','jobdesk-mgmt')">🗑️ Hapus</button>` : ''}`}</div>`,
     true
   );
 }
