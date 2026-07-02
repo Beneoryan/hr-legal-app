@@ -260,7 +260,10 @@ async function viewCutiDetail(id) {
   if (isPending) {
     const approver = getApproverForItem(flows, p.nama, p.approvalStep);
     if (approver) {
-      pendingRow = '<tr><td class="fw-700" style="padding:6px 8px;color:#1565c0">\u23F3 Pending di</td><td style="padding:6px 8px;color:#1565c0;font-weight:700">' + escHtml(approver) + '</td></tr>';
+      pendingRow =
+        '<tr><td class="fw-700" style="padding:6px 8px;color:#1565c0">\u23F3 Pending di</td><td style="padding:6px 8px;color:#1565c0;font-weight:700">' +
+        escHtml(approver) +
+        '</td></tr>';
     }
   }
   openModal(`<div class="modal-title">Detail Cuti/Izin</div>
@@ -2689,16 +2692,34 @@ function stopCamera() {
 }
 
 // ── EVIDEN ZOOM VIEWER ─────────────────────────────────────────
-var _zoomState = { scale: 1, posX: 0, posY: 0, isDragging: false, startX: 0, startY: 0, lastPosX: 0, lastPosY: 0 };
+var _zoomState = {
+  scale: 1,
+  posX: 0,
+  posY: 0,
+  isDragging: false,
+  startX: 0,
+  startY: 0,
+  lastPosX: 0,
+  lastPosY: 0,
+};
 
 function initEvidenZoom() {
-  _zoomState = { scale: 1, posX: 0, posY: 0, isDragging: false, startX: 0, startY: 0, lastPosX: 0, lastPosY: 0 };
+  _zoomState = {
+    scale: 1,
+    posX: 0,
+    posY: 0,
+    isDragging: false,
+    startX: 0,
+    startY: 0,
+    lastPosX: 0,
+    lastPosY: 0,
+  };
   const container = document.getElementById('zoomContainer');
   const img = document.getElementById('zoomImage');
   if (!container || !img) return;
 
   // Wait for image to load then fit
-  img.onload = function() {
+  img.onload = function () {
     evidenZoomFit();
   };
   // If already loaded (cached)
@@ -2707,16 +2728,20 @@ function initEvidenZoom() {
   }
 
   // Mouse wheel zoom
-  container.addEventListener('wheel', function(e) {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.15 : 0.15;
-    const newScale = Math.min(5, Math.max(0.2, _zoomState.scale + delta));
-    _zoomState.scale = newScale;
-    updateZoomTransform();
-  }, { passive: false });
+  container.addEventListener(
+    'wheel',
+    function (e) {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.15 : 0.15;
+      const newScale = Math.min(5, Math.max(0.2, _zoomState.scale + delta));
+      _zoomState.scale = newScale;
+      updateZoomTransform();
+    },
+    { passive: false }
+  );
 
   // Mouse drag
-  container.addEventListener('mousedown', function(e) {
+  container.addEventListener('mousedown', function (e) {
     e.preventDefault();
     _zoomState.isDragging = true;
     _zoomState.startX = e.clientX - _zoomState.posX;
@@ -2728,42 +2753,50 @@ function initEvidenZoom() {
 
   // Touch support (pinch-to-zoom + drag)
   var lastTouchDist = 0;
-  container.addEventListener('touchstart', function(e) {
-    if (e.touches.length === 1) {
-      _zoomState.isDragging = true;
-      _zoomState.startX = e.touches[0].clientX - _zoomState.posX;
-      _zoomState.startY = e.touches[0].clientY - _zoomState.posY;
-      img.classList.add('no-transition');
-    } else if (e.touches.length === 2) {
-      lastTouchDist = getTouchDist(e.touches);
-    }
-  }, { passive: true });
-
-  container.addEventListener('touchmove', function(e) {
-    e.preventDefault();
-    if (e.touches.length === 1 && _zoomState.isDragging) {
-      _zoomState.posX = e.touches[0].clientX - _zoomState.startX;
-      _zoomState.posY = e.touches[0].clientY - _zoomState.startY;
-      updateZoomTransform();
-    } else if (e.touches.length === 2) {
-      const dist = getTouchDist(e.touches);
-      if (lastTouchDist > 0) {
-        const pinchDelta = (dist - lastTouchDist) * 0.008;
-        _zoomState.scale = Math.min(5, Math.max(0.2, _zoomState.scale + pinchDelta));
-        updateZoomTransform();
+  container.addEventListener(
+    'touchstart',
+    function (e) {
+      if (e.touches.length === 1) {
+        _zoomState.isDragging = true;
+        _zoomState.startX = e.touches[0].clientX - _zoomState.posX;
+        _zoomState.startY = e.touches[0].clientY - _zoomState.posY;
+        img.classList.add('no-transition');
+      } else if (e.touches.length === 2) {
+        lastTouchDist = getTouchDist(e.touches);
       }
-      lastTouchDist = dist;
-    }
-  }, { passive: false });
+    },
+    { passive: true }
+  );
 
-  container.addEventListener('touchend', function(e) {
+  container.addEventListener(
+    'touchmove',
+    function (e) {
+      e.preventDefault();
+      if (e.touches.length === 1 && _zoomState.isDragging) {
+        _zoomState.posX = e.touches[0].clientX - _zoomState.startX;
+        _zoomState.posY = e.touches[0].clientY - _zoomState.startY;
+        updateZoomTransform();
+      } else if (e.touches.length === 2) {
+        const dist = getTouchDist(e.touches);
+        if (lastTouchDist > 0) {
+          const pinchDelta = (dist - lastTouchDist) * 0.008;
+          _zoomState.scale = Math.min(5, Math.max(0.2, _zoomState.scale + pinchDelta));
+          updateZoomTransform();
+        }
+        lastTouchDist = dist;
+      }
+    },
+    { passive: false }
+  );
+
+  container.addEventListener('touchend', function (e) {
     _zoomState.isDragging = false;
     lastTouchDist = 0;
     img.classList.remove('no-transition');
   });
 
   // Double click/tap to reset
-  container.addEventListener('dblclick', function() {
+  container.addEventListener('dblclick', function () {
     evidenZoomReset();
   });
 }
@@ -2791,7 +2824,14 @@ function updateZoomTransform() {
   var img = document.getElementById('zoomImage');
   var levelText = document.getElementById('zoomLevelText');
   if (img) {
-    img.style.transform = 'translate(calc(-50% + ' + _zoomState.posX + 'px), calc(-50% + ' + _zoomState.posY + 'px)) scale(' + _zoomState.scale + ')';
+    img.style.transform =
+      'translate(calc(-50% + ' +
+      _zoomState.posX +
+      'px), calc(-50% + ' +
+      _zoomState.posY +
+      'px)) scale(' +
+      _zoomState.scale +
+      ')';
   }
   if (levelText) {
     levelText.textContent = Math.round(_zoomState.scale * 100) + '%';
@@ -2970,7 +3010,11 @@ async function _loadReportSummaryForDate(dateVal) {
   var dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
   var dObj = new Date(dateVal + 'T00:00:00');
   var dayName = dayNames[dObj.getDay()];
-  var dateStr = dObj.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+  var dateStr = dObj.toLocaleDateString('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
 
   var waText = '\ud83d\udccb REPORT HARIAN IJEF\n\ud83d\udcc5 ' + dayName + ', ' + dateStr + '\n\n';
   var htmlContent = '';
@@ -2984,7 +3028,8 @@ async function _loadReportSummaryForDate(dateVal) {
 
   if (!reports.length) {
     waText += '\u26a0\ufe0f 0 report hari ini.\n';
-    htmlContent = '<div class="card"><p>\u26a0\ufe0f Tidak ada report masuk pada tanggal ini.</p></div>';
+    htmlContent =
+      '<div class="card"><p>\u26a0\ufe0f Tidak ada report masuk pada tanggal ini.</p></div>';
   } else {
     Object.keys(byDept)
       .sort()
@@ -3030,8 +3075,11 @@ async function _loadReportSummaryForDate(dateVal) {
           waText += '  \ud83d\udcc8 Progress: ' + prog + '%\n';
           waText += '  \ud83d\udccb Aktivitas: ' + aktivitasFirst + '\n';
           if (hasil) waText += '  \u2714 Hasil: ' + hasil.split('\n')[0].substring(0, 100) + '\n';
-          if (kendala) waText += '  \u26a0 Kendala: ' + kendala.split('\n')[0].substring(0, 100) + '\n';
-          if (solusi) waText += '  \ud83d\udca1 Tindak Lanjut: ' + solusi.split('\n')[0].substring(0, 100) + '\n';
+          if (kendala)
+            waText += '  \u26a0 Kendala: ' + kendala.split('\n')[0].substring(0, 100) + '\n';
+          if (solusi)
+            waText +=
+              '  \ud83d\udca1 Tindak Lanjut: ' + solusi.split('\n')[0].substring(0, 100) + '\n';
 
           // HTML display with detail
           htmlContent +=
@@ -3164,7 +3212,9 @@ async function _loadReportSummaryForDate(dateVal) {
       });
 
     var avgProgress = reports.length ? Math.round(totalProgressValue / reports.length) : 0;
-    var highCoverage = reports.length ? Math.round(((totalDone + totalOnTrack) / reports.length) * 100) : 0;
+    var highCoverage = reports.length
+      ? Math.round(((totalDone + totalOnTrack) / reports.length) * 100)
+      : 0;
     var kendalaCoverage = reports.length ? Math.round((totalKendala / reports.length) * 100) : 0;
     waText +=
       '\ud83d\udcca Total: ' +
@@ -3250,9 +3300,25 @@ async function shareReportWA() {
   }
   var waNumber = await getRegisteredWhatsAppNumber();
   if (!waNumber) {
-    toast('Nomor WhatsApp admin belum terdaftar. Menggunakan share umum.', 'warning');
+    toast('Nomor WhatsApp admin belum terdaftar di Data Perusahaan.', 'warning');
+    return;
   }
-  window.open(buildWhatsAppShareUrl(text, waNumber), '_blank');
+  try {
+    await db.collection('hrd_wa_outbox').add({
+      targetNumber: waNumber,
+      message: text,
+      type: 'daily_report_summary',
+      requestedBy: currentUser?.nama || 'system',
+      requestedById: currentUser?.id || '',
+      createdAt: new Date().toISOString(),
+      status: 'queued',
+    });
+    toast('Report masuk antrian kirim WA nomor admin.', 'success');
+  } catch (e) {
+    console.warn('[WA Outbox] Queue failed, fallback to wa.me:', e.message);
+    toast('Gagal enqueue WA. Membuka share manual sebagai fallback.', 'warning');
+    window.open(buildWhatsAppShareUrl(text, waNumber), '_blank');
+  }
 }
 
 async function loadReportSummaryByDate(dateVal) {

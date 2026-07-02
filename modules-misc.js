@@ -954,6 +954,14 @@ async function renderAkun() {
       <div class="form-group"><label>Email</label><input class="form-control" id="cpEmail" type="email"></div>
     </div>
     <div class="grid-2">
+      <div class="form-group"><label>WhatsApp Admin (Nomor Tujuan Report)</label><input class="form-control" id="cpWhatsapp" placeholder="08xxxxxxxxxx atau 62xxxxxxxxxx"></div>
+      <div class="form-group"><label>WA Gateway Provider</label><select class="form-control" id="cpWaProvider"><option value="fonnte">Fonnte</option><option value="generic">Generic API</option></select></div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group"><label>WA API URL</label><input class="form-control" id="cpWaApiUrl" placeholder="https://api.fonnte.com/send"></div>
+      <div class="form-group"><label>WA API Token</label><input class="form-control" id="cpWaApiToken" type="password" placeholder="Token API WhatsApp Gateway"></div>
+    </div>
+    <div class="grid-2">
       <div class="form-group"><label>Jumlah Karyawan</label><input class="form-control" id="cpJmlKaryawan" type="number" placeholder="50"></div>
       <div class="form-group"><label>Tahun Berdiri</label><input class="form-control" id="cpTahunBerdiri" type="number" placeholder="2020"></div>
     </div>
@@ -995,6 +1003,10 @@ async function loadCompanyData() {
   if (d.kota) document.getElementById('cpKota').value = d.kota;
   if (d.telepon) document.getElementById('cpTelp').value = d.telepon;
   if (d.email) document.getElementById('cpEmail').value = d.email;
+  if (d.whatsapp) document.getElementById('cpWhatsapp').value = d.whatsapp;
+  if (d.waProvider) document.getElementById('cpWaProvider').value = d.waProvider;
+  if (d.waApiUrl) document.getElementById('cpWaApiUrl').value = d.waApiUrl;
+  if (d.waApiToken) document.getElementById('cpWaApiToken').value = d.waApiToken;
   if (d.jumlahKaryawan) document.getElementById('cpJmlKaryawan').value = d.jumlahKaryawan;
   if (d.tahunBerdiri) document.getElementById('cpTahunBerdiri').value = d.tahunBerdiri;
   if (d.nib) document.getElementById('cpNIB').value = d.nib;
@@ -1120,6 +1132,10 @@ async function simpanDataPerusahaan() {
     kota: document.getElementById('cpKota').value,
     telepon: document.getElementById('cpTelp').value,
     email: document.getElementById('cpEmail').value,
+    whatsapp: document.getElementById('cpWhatsapp').value,
+    waProvider: document.getElementById('cpWaProvider').value,
+    waApiUrl: document.getElementById('cpWaApiUrl').value,
+    waApiToken: document.getElementById('cpWaApiToken').value,
     jumlahKaryawan: Number(document.getElementById('cpJmlKaryawan').value) || 0,
     tahunBerdiri: Number(document.getElementById('cpTahunBerdiri').value) || 0,
     nib: document.getElementById('cpNIB').value,
@@ -2250,10 +2266,10 @@ function renderDownloadAppSection() {
 
 async function shareAppWA() {
   const url = 'https://hrlegal.netlify.app';
-  const msg =
-    `📱 *HRD & Legal IJEF Corp*\n\nInstall aplikasi HRD di perangkat Anda:\n${url}\n\n📲 Cara Install:\n• Android: Chrome → Menu → "Add to Home Screen"\n• iPhone: Safari → Share → "Add to Home Screen"\n• PC/Laptop: Chrome → Klik ikon install di address bar\n\nLogin dengan akun karyawan Anda.\n\n— HRD IJEF Corp`;
+  const msg = `📱 *HRD & Legal IJEF Corp*\n\nInstall aplikasi HRD di perangkat Anda:\n${url}\n\n📲 Cara Install:\n• Android: Chrome → Menu → "Add to Home Screen"\n• iPhone: Safari → Share → "Add to Home Screen"\n• PC/Laptop: Chrome → Klik ikon install di address bar\n\nLogin dengan akun karyawan Anda.\n\n— HRD IJEF Corp`;
   const waNumber = await getRegisteredWhatsAppNumber();
-  if (!waNumber) toast('Nomor WhatsApp perusahaan belum terdaftar. Menggunakan share umum.', 'warning');
+  if (!waNumber)
+    toast('Nomor WhatsApp perusahaan belum terdaftar. Menggunakan share umum.', 'warning');
   window.open(buildWhatsAppShareUrl(msg, waNumber), '_blank');
 }
 

@@ -10,6 +10,15 @@ const messaging = admin.messaging();
 const APP_URL = "https://hr-legal-app.netlify.app";
 const APP_ICON = "https://hr-legal-app.netlify.app/icons/icon-192x192.png";
 
+function normalizeWaNumber(raw) {
+  if (!raw) return "";
+  const digits = String(raw).replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("62")) return digits;
+  if (digits.startsWith("0")) return `62${digits.slice(1)}`;
+  return digits;
+}
+
 /**
  * Helper: Get FCM token(s) for a specific user ID.
  * Reads from subcollection: hrd_fcm_tokens/{userId}/devices/*
@@ -218,6 +227,122 @@ exports.onPengumumanCreated = functions.firestore
       { title, body, icon: APP_ICON },
       { click_action: APP_URL, type: "pengumuman" },
     );
+  });
+
+/**
+ * Trigger: When a new WhatsApp outbox document is created in hrd_wa_outbox.
+ * Sends message via configured WhatsApp gateway so message is sent from one
+ * registered admin/sender number managed by the gateway account.
+ */
+exports.onWaOutboxCreated = functions.firestore
+  .document("hrd_wa_outbox/{docId}")
+  .onCreate(async (snap) => {
+    const data = snap.data() || {};
+    const docRef = snap.ref;
+
+    const targetNumber = normalizeWaNumber(data.targetNumber || data.to || "");
+    const message = String(data.message || "").trim();
+
+    if (!targetNumber || !message) {
+      await docRef.set(
+        {
+          status: "failed",
+          failedAt: new Date().toISOString(),
+          error: "targetNumber atau message kosong.",
+        },
+        {merge: true},
+      );
+      return;
+    }
+
+    const cfgSnap = await db.collection("hrd_settings").doc("perusahaan").get();
+    const cfg = cfgSnap.exists ? cfgSnap.data() || {} : {};
+    const provider = String(cfg.waProvider || "fonnte").toLowerCase();
+    const apiUrl = String(cfg.waApiUrl || "").trim();
+    const apiToken = String(cfg.waApiToken || "").trim();
+
+    if (!apiUrl || !apiToken) {
+      await docRef.set(
+        {
+          status: "failed",
+          failedAt: new Date().toISOString(),
+          error: "WA gateway belum dikonfigurasi (waApiUrl/waApiToken).",
+        },
+        {merge: true},
+      );
+      return;
+    }
+
+    let requestBody;
+    let headers;
+
+    if (provider === "fonnte") {
+      requestBody = {
+        target: targetNumber,
+        message,
+        countryCode: "62",
+      };
+      headers = {
+        "Content-Type": "application/json",
+        Authorization: apiToken,
+      };
+    } else {
+      requestBody = {
+        to: targetNumber,
+        message,
+      };
+      headers = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiToken}`,
+      };
+    }
+
+    try {
+      const resp = await fetch(apiUrl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(requestBody),
+      });
+
+      const raw = await resp.text();
+      const responseSnippet = raw ? raw.slice(0, 500) : "";
+
+      if (!resp.ok) {
+        await docRef.set(
+          {
+            status: "failed",
+            failedAt: new Date().toISOString(),
+            provider,
+            httpStatus: resp.status,
+            error: `Gateway error ${resp.status}`,
+            responseSnippet,
+          },
+          {merge: true},
+        );
+        return;
+      }
+
+      await docRef.set(
+        {
+          status: "sent",
+          sentAt: new Date().toISOString(),
+          provider,
+          httpStatus: resp.status,
+          responseSnippet,
+        },
+        {merge: true},
+      );
+    } catch (e) {
+      await docRef.set(
+        {
+          status: "failed",
+          failedAt: new Date().toISOString(),
+          provider,
+          error: e.message || "Unknown WA gateway error",
+        },
+        {merge: true},
+      );
+    }
   });
 
 // NOTE: onChatCreated has been intentionally removed.
