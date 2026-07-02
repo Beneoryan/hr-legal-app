@@ -4,7 +4,7 @@ const firebaseConfig = {
   apiKey: 'AIzaSyAWlNi_iBOWxZBD6E20aHOSrRpPsirDdOM',
   authDomain: 'test-kesehatan-ijef-corp-7c278.firebaseapp.com',
   projectId: 'test-kesehatan-ijef-corp-7c278',
-  storageBucket: 'test-kesehatan-ijef-corp-7c278.appspot.com',
+  storageBucket: 'test-kesehatan-ijef-corp-7c278.firebasestorage.app',
   messagingSenderId: '48180557823',
   appId: '1:48180557823:web:47ea8db8126737dbc0d9ca',
 };
@@ -1057,50 +1057,46 @@ async function saveResult(r) {
       100,
       Math.max(0, 70 + Math.min(posCount * 3, 20) - Math.min(negCount * 2, 15))
     );
-    await db
-      .collection('hrd_disc_results')
-      .add({
-        mode: testState.mode,
-        nama: testState.nama,
-        usia: testState.usia,
-        jenisKelamin: testState.jenisKelamin,
-        posisi: testState.posisi,
-        tanggalTes: testState.tanggalTes,
-        nip: testState.nip || '',
-        departemen: testState.departemen || '',
-        evaluasiPeriode: testState.evaluasiPeriode || '',
-        kontak: testState.kontak || '',
-        rawP: r.rawP,
-        rawK: r.rawK,
-        seg1: r.s1,
-        seg2: r.s2,
-        seg3: r.s3,
-        pattern: r.pattern,
-        profileName: r.profile.name,
-        positiveTraits: r.profile.pos || [],
-        negativeTraits: r.profile.neg || [],
-        career: r.profile.career || '',
-        kpiScore,
-        createdAt: new Date().toISOString(),
-      });
+    await db.collection('hrd_disc_results').add({
+      mode: testState.mode,
+      nama: testState.nama,
+      usia: testState.usia,
+      jenisKelamin: testState.jenisKelamin,
+      posisi: testState.posisi,
+      tanggalTes: testState.tanggalTes,
+      nip: testState.nip || '',
+      departemen: testState.departemen || '',
+      evaluasiPeriode: testState.evaluasiPeriode || '',
+      kontak: testState.kontak || '',
+      rawP: r.rawP,
+      rawK: r.rawK,
+      seg1: r.s1,
+      seg2: r.s2,
+      seg3: r.s3,
+      pattern: r.pattern,
+      profileName: r.profile.name,
+      positiveTraits: r.profile.pos || [],
+      negativeTraits: r.profile.neg || [],
+      career: r.profile.career || '',
+      kpiScore,
+      createdAt: new Date().toISOString(),
+    });
     // Sync calon karyawan to recruitment pipeline
     if (testState.mode === 'calon') {
-      await db
-        .collection('hrd_kandidat')
-        .add({
-          nama: testState.nama,
-          email: testState.kontak || '',
-          posisi: testState.posisi,
-          stage: 'DISC Test Done',
-          sumber: 'DISC Test Online',
-          discPattern: r.pattern,
-          discProfile: r.profile.name,
-          discScore: kpiScore,
-          usia: testState.usia,
-          jenisKelamin: testState.jenisKelamin,
-          kontak: testState.kontak || '',
-          createdAt: new Date().toISOString(),
-        });
+      await db.collection('hrd_kandidat').add({
+        nama: testState.nama,
+        email: testState.kontak || '',
+        posisi: testState.posisi,
+        stage: 'DISC Test Done',
+        sumber: 'DISC Test Online',
+        discPattern: r.pattern,
+        discProfile: r.profile.name,
+        discScore: kpiScore,
+        usia: testState.usia,
+        jenisKelamin: testState.jenisKelamin,
+        kontak: testState.kontak || '',
+        createdAt: new Date().toISOString(),
+      });
       toast('Hasil tes disimpan & data masuk ke pipeline rekrutmen', 'success');
     } else {
       toast('Hasil tes berhasil disimpan', 'success');

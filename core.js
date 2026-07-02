@@ -14,12 +14,33 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+const auth = firebase.auth();
 const storage = firebase.storage();
+const MAX_STORAGE_UPLOAD_BYTES = 500 * 1024 * 1024;
+let storageAuthReadyPromise = null;
 
-// ── FILE UPLOAD HELPER — Firebase Storage (max 100MB) ─────────
+// ── FILE UPLOAD HELPER — Firebase Storage (max 500MB) ─────────
+async function ensureStorageAuth() {
+  if (auth.currentUser) return auth.currentUser;
+  if (!storageAuthReadyPromise) {
+    storageAuthReadyPromise = auth
+      .signInAnonymously()
+      .then((cred) => cred.user)
+      .catch((e) => {
+        storageAuthReadyPromise = null;
+        throw e;
+      });
+  }
+  return storageAuthReadyPromise;
+}
+
+function getStorageAuthUid() {
+  return auth.currentUser?.uid || '';
+}
+
 async function uploadFileToStorage(file, path) {
   if (!file) throw new Error('No file provided');
-  if (file.size > 100 * 1024 * 1024) throw new Error('File terlalu besar (max 100MB)');
+  if (file.size > MAX_STORAGE_UPLOAD_BYTES) throw new Error('File terlalu besar (max 500MB)');
   const storageRef = storage.ref(path);
   const metadata = { contentType: file.type || 'application/octet-stream' };
   const snapshot = await storageRef.put(file, metadata);
@@ -35,6 +56,23 @@ async function deleteFileFromStorage(url) {
   } catch (e) {
     console.warn('[Storage] Delete failed:', e.message);
   }
+}
+
+function getStorageErrorMessage(error) {
+  const code = error && error.code ? error.code : '';
+  if (code === 'storage/unauthorized' || code === 'storage/permission-denied') {
+    return 'Akses upload ditolak Firebase Storage. Cek Storage Rules atau App Check.';
+  }
+  if (code === 'storage/bucket-not-found') {
+    return 'Bucket Firebase Storage tidak ditemukan. Cek konfigurasi storageBucket.';
+  }
+  if (code === 'storage/quota-exceeded') {
+    return 'Kuota Firebase Storage habis.';
+  }
+  if (code === 'storage/retry-limit-exceeded') {
+    return 'Upload timeout. Coba lagi.';
+  }
+  return (error && error.message) || 'Gagal upload file.';
 }
 
 // ── FCM (Firebase Cloud Messaging) Push Notifications ──────────────────
@@ -207,6 +245,7 @@ async function initApp() {
       currentUser = JSON.parse(saved);
       const adminRoles = ['admin', 'bod', 'head', 'manager'];
       currentPage = adminRoles.includes(currentUser.role) ? 'dashboard' : 'portal';
+      await ensureStorageAuth();
       renderApp();
     } catch (e) {
       renderLogin();
@@ -238,6 +277,7 @@ async function doLogin(username, password) {
   if (data.status === 'nonaktif') throw new Error('Akun dinonaktifkan');
   currentUser = { id: doc.id, ...data };
   localStorage.setItem('hrd_session', JSON.stringify(currentUser));
+  await ensureStorageAuth();
   // Langsung ke beranda - admin/bod/head/manager get dashboard, leader/staff get portal
   const adminRoles = ['admin', 'bod', 'head', 'manager'];
   currentPage = adminRoles.includes(currentUser.role) ? 'dashboard' : 'portal';
@@ -250,6 +290,8 @@ function doLogout() {
   cleanupFCMToken(userId);
   currentUser = null;
   currentPage = 'dashboard';
+  storageAuthReadyPromise = null;
+  auth.signOut().catch(() => {});
   localStorage.removeItem('hrd_session');
   unsubscribers.forEach((fn) => fn());
   unsubscribers = [];

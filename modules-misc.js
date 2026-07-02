@@ -526,7 +526,7 @@ async function showKontrakForm(id, p) {
     </div>
     <div class="form-group"><label>Catatan</label><textarea class="form-control" id="ktCatatan" style="min-height:50px">${escHtml(p.catatan || '')}</textarea></div>
     <div class="form-group">
-      <label>Upload Softcopy Kontrak (PDF/Image, max 100MB)</label>
+      <label>Upload Softcopy Kontrak (PDF/Image, max 500MB)</label>
       <input class="form-control" type="file" id="ktFile" accept=".pdf,image/png,image/jpeg,image/jpg" onchange="previewKontrakFile(this)">
       <div id="ktFilePreview" class="mt-8">${p.fileURL ? '<span class="badge badge-success">File sudah ada</span>' : p.fileData ? '<span class="badge badge-success">File sudah ada (legacy)</span>' : ''}</div>
     </div>
@@ -540,7 +540,7 @@ async function showKontrakForm(id, p) {
 function previewKontrakFile(input) {
   const file = input.files[0];
   if (!file) return;
-  if (file.size > 100 * 1024 * 1024) return toast('File terlalu besar (max 100MB)', 'warning');
+  if (file.size > 500 * 1024 * 1024) return toast('File terlalu besar (max 500MB)', 'warning');
   window._kontrakFile = file;
   window._kontrakFileName = file.name;
   const ext = file.name.split('.').pop().toLowerCase();
@@ -576,13 +576,17 @@ async function simpanKontrak(id) {
   if (window._kontrakFile) {
     try {
       toast('⏳ Mengupload file...', 'info');
-      const path = `kontrak/${karyawanId}/${Date.now()}_${window._kontrakFileName}`;
+      await ensureStorageAuth();
+      const storageUid = getStorageAuthUid();
+      if (!storageUid) throw new Error('Sesi Firebase Auth belum aktif. Coba login ulang.');
+      const path = `kontrak/${storageUid}/${karyawanId}/${Date.now()}_${window._kontrakFileName}`;
       const fileURL = await uploadFileToStorage(window._kontrakFile, path);
       data.fileURL = fileURL;
       data.fileName = window._kontrakFileName;
       data.fileSize = window._kontrakFile.size;
+      data.storageUid = storageUid;
     } catch (e) {
-      return toast('Gagal upload file: ' + e.message, 'error');
+      return toast('Gagal upload file: ' + getStorageErrorMessage(e), 'error');
     }
   }
   if (id) await db.collection('hrd_kontrak').doc(id).update(data);
@@ -717,7 +721,7 @@ async function modalUploadDokumen(preKaryId) {
       <div class="form-group"><label>Keterangan</label><input class="form-control" id="dokKeterangan" placeholder="No. dokumen, catatan, dll"></div>
     </div>
     <div class="form-group">
-      <label>Upload File (PDF/Image, max 100MB) <span style="color:var(--danger)">*</span></label>
+      <label>Upload File (PDF/Image, max 500MB) <span style="color:var(--danger)">*</span></label>
       <input class="form-control" type="file" id="dokFile" accept=".pdf,image/png,image/jpeg,image/jpg" onchange="previewDokumenFile(this)">
       <div id="dokFilePreview" class="mt-8"></div>
     </div>
@@ -731,7 +735,7 @@ async function modalUploadDokumen(preKaryId) {
 function previewDokumenFile(input) {
   const file = input.files[0];
   if (!file) return;
-  if (file.size > 100 * 1024 * 1024) return toast('File terlalu besar (max 100MB)', 'warning');
+  if (file.size > 500 * 1024 * 1024) return toast('File terlalu besar (max 500MB)', 'warning');
   window._dokFile = file;
   window._dokFileName = file.name;
   const ext = file.name.split('.').pop().toLowerCase();
@@ -757,7 +761,10 @@ async function simpanDokumen() {
   // Upload to Firebase Storage
   try {
     toast('⏳ Mengupload file...', 'info');
-    const path = `dokumen/${karyawanId}/${tipeDokumen}_${Date.now()}_${window._dokFileName}`;
+    await ensureStorageAuth();
+    const storageUid = getStorageAuthUid();
+    if (!storageUid) throw new Error('Sesi Firebase Auth belum aktif. Coba login ulang.');
+    const path = `dokumen/${storageUid}/${karyawanId}/${tipeDokumen}_${Date.now()}_${window._dokFileName}`;
     const fileURL = await uploadFileToStorage(window._dokFile, path);
     const data = {
       karyawanId,
@@ -767,6 +774,7 @@ async function simpanDokumen() {
       fileURL,
       fileName: window._dokFileName,
       fileSize: window._dokFile.size,
+      storageUid,
       createdAt: new Date().toISOString(),
     };
     await db.collection('hrd_dokumen_karyawan').add(data);
@@ -776,7 +784,7 @@ async function simpanDokumen() {
     toast(`Dokumen ${tipeDokumen} untuk ${namaKaryawan} berhasil diupload`, 'success');
     showKontrakTab('dokumen');
   } catch (e) {
-    toast('Gagal upload: ' + e.message, 'error');
+    toast('Gagal upload: ' + getStorageErrorMessage(e), 'error');
   }
 }
 

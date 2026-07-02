@@ -1,0 +1,56 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAllowedDocumentType() {
+      return request.resource != null
+        && request.resource.contentType.matches('application/pdf|image/.*');
+    }
+
+    function isWithinSizeLimit() {
+      return request.resource != null && request.resource.size <= 500 * 1024 * 1024;
+    }
+
+    match /kontrak/{uid}/{karyawanId}/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn()
+        && request.auth.uid == uid
+        && isAllowedDocumentType()
+        && isWithinSizeLimit();
+    }
+
+    match /dokumen/{uid}/{karyawanId}/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn()
+        && request.auth.uid == uid
+        && isAllowedDocumentType()
+        && isWithinSizeLimit();
+    }
+
+    // Legacy path compatibility while old frontend is still deployed:
+    // /kontrak/{karyawanId}/{filename}
+    // /dokumen/{karyawanId}/{filename}
+    // Keep strict file-type and size checks.
+    match /kontrak/{karyawanId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAllowedDocumentType() && isWithinSizeLimit();
+    }
+
+    match /dokumen/{karyawanId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAllowedDocumentType() && isWithinSizeLimit();
+    }
+
+    match /candidates/{uid}/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

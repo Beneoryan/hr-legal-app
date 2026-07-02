@@ -10,7 +10,7 @@ const firebaseConfig = {
   apiKey: 'AIzaSyAWlNi_iBOWxZBD6E20aHOSrRpPsirDdOM',
   authDomain: 'test-kesehatan-ijef-corp-7c278.firebaseapp.com',
   projectId: 'test-kesehatan-ijef-corp-7c278',
-  storageBucket: 'test-kesehatan-ijef-corp-7c278.appspot.com',
+  storageBucket: 'test-kesehatan-ijef-corp-7c278.firebasestorage.app',
   messagingSenderId: '48180557823',
   appId: '1:48180557823:web:47ea8db8126737dbc0d9ca',
 };
