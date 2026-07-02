@@ -30,7 +30,9 @@ function normalizePeriodeKPI(periode) {
 function pickLatestByDate(items, periodKey) {
   if (!items.length) return null;
   const filtered = periodKey
-    ? items.filter((x) => (x.evaluasiPeriode || x.periode || x.tanggalTes || '').startsWith(periodKey))
+    ? items.filter((x) =>
+        (x.evaluasiPeriode || x.periode || x.tanggalTes || '').startsWith(periodKey)
+      )
     : items;
   const src = filtered.length ? filtered : items;
   src.sort((a, b) =>
@@ -65,7 +67,9 @@ async function hitungKPIIntegrasi(nama, periode) {
   const filledJobdesk = jobdeskData
     ? bidangJobdesk.filter((key) => (jobdeskData[key] || '').toString().trim()).length
     : 0;
-  const jobdeskScore = clampScore(jobdeskData ? 50 + (filledJobdesk / bidangJobdesk.length) * 50 : 50);
+  const jobdeskScore = clampScore(
+    jobdeskData ? 50 + (filledJobdesk / bidangJobdesk.length) * 50 : 50
+  );
   const masukPeriode = [];
   const hariMasuk = new Set();
   let countTerlambat = 0;
@@ -92,7 +96,8 @@ async function hitungKPIIntegrasi(nama, periode) {
   let totalPenaltyPoin = 0;
   penSnap.forEach((d) => {
     const pe = d.data() || {};
-    if ((pe.nama || '').toLowerCase().trim() === namaLower) totalPenaltyPoin += parseInt(pe.poin) || 0;
+    if ((pe.nama || '').toLowerCase().trim() === namaLower)
+      totalPenaltyPoin += parseInt(pe.poin) || 0;
   });
   const discItems = [];
   discSnap.forEach((d) => {
@@ -366,7 +371,11 @@ function viewPelatihan(id) {
         ? '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">' +
           (p.peserta || [])
             .map(function (nama) {
-              return '<span style="padding:4px 10px;background:#e3f2fd;border-radius:6px;font-size:.78rem">' + escHtml(nama) + '</span>';
+              return (
+                '<span style="padding:4px 10px;background:#e3f2fd;border-radius:6px;font-size:.78rem">' +
+                escHtml(nama) +
+                '</span>'
+              );
             })
             .join('') +
           '</div>'
@@ -374,17 +383,43 @@ function viewPelatihan(id) {
       openModal(
         '<div class="modal-title">🎓 Detail Pelatihan</div>' +
           '<table style="width:100%;border-collapse:collapse">' +
-          '<tr><td class="fw-700" style="padding:8px;width:120px;vertical-align:top">Judul</td><td style="padding:8px">' + escHtml(p.judul || '-') + '</td></tr>' +
-          '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Jenis</td><td style="padding:8px"><span class="badge badge-info">' + escHtml(p.jenis || '-') + '</span></td></tr>' +
-          '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Tanggal</td><td style="padding:8px">' + formatDate(p.tanggal) + '</td></tr>' +
-          '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Status</td><td style="padding:8px"><span class="badge badge-' + (p.status === 'selesai' ? 'success' : 'warning') + '">' + escHtml(p.status || 'terjadwal') + '</span></td></tr>' +
-          '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Peserta (' + (p.peserta || []).length + ')</td><td style="padding:8px">' + pesertaList + '</td></tr>' +
-          (p.createdAt ? '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Dibuat</td><td style="padding:8px">' + formatDateTime(p.createdAt) + '</td></tr>' : '') +
-          (p.updatedAt ? '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Diupdate</td><td style="padding:8px">' + formatDateTime(p.updatedAt) + '</td></tr>' : '') +
+          '<tr><td class="fw-700" style="padding:8px;width:120px;vertical-align:top">Judul</td><td style="padding:8px">' +
+          escHtml(p.judul || '-') +
+          '</td></tr>' +
+          '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Jenis</td><td style="padding:8px"><span class="badge badge-info">' +
+          escHtml(p.jenis || '-') +
+          '</span></td></tr>' +
+          '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Tanggal</td><td style="padding:8px">' +
+          formatDate(p.tanggal) +
+          '</td></tr>' +
+          '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Status</td><td style="padding:8px"><span class="badge badge-' +
+          (p.status === 'selesai' ? 'success' : 'warning') +
+          '">' +
+          escHtml(p.status || 'terjadwal') +
+          '</span></td></tr>' +
+          '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Peserta (' +
+          (p.peserta || []).length +
+          ')</td><td style="padding:8px">' +
+          pesertaList +
+          '</td></tr>' +
+          (p.createdAt
+            ? '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Dibuat</td><td style="padding:8px">' +
+              formatDateTime(p.createdAt) +
+              '</td></tr>'
+            : '') +
+          (p.updatedAt
+            ? '<tr><td class="fw-700" style="padding:8px;vertical-align:top">Diupdate</td><td style="padding:8px">' +
+              formatDateTime(p.updatedAt) +
+              '</td></tr>'
+            : '') +
           '</table>' +
           '<div style="margin-top:16px;display:flex;gap:8px">' +
-          '<button class="btn btn-warning btn-sm" onclick="closeModalDirect();modalPelatihan(\'' + id + '\')">✏️ Edit</button>' +
-          '<button class="btn btn-danger btn-sm" onclick="closeModalDirect();hapusPelatihan(\'' + id + '\')">🗑️ Hapus</button>' +
+          '<button class="btn btn-warning btn-sm" onclick="closeModalDirect();modalPelatihan(\'' +
+          id +
+          '\')">✏️ Edit</button>' +
+          '<button class="btn btn-danger btn-sm" onclick="closeModalDirect();hapusPelatihan(\'' +
+          id +
+          '\')">🗑️ Hapus</button>' +
           '<button class="btn btn-outline btn-sm" onclick="closeModalDirect()">Tutup</button>' +
           '</div>',
         true
@@ -581,7 +616,10 @@ async function simpanKontrak(id) {
         await ensureStorageAuth();
         storageUid = getStorageAuthUid();
       } catch (authErr) {
-        console.warn('[StorageAuth] Upload fallback to legacy path:', authErr.code || authErr.message);
+        console.warn(
+          '[StorageAuth] Upload fallback to legacy path:',
+          authErr.code || authErr.message
+        );
       }
       const path = storageUid
         ? `kontrak/${storageUid}/${karyawanId}/${Date.now()}_${window._kontrakFileName}`
@@ -772,7 +810,10 @@ async function simpanDokumen() {
       await ensureStorageAuth();
       storageUid = getStorageAuthUid();
     } catch (authErr) {
-      console.warn('[StorageAuth] Upload fallback to legacy path:', authErr.code || authErr.message);
+      console.warn(
+        '[StorageAuth] Upload fallback to legacy path:',
+        authErr.code || authErr.message
+      );
     }
     const path = storageUid
       ? `dokumen/${storageUid}/${karyawanId}/${tipeDokumen}_${Date.now()}_${window._dokFileName}`
@@ -2207,12 +2248,13 @@ function renderDownloadAppSection() {
     </div>`;
 }
 
-function shareAppWA() {
+async function shareAppWA() {
   const url = 'https://hrlegal.netlify.app';
-  const text = encodeURIComponent(
-    `📱 *HRD & Legal IJEF Corp*\n\nInstall aplikasi HRD di perangkat Anda:\n${url}\n\n📲 Cara Install:\n• Android: Chrome → Menu → "Add to Home Screen"\n• iPhone: Safari → Share → "Add to Home Screen"\n• PC/Laptop: Chrome → Klik ikon install di address bar\n\nLogin dengan akun karyawan Anda.\n\n— HRD IJEF Corp`
-  );
-  window.open(`https://wa.me/?text=${text}`, '_blank');
+  const msg =
+    `📱 *HRD & Legal IJEF Corp*\n\nInstall aplikasi HRD di perangkat Anda:\n${url}\n\n📲 Cara Install:\n• Android: Chrome → Menu → "Add to Home Screen"\n• iPhone: Safari → Share → "Add to Home Screen"\n• PC/Laptop: Chrome → Klik ikon install di address bar\n\nLogin dengan akun karyawan Anda.\n\n— HRD IJEF Corp`;
+  const waNumber = await getRegisteredWhatsAppNumber();
+  if (!waNumber) toast('Nomor WhatsApp perusahaan belum terdaftar. Menggunakan share umum.', 'warning');
+  window.open(buildWhatsAppShareUrl(msg, waNumber), '_blank');
 }
 
 async function shareAppBroadcast() {

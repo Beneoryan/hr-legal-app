@@ -950,17 +950,19 @@ function copyDownloadLink() {
     });
 }
 
-function shareDownloadWhatsApp() {
+async function shareDownloadWhatsApp() {
   const link = getAppDownloadLink();
-  const text = encodeURIComponent(`Halo,
+  const msg = `Halo,
 
 Berikut link download aplikasi HRD IJEF Corp:
 ${link}
 
 Buka link menggunakan browser dan pilih "Add to Home Screen" atau install PWA untuk akses cepat di Android, iOS, Windows, atau Mac.
 
-— HRD IJEF Corp`);
-  window.open(`https://wa.me/?text=${text}`, '_blank');
+— HRD IJEF Corp`;
+  const waNumber = await getRegisteredWhatsAppNumber();
+  if (!waNumber) toast('Nomor WhatsApp perusahaan belum terdaftar. Menggunakan share umum.', 'warning');
+  window.open(buildWhatsAppShareUrl(msg, waNumber), '_blank');
 }
 
 function shareDownloadEmail() {

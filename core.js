@@ -78,6 +78,36 @@ function getStorageErrorMessage(error) {
   return (error && error.message) || 'Gagal upload file.';
 }
 
+function normalizeWhatsAppNumber(raw) {
+  if (!raw) return '';
+  const digits = String(raw).replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('62')) return digits;
+  if (digits.startsWith('0')) return '62' + digits.slice(1);
+  return digits;
+}
+
+async function getRegisteredWhatsAppNumber() {
+  if (typeof window._registeredWaNumber !== 'undefined') return window._registeredWaNumber;
+  try {
+    const snap = await db.collection('hrd_settings').doc('perusahaan').get();
+    const data = snap.exists ? snap.data() || {} : {};
+    const candidate =
+      data.whatsapp || data.whatsApp || data.wa || data.telepon || data.phone || data.contact || '';
+    window._registeredWaNumber = normalizeWhatsAppNumber(candidate);
+    return window._registeredWaNumber;
+  } catch (e) {
+    console.warn('[WA] Failed to load registered number:', e.message);
+    window._registeredWaNumber = '';
+    return '';
+  }
+}
+
+function buildWhatsAppShareUrl(message, phoneNumber) {
+  const text = encodeURIComponent(message || '');
+  return phoneNumber ? `https://wa.me/${phoneNumber}?text=${text}` : `https://wa.me/?text=${text}`;
+}
+
 // ── FCM (Firebase Cloud Messaging) Push Notifications ──────────────────
 // IMPORTANT: Replace this placeholder with your actual VAPID public key.
 // Generate it in Firebase Console > Project Settings > Cloud Messaging >
@@ -484,12 +514,20 @@ function buildNavItems(isPortalUser) {
     ['penalty', '⚠️', 'Penalty Point'],
     ['daily-task', '📋', 'Daily Task'],
   ]);
-  const _lkSidebarUsers = ['muhammad agus ryanda', 'siti sofuroh', 'irsan janwar wibawa', 'misriana'];
+  const _lkSidebarUsers = [
+    'muhammad agus ryanda',
+    'siti sofuroh',
+    'irsan janwar wibawa',
+    'misriana',
+  ];
   const _showLaporanKeuangan = _lkSidebarUsers.includes((currentUser.nama || '').toLowerCase());
   nav += navGroup(
     '💰 Keuangan',
     currentUser.role === 'bod'
-      ? [['penggajian', '💰', 'Penggajian'], ['laporan-keuangan', '📊', 'Laporan Keuangan']]
+      ? [
+          ['penggajian', '💰', 'Penggajian'],
+          ['laporan-keuangan', '📊', 'Laporan Keuangan'],
+        ]
       : _showLaporanKeuangan
         ? [
             ['penggajian', '💰', 'Penggajian'],
@@ -516,14 +554,17 @@ function buildNavItems(isPortalUser) {
   ]);
   // Manager+ gets Legal & Aset
   if (hasAccess(3))
-    nav += navGroup('📄 Legal & Aset', currentUser.role === 'bod'
-      ? [['kontrak', '📄', 'Kontrak']]
-      : [
-        ['kontrak', '📄', 'Kontrak'],
-        ['asset', '💻', 'Asset'],
-        ['peraturan', '📜', 'Peraturan'],
-        ['surat', '✉️', 'Generator Surat'],
-      ]);
+    nav += navGroup(
+      '📄 Legal & Aset',
+      currentUser.role === 'bod'
+        ? [['kontrak', '📄', 'Kontrak']]
+        : [
+            ['kontrak', '📄', 'Kontrak'],
+            ['asset', '💻', 'Asset'],
+            ['peraturan', '📜', 'Peraturan'],
+            ['surat', '✉️', 'Generator Surat'],
+          ]
+    );
   nav += navGroup('💬 Komunikasi', [
     ['meeting', '📅', 'Meeting & Invite'],
     ['chat', '💬', 'Obrolan Divisi'],
@@ -748,7 +789,11 @@ function pendingApproverHtml(flows, nama, status, approvalStep) {
   if (!isPending) return '';
   var approver = getApproverForItem(flows, nama, approvalStep);
   if (!approver) return '';
-  return '<div class="text-xs" style="color:#1565c0;margin-top:2px">\u23F3 Menunggu: <b>' + escHtml(approver) + '</b></div>';
+  return (
+    '<div class="text-xs" style="color:#1565c0;margin-top:2px">\u23F3 Menunggu: <b>' +
+    escHtml(approver) +
+    '</b></div>'
+  );
 }
 function formatDate(d) {
   if (!d) return '-';
