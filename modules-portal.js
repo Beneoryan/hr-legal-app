@@ -32,6 +32,17 @@ async function renderPortal() {
     <div class="card-title mb-12" style="display:flex;justify-content:space-between;align-items:center"><span>📋 Daily Task Hari Ini</span><button class="btn btn-xs btn-primary" onclick="navigateTo('daily-task')">Lihat Semua</button></div>
     <div id="portalDailyTaskList"><p class="text-sm" style="color:#999">Memuat...</p></div>
   </div>
+  ${hasAccess(4) ? `<!-- REPORT TIM SECTION (HEAD+) -->
+  <div class="card" id="portalTeamReportSection">
+    <div class="card-title mb-12" style="display:flex;justify-content:space-between;align-items:center">
+      <span>📊 Report Tim Hari Ini</span>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-xs btn-outline" onclick="loadPortalTeamReport()">🔄</button>
+        <button class="btn btn-xs btn-primary" onclick="navigateTo('daily-task')">Lihat Semua</button>
+      </div>
+    </div>
+    <div id="portalTeamReportList"><p class="text-sm" style="color:#999">Memuat...</p></div>
+  </div>` : ''}
   <!-- KOLOM PENGUMUMAN, BROADCAST, MEETING & INVITE -->
   <!-- AKSI CEPAT + KOMUNIKASI -->
   <div class="card">
@@ -129,6 +140,77 @@ async function renderPortal() {
       });
       taskListEl.innerHTML = th;
     }
+  }
+  // Load team report for HEAD+ users
+  if (hasAccess(4)) {
+    loadPortalTeamReport().catch(function () {});
+  }
+}
+
+async function loadPortalTeamReport() {
+  var listEl = document.getElementById('portalTeamReportList');
+  if (!listEl) return;
+  listEl.innerHTML = '<p class="text-sm" style="color:#999">Memuat...</p>';
+  try {
+    var today2 = todayStr();
+    var snap = await db.collection('hrd_daily_tasks').get();
+    var reports = [];
+    snap.forEach(function (d) {
+      var t = d.data();
+      if ((t.type === 'report' || (t.title && t.title.includes('Daily Report'))) && t.tanggal === today2) {
+        reports.push({ id: d.id, ...t });
+      }
+    });
+    if (!reports.length) {
+      listEl.innerHTML =
+        '<p class="text-sm" style="color:#999">Belum ada report masuk hari ini.</p>';
+      return;
+    }
+    // Sort by dept → kategori
+    reports.sort(function (a, b) {
+      return (
+        (a.departemen || '').localeCompare(b.departemen || '') ||
+        (a.kategori || '').localeCompare(b.kategori || '')
+      );
+    });
+    // Build division filter tabs (Semua / Academic / Office)
+    var portalDivFilter = window._portalTeamDivFilter || 'all';
+    var filteredReports = reports;
+    if (portalDivFilter === 'academic') {
+      filteredReports = reports.filter(function (r) {
+        return (r.departemen || '').toUpperCase().includes('ACADEMIC');
+      });
+    } else if (portalDivFilter === 'office') {
+      filteredReports = reports.filter(function (r) {
+        return (r.departemen || '').toUpperCase().includes('OFFICE');
+      });
+    }
+    var tabHtml =
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">' +
+      ['all', 'academic', 'office']
+        .map(function (div) {
+          var label =
+            div === 'all' ? '\ud83d\uddc2\ufe0f Semua' : div === 'academic' ? '\ud83d\udcda Academic' : '\ud83c\udfe2 Office';
+          var active = portalDivFilter === div;
+          return (
+            '<button class="btn btn-sm" style="' +
+            (active
+              ? 'background:var(--primary);color:#fff;font-weight:700'
+              : 'background:#f0f0f0;color:#333') +
+            '" onclick="window._portalTeamDivFilter=\'' +
+            div +
+            '\';loadPortalTeamReport()">' +
+            label +
+            '</button>'
+          );
+        })
+        .join('') +
+      '</div>';
+    var html = tabHtml + _renderGroupedReportTracker(filteredReports, 'all-report');
+    listEl.innerHTML = html;
+  } catch (e) {
+    listEl.innerHTML =
+      '<p class="text-sm" style="color:#c62828">Gagal memuat: ' + escHtml(e.message) + '</p>';
   }
 }
 
