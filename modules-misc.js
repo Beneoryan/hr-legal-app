@@ -962,6 +962,10 @@ async function renderAkun() {
       <div class="form-group"><label>WA API Token</label><input class="form-control" id="cpWaApiToken" type="password" placeholder="Token API WhatsApp Gateway"></div>
     </div>
     <div class="grid-2">
+      <div class="form-group"><label>Auto Kirim Report WA Harian</label><select class="form-control" id="cpWaAutoEnabled"><option value="1">Aktif</option><option value="0">Nonaktif</option></select></div>
+      <div class="form-group"><label>Jam Kirim Otomatis (WIB)</label><input class="form-control" id="cpWaAutoTime" type="time" value="18:00"></div>
+    </div>
+    <div class="grid-2">
       <div class="form-group"><label>Jumlah Karyawan</label><input class="form-control" id="cpJmlKaryawan" type="number" placeholder="50"></div>
       <div class="form-group"><label>Tahun Berdiri</label><input class="form-control" id="cpTahunBerdiri" type="number" placeholder="2020"></div>
     </div>
@@ -1007,6 +1011,9 @@ async function loadCompanyData() {
   if (d.waProvider) document.getElementById('cpWaProvider').value = d.waProvider;
   if (d.waApiUrl) document.getElementById('cpWaApiUrl').value = d.waApiUrl;
   if (d.waApiToken) document.getElementById('cpWaApiToken').value = d.waApiToken;
+  if (typeof d.waAutoReportEnabled !== 'undefined')
+    document.getElementById('cpWaAutoEnabled').value = d.waAutoReportEnabled ? '1' : '0';
+  if (d.waAutoReportTime) document.getElementById('cpWaAutoTime').value = d.waAutoReportTime;
   if (d.jumlahKaryawan) document.getElementById('cpJmlKaryawan').value = d.jumlahKaryawan;
   if (d.tahunBerdiri) document.getElementById('cpTahunBerdiri').value = d.tahunBerdiri;
   if (d.nib) document.getElementById('cpNIB').value = d.nib;
@@ -1136,6 +1143,8 @@ async function simpanDataPerusahaan() {
     waProvider: document.getElementById('cpWaProvider').value,
     waApiUrl: document.getElementById('cpWaApiUrl').value,
     waApiToken: document.getElementById('cpWaApiToken').value,
+    waAutoReportEnabled: document.getElementById('cpWaAutoEnabled').value === '1',
+    waAutoReportTime: document.getElementById('cpWaAutoTime').value || '18:00',
     jumlahKaryawan: Number(document.getElementById('cpJmlKaryawan').value) || 0,
     tahunBerdiri: Number(document.getElementById('cpTahunBerdiri').value) || 0,
     nib: document.getElementById('cpNIB').value,
