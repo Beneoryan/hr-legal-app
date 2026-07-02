@@ -2933,6 +2933,8 @@ function startTaskReminderCheck() {
 
 // ── DAILY REPORT AUTO-SUMMARY & WA SHARE ──────────────────────
 let _reportSummaryInterval = null;
+let _reportSummaryDivisionFilter = 'all';
+let _reportSummaryCache = {};
 
 function startReportSummaryScheduler() {
   if (_reportSummaryInterval) clearInterval(_reportSummaryInterval);
@@ -2989,21 +2991,38 @@ async function _loadReportSummaryForDate(dateVal) {
 
   const snap = await db.collection('hrd_daily_tasks').get();
 
-  // Filter reports for selected date
-  const reports = [];
+  // Build cache and collect reports for selected date
+  _reportSummaryCache = {};
+  const allReports = [];
   snap.forEach(function (d) {
     var t = d.data();
     if (t.type === 'report' && t.tanggal === dateVal) {
-      reports.push(t);
+      var rep = Object.assign({ id: d.id }, t);
+      allReports.push(rep);
+      _reportSummaryCache[d.id] = rep;
     }
   });
 
-  // Group by department
+  // Apply division filter
+  var reports = allReports;
+  if (_reportSummaryDivisionFilter === 'academic') {
+    reports = allReports.filter(function (r) {
+      return (r.departemen || '').toUpperCase() === 'ACADEMIC';
+    });
+  } else if (_reportSummaryDivisionFilter === 'office') {
+    reports = allReports.filter(function (r) {
+      return (r.departemen || '').toUpperCase() === 'OFFICE';
+    });
+  }
+
+  // Group by department then by category
   var byDept = {};
   reports.forEach(function (r) {
-    var dept = r.departemen || 'LAINNYA';
-    if (!byDept[dept]) byDept[dept] = [];
-    byDept[dept].push(r);
+    var dept = (r.departemen || 'LAINNYA').toUpperCase();
+    var kat = (r.kategori || 'UMUM').toUpperCase();
+    if (!byDept[dept]) byDept[dept] = {};
+    if (!byDept[dept][kat]) byDept[dept][kat] = [];
+    byDept[dept][kat].push(r);
   });
 
   // Build display + WA text
@@ -3034,7 +3053,10 @@ async function _loadReportSummaryForDate(dateVal) {
     Object.keys(byDept)
       .sort()
       .forEach(function (dept) {
-        var items = byDept[dept];
+        var katMap = byDept[dept];
+        var deptItems = Object.values(katMap).reduce(function (acc, arr) {
+          return acc.concat(arr);
+        }, []);
         var icon = dept.includes('ACADEMIC') ? '\ud83d\udcda' : '\ud83c\udfe2';
         var deptDone = 0;
         var deptProgress = 0;
@@ -3043,111 +3065,150 @@ async function _loadReportSummaryForDate(dateVal) {
         var deptKendala = 0;
         var deptTanpaKendala = 0;
         var deptKendalaNotes = [];
-        waText += icon + ' ' + dept + ' (' + items.length + ' report)\n';
+        waText += icon + ' ' + dept + ' (' + deptItems.length + ' report)\n';
         htmlContent +=
           '<div class="card mb-8"><div class="fw-700 mb-8">' +
           icon +
           ' ' +
           escHtml(dept) +
           ' (' +
-          items.length +
+          deptItems.length +
           ')</div>';
 
-        items.forEach(function (r) {
-          var nama = (r.targetUserName || r.nama || '-').toUpperCase();
-          var aktivitasRaw = (r.aktivitas || '-').trim();
-          var aktivitasFirst = aktivitasRaw.split('\n')[0].substring(0, 80);
-          var prog = parseInt(r.progress, 10);
-          if (isNaN(prog)) prog = 0;
-          prog = Math.max(0, Math.min(100, prog));
-          var status = prog >= 100 ? '\u2705' : prog + '%';
-          var hasil = (r.hasil || '').trim();
-          var kendala = (r.kendala || '').trim();
-          var solusi = (r.solusi || '').trim();
-          var aktivitasDisplay = aktivitasRaw.substring(0, 180);
-          var hasilDisplay = hasil.substring(0, 180);
-          var kendalaDisplay = kendala.substring(0, 180);
-          var solusiDisplay = solusi.substring(0, 180);
-          var progressColor = prog >= 100 ? '#2e7d32' : prog >= 50 ? '#f57f17' : '#c62828';
-
-          // WA text with detail
-          waText += '\u2022 ' + nama + '\n';
-          waText += '  \ud83d\udcc8 Progress: ' + prog + '%\n';
-          waText += '  \ud83d\udccb Aktivitas: ' + aktivitasFirst + '\n';
-          if (hasil) waText += '  \u2714 Hasil: ' + hasil.split('\n')[0].substring(0, 100) + '\n';
-          if (kendala)
-            waText += '  \u26a0 Kendala: ' + kendala.split('\n')[0].substring(0, 100) + '\n';
-          if (solusi)
-            waText +=
-              '  \ud83d\udca1 Tindak Lanjut: ' + solusi.split('\n')[0].substring(0, 100) + '\n';
-
-          // HTML display with detail
-          htmlContent +=
-            '<div style="padding:8px 0;border-bottom:1px solid #eee;font-size:.85rem">' +
-            '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap"><div>\u2022 <b>' +
-            escHtml(nama) +
-            '</b></div><div style="font-weight:700;color:' +
-            progressColor +
-            '">' +
-            status +
-            '</div></div>';
-          htmlContent +=
-            '<div style="padding-left:16px;font-size:.78rem;margin-top:4px"><div style="height:6px;background:#eee;border-radius:999px;overflow:hidden"><div style="height:100%;width:' +
-            Math.min(100, Math.max(0, prog)) +
-            '%;background:' +
-            progressColor +
-            '"></div></div><div style="margin-top:4px;color:#333">\ud83d\udccb Aktivitas: ' +
-            escHtml(aktivitasDisplay || '-') +
-            '</div></div>';
-          if (hasil)
+        // Render by category
+        Object.keys(katMap)
+          .sort()
+          .forEach(function (kat) {
+            var items = katMap[kat];
+            var katLabel = kat;
             htmlContent +=
-              '<div style="padding-left:16px;font-size:.78rem;color:#2e7d32;margin-top:2px">\u2714 Hasil: ' +
-              escHtml(hasilDisplay) +
-              '</div>';
-          if (kendala)
-            htmlContent +=
-              '<div style="padding-left:16px;font-size:.78rem;color:#c62828;margin-top:2px">\u26a0 Kendala: ' +
-              escHtml(kendalaDisplay) +
-              '</div>';
-          if (solusi)
-            htmlContent +=
-              '<div style="padding-left:16px;font-size:.78rem;color:#e65100;margin-top:2px">\ud83d\udca1 Tindak Lanjut: ' +
-              escHtml(solusiDisplay) +
-              '</div>';
-          htmlContent += '</div>';
+              '<div style="margin-bottom:12px;background:#f8f9ff;border-radius:8px;padding:10px 12px">' +
+              '<div style="font-weight:600;font-size:.82rem;color:#1565c0;margin-bottom:6px;border-bottom:1px solid #d0d9ff;padding-bottom:4px">' +
+              '\ud83d\udcc2 ' +
+              escHtml(katLabel) +
+              ' (' +
+              items.length +
+              ')</div>';
+            waText += '  \ud83d\udcc2 ' + katLabel + ' (' + items.length + ')\n';
 
-          if (prog >= 100) {
-            totalDone++;
-            deptDone++;
-          } else {
-            totalProgress++;
-            deptProgress++;
-            if (prog >= 70) {
-              totalOnTrack++;
-              deptOnTrack++;
-            } else {
-              totalNeedAttention++;
-              deptNeedAttention++;
-            }
-          }
-          if (kendala) {
-            totalKendala++;
-            deptKendala++;
-            deptKendalaNotes.push('• ' + nama + ': ' + kendala.split('\n')[0].substring(0, 80));
-          } else {
-            totalTanpaKendala++;
-            deptTanpaKendala++;
-          }
-          totalProgressValue += prog;
-        });
+            items.forEach(function (r) {
+              var nama = (r.targetUserName || r.nama || '-').toUpperCase();
+              var aktivitasRaw = (r.aktivitas || '-').trim();
+              var aktivitasFirst = aktivitasRaw.split('\n')[0].substring(0, 80);
+              var prog = parseInt(r.progress, 10);
+              if (isNaN(prog)) prog = 0;
+              prog = Math.max(0, Math.min(100, prog));
+              var status = prog >= 100 ? '\u2705' : prog + '%';
+              var hasil = (r.hasil || '').trim();
+              var kendala = (r.kendala || '').trim();
+              var solusi = (r.solusi || '').trim();
+              var aktivitasDisplay = aktivitasRaw.substring(0, 180);
+              var hasilDisplay = hasil.substring(0, 180);
+              var kendalaDisplay = kendala.substring(0, 180);
+              var solusiDisplay = solusi.substring(0, 180);
+              var progressColor = prog >= 100 ? '#2e7d32' : prog >= 50 ? '#f57f17' : '#c62828';
 
-        var deptAvg = items.length
+              // WA text with detail
+              waText += '    \u2022 ' + nama + '\n';
+              waText += '      \ud83d\udcc8 Progress: ' + prog + '%\n';
+              waText += '      \ud83d\udccb Aktivitas: ' + aktivitasFirst + '\n';
+              if (hasil)
+                waText += '      \u2714 Hasil: ' + hasil.split('\n')[0].substring(0, 100) + '\n';
+              if (kendala)
+                waText +=
+                  '      \u26a0 Kendala: ' + kendala.split('\n')[0].substring(0, 100) + '\n';
+              if (solusi)
+                waText +=
+                  '      \ud83d\udca1 Tindak Lanjut: ' +
+                  solusi.split('\n')[0].substring(0, 100) +
+                  '\n';
+
+              // HTML display — clickable row
+              htmlContent +=
+                '<div style="padding:8px 0;border-bottom:1px solid #eee;font-size:.85rem;cursor:pointer;border-radius:6px;transition:background .15s" ' +
+                'onclick="viewReportFromSummary(\'' +
+                r.id +
+                '\')" ' +
+                'onmouseover="this.style.background=\'#f0f4ff\'" onmouseout="this.style.background=\'\'">' +
+                '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">' +
+                '<div>\u2022 <b>' +
+                escHtml(nama) +
+                '</b></div>' +
+                '<div style="display:flex;align-items:center;gap:6px">' +
+                '<div style="font-weight:700;color:' +
+                progressColor +
+                '">' +
+                status +
+                '</div>' +
+                '<button class="btn btn-xs btn-info" onclick="event.stopPropagation();viewReportFromSummary(\'' +
+                r.id +
+                '\')" style="padding:2px 7px;font-size:.7rem">\ud83d\udc41\ufe0f View</button>' +
+                '</div></div>';
+              htmlContent +=
+                '<div style="padding-left:16px;font-size:.78rem;margin-top:4px">' +
+                '<div style="height:6px;background:#eee;border-radius:999px;overflow:hidden">' +
+                '<div style="height:100%;width:' +
+                Math.min(100, Math.max(0, prog)) +
+                '%;background:' +
+                progressColor +
+                '"></div></div>' +
+                '<div style="margin-top:4px;color:#333">\ud83d\udccb Aktivitas: ' +
+                escHtml(aktivitasDisplay || '-') +
+                '</div></div>';
+              if (hasil)
+                htmlContent +=
+                  '<div style="padding-left:16px;font-size:.78rem;color:#2e7d32;margin-top:2px">\u2714 Hasil: ' +
+                  escHtml(hasilDisplay) +
+                  '</div>';
+              if (kendala)
+                htmlContent +=
+                  '<div style="padding-left:16px;font-size:.78rem;color:#c62828;margin-top:2px">\u26a0 Kendala: ' +
+                  escHtml(kendalaDisplay) +
+                  '</div>';
+              if (solusi)
+                htmlContent +=
+                  '<div style="padding-left:16px;font-size:.78rem;color:#e65100;margin-top:2px">\ud83d\udca1 Tindak Lanjut: ' +
+                  escHtml(solusiDisplay) +
+                  '</div>';
+              htmlContent += '</div>';
+
+              if (prog >= 100) {
+                totalDone++;
+                deptDone++;
+              } else {
+                totalProgress++;
+                deptProgress++;
+                if (prog >= 70) {
+                  totalOnTrack++;
+                  deptOnTrack++;
+                } else {
+                  totalNeedAttention++;
+                  deptNeedAttention++;
+                }
+              }
+              if (kendala) {
+                totalKendala++;
+                deptKendala++;
+                deptKendalaNotes.push(
+                  '• ' + nama + ': ' + kendala.split('\n')[0].substring(0, 80)
+                );
+              } else {
+                totalTanpaKendala++;
+                deptTanpaKendala++;
+              }
+              totalProgressValue += prog;
+            });
+
+            htmlContent += '</div>'; // end category block
+          });
+
+        var deptAvg = deptItems.length
           ? Math.round(
-              items.reduce(function (acc, it) {
+              deptItems.reduce(function (acc, it) {
                 var p = parseInt(it.progress, 10);
                 if (isNaN(p)) p = 0;
                 return acc + Math.max(0, Math.min(100, p));
-              }, 0) / items.length
+              }, 0) / deptItems.length
             )
           : 0;
         waText +=
@@ -3198,15 +3259,17 @@ async function _loadReportSummaryForDate(dateVal) {
         }
         htmlContent +=
           '<div style="padding-top:6px;font-size:.72rem;color:#777">Coverage kendala: <b>' +
-          (items.length ? Math.round((deptKendala / items.length) * 100) : 0) +
+          (deptItems.length ? Math.round((deptKendala / deptItems.length) * 100) : 0) +
           '%</b> report punya hambatan</div>';
         htmlContent +=
           '<div style="padding-top:4px;font-size:.72rem;color:#777">Coverage progres tinggi (Done + On Track): <b>' +
-          (items.length ? Math.round(((deptDone + deptOnTrack) / items.length) * 100) : 0) +
+          (deptItems.length
+            ? Math.round(((deptDone + deptOnTrack) / deptItems.length) * 100)
+            : 0) +
           '%</b></div>';
         htmlContent +=
           '<div style="padding-top:2px;font-size:.72rem;color:#777">Coverage progres rendah (Perlu Atensi): <b>' +
-          (items.length ? Math.round((deptNeedAttention / items.length) * 100) : 0) +
+          (deptItems.length ? Math.round((deptNeedAttention / deptItems.length) * 100) : 0) +
           '%</b></div>';
         htmlContent += '</div>';
       });
@@ -3241,6 +3304,29 @@ async function _loadReportSummaryForDate(dateVal) {
       kendalaCoverage +
       '%';
   }
+
+  // Build division filter tabs
+  var filterTabs =
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">' +
+    ['all', 'academic', 'office']
+      .map(function (div) {
+        var label = div === 'all' ? '🗂️ Semua' : div === 'academic' ? '📚 Academic' : '🏢 Office';
+        var active = _reportSummaryDivisionFilter === div;
+        return (
+          '<button class="btn btn-sm" ' +
+          'style="' +
+          (active
+            ? 'background:var(--primary);color:#fff;font-weight:700'
+            : 'background:#f0f0f0;color:#333') +
+          '" onclick="filterReportSummaryByDivision(\'' +
+          div +
+          '\')">' +
+          label +
+          '</button>'
+        );
+      })
+      .join('') +
+    '</div>';
 
   var summaryPage =
     '<div class="card mb-16">' +
@@ -3281,6 +3367,7 @@ async function _loadReportSummaryForDate(dateVal) {
     '</div>' +
     '</div>' +
     '</div>' +
+    filterTabs +
     htmlContent +
     '<textarea id="waShareText" style="display:none">' +
     escHtml(waText) +
@@ -3289,6 +3376,129 @@ async function _loadReportSummaryForDate(dateVal) {
   container.innerHTML = summaryPage;
   // Store raw waText for sharing (textarea has escaped HTML, we need raw)
   container.setAttribute('data-wa-text', waText);
+}
+
+function filterReportSummaryByDivision(div) {
+  _reportSummaryDivisionFilter = div;
+  var dateVal = (document.getElementById('summaryDate') || {}).value || todayStr();
+  _loadReportSummaryForDate(dateVal);
+}
+
+function viewReportFromSummary(id) {
+  var task = _reportSummaryCache[id];
+  if (!task) {
+    toast('Data report tidak ditemukan', 'warning');
+    return;
+  }
+  var moodMap = {
+    sangat_baik: '\ud83e\udd29 Sangat Baik',
+    baik: '\ud83d\ude0a Baik',
+    cukup: '\ud83d\ude10 Cukup',
+    kurang: '\ud83d\ude1f Kurang',
+    buruk: '\ud83d\ude1e Buruk',
+    sangat_buruk: '\ud83d\ude2b Sangat Buruk',
+  };
+  var moodLabel = moodMap[task.mood] || '\ud83d\ude10 ' + (task.mood || '-');
+  var progressColor =
+    task.progress >= 80 ? '#2e7d32' : task.progress >= 50 ? '#f57f17' : '#c62828';
+  openModal(
+    '<div class="modal-title">\ud83d\udcdd Daily Report</div>' +
+      '<div style="background:#f8f9ff;padding:16px;border-radius:8px;margin-bottom:16px;border-left:4px solid var(--primary)">' +
+      '<div class="fw-700" style="color:var(--primary)">' +
+      escHtml(task.targetUserName || task.nama || '-') +
+      '</div>' +
+      '<div class="text-sm" style="color:#666">\ud83d\udcc5 ' +
+      formatDate(task.tanggal) +
+      ' | \u23f0 ' +
+      (task.jamMasuk || '-') +
+      ' - ' +
+      (task.jamKeluar || '-') +
+      '</div>' +
+      '<div class="text-sm mt-4">\ud83c\udfe2 ' +
+      escHtml(task.departemen || '-') +
+      ' | \ud83d\udcc2 ' +
+      escHtml(task.kategori || '-') +
+      '</div>' +
+      '<div class="text-sm mt-4">Progress: <span style="color:' +
+      progressColor +
+      ';font-weight:700">' +
+      (task.progress || 0) +
+      '%</span> | Durasi: <b>' +
+      (task.durasi || '-') +
+      ' hari</b> | Mood: ' +
+      moodLabel +
+      '</div>' +
+      '</div>' +
+      '<div class="mb-16"><div class="fw-700 mb-4" style="color:var(--primary)">\ud83d\udccb Aktivitas</div>' +
+      '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:12px;font-size:.85rem;white-space:pre-wrap;line-height:1.7">' +
+      escHtml(task.aktivitas || task.description || '-') +
+      '</div></div>' +
+      (task.hasil
+        ? '<div class="mb-16"><div class="fw-700 mb-4" style="color:#2e7d32">\u2705 Hasil / Output</div><div style="background:#f1f8e9;border-radius:8px;padding:12px;font-size:.85rem;white-space:pre-wrap">' +
+          escHtml(task.hasil) +
+          '</div></div>'
+        : '') +
+      (task.kendala
+        ? '<div class="mb-16"><div class="fw-700 mb-4" style="color:#c62828">\u26a0\ufe0f Kendala / Case</div><div style="background:#fff8f8;border-radius:8px;padding:12px;font-size:.85rem;white-space:pre-wrap">' +
+          escHtml(task.kendala) +
+          '</div></div>'
+        : '') +
+      (task.solusi
+        ? '<div class="mb-16"><div class="fw-700 mb-4" style="color:#ff6f00">\ud83d\udca1 Solusi / Tindakan</div><div style="background:#fff8e1;border-radius:8px;padding:12px;font-size:.85rem;white-space:pre-wrap">' +
+          escHtml(task.solusi) +
+          '</div></div>'
+        : '') +
+      (task.rencana
+        ? '<div class="mb-16"><div class="fw-700 mb-4" style="color:#1565c0">\ud83c\udf1f Rencana Besok</div><div style="background:#e3f2fd;border-radius:8px;padding:12px;font-size:.85rem;white-space:pre-wrap">' +
+          escHtml(task.rencana) +
+          '</div></div>'
+        : '') +
+      (task.komentarAtasan
+        ? '<div class="mb-16"><div class="fw-700 mb-4" style="color:#6a1b9a">\ud83d\udcac Komentar untuk Atasan</div><div style="background:#f3e5f5;border-radius:8px;padding:12px;font-size:.85rem;white-space:pre-wrap">' +
+          escHtml(task.komentarAtasan) +
+          '</div></div>'
+        : '') +
+      (task.komentarRekan
+        ? '<div class="mb-16"><div class="fw-700 mb-4" style="color:#00695c">\ud83e\udd1d Komentar untuk Rekan Kerja</div><div style="background:#e0f2f1;border-radius:8px;padding:12px;font-size:.85rem;white-space:pre-wrap">' +
+          escHtml(task.komentarRekan) +
+          '</div></div>'
+        : '') +
+      (task.attachments && task.attachments.length
+        ? '<div class="mb-16" style="padding:16px;background:#f8f9ff;border-radius:10px;border:1px solid var(--border)"><div class="fw-700 mb-12" style="color:#37474f">\ud83d\udcce Lampiran Eviden (' +
+          task.attachments.length +
+          ' file)</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px">' +
+          task.attachments
+            .map(function (a, i) {
+              return a.type && a.type.startsWith('image/')
+                ? '<div style="text-align:center;cursor:pointer" onclick="viewEviden(\'' +
+                    encodeURIComponent(JSON.stringify({ name: a.name, type: a.type, data: a.data })) +
+                    '\')"><img src="' +
+                    a.data +
+                    '" style="width:100%;height:100px;object-fit:cover;border-radius:8px;border:2px solid var(--border)"><div style="font-size:.6rem;color:#666;margin-top:4px">' +
+                    escHtml(a.name || 'Foto ' + (i + 1)) +
+                    '</div></div>'
+                : '<div style="cursor:pointer;display:flex;flex-direction:column;align-items:center;padding:14px;background:#fff;border-radius:8px;border:1px solid var(--border)" onclick="viewEviden(\'' +
+                    encodeURIComponent(JSON.stringify({ name: a.name, type: a.type, data: a.data })) +
+                    '\')"><div style="font-size:2.5rem">' +
+                    (a.name && a.name.endsWith('.pdf')
+                      ? '\ud83d\udcd5'
+                      : a.name && a.name.match(/\.docx?$/)
+                        ? '\ud83d\udcd8'
+                        : a.name && a.name.match(/\.xlsx?$/)
+                          ? '\ud83d\udcd7'
+                          : '\ud83d\udcc4') +
+                    '</div><div style="font-size:.65rem;color:#333;margin-top:6px;text-align:center;word-break:break-all">' +
+                    escHtml(a.name) +
+                    '</div><div style="font-size:.6rem;color:#1565c0;margin-top:4px;font-weight:600">\ud83d\udc41\ufe0f Lihat</div></div>';
+            })
+            .join('') +
+          '</div></div>'
+        : '') +
+      '<div class="text-xs" style="color:#999">Dikirim: ' +
+      formatDateTime(task.createdAt) +
+      '</div>',
+    true
+  );
 }
 
 async function shareReportWA() {
