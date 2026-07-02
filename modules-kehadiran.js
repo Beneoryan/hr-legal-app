@@ -1938,6 +1938,48 @@ async function loadDailyTasks(filter) {
   }
   const isAdmin = hasAccess(3);
   let html = dateFilterHtml;
+
+  // ── TRACKER STYLE for team-report and all-report tabs ──────────
+  if (filter === 'team-report' || filter === 'all-report') {
+    html += _renderGroupedReportTracker(filtered, filter);
+    listEl.innerHTML = html;
+    return;
+  }
+
+  // ── TRACKER STATS for report tab at leader+ ────────────────────
+  if (filter === 'report' && hasAccess(2)) {
+    // Build grouped tracker per category
+    var reportOnlyItems = filtered.filter(function (t) {
+      return t.type === 'report' || (t.title && t.title.includes('Daily Report'));
+    });
+    if (reportOnlyItems.length) {
+      var byCatOwn = {};
+      reportOnlyItems.forEach(function (r) {
+        var cat = r.kategori || 'Tanpa Kategori';
+        if (!byCatOwn[cat]) byCatOwn[cat] = [];
+        byCatOwn[cat].push(r);
+      });
+      Object.keys(byCatOwn)
+        .sort()
+        .forEach(function (cat) {
+          var catItems = byCatOwn[cat];
+          html +=
+            '<div style="padding:10px 12px;margin:12px 0 8px;background:#e3f2fd;border-radius:8px;font-weight:700;font-size:.88rem;color:#1565c0;border-left:4px solid #1565c0">' +
+            '\ud83d\udcc2 ' +
+            escHtml(cat) +
+            ' (' +
+            catItems.length +
+            ')</div>';
+          catItems.forEach(function (r) {
+            html += _buildReportTrackerRow(r);
+          });
+          html += _buildReportTrackerStats(catItems);
+        });
+      listEl.innerHTML = html;
+      return;
+    }
+  }
+
   // Add group headers for report views
   let lastGroup = '';
   let lastSubGroup = '';
@@ -1947,30 +1989,6 @@ async function loadDailyTasks(filter) {
       if (group !== lastGroup) {
         lastGroup = group;
         html += `<div style="padding:10px 12px;margin:12px 0 8px;background:#e3f2fd;border-radius:8px;font-weight:700;font-size:.88rem;color:#1565c0;border-left:4px solid #1565c0">📂 ${escHtml(group)}</div>`;
-      }
-    } else if (_dailyTaskFilter === 'team-report' && t.type === 'report') {
-      const group = t.kategori || 'Tanpa Kategori';
-      if (group !== lastGroup) {
-        lastGroup = group;
-        lastSubGroup = '';
-        html += `<div style="padding:10px 12px;margin:16px 0 8px;background:#e8f5e9;border-radius:8px;font-weight:700;font-size:.92rem;color:#2e7d32;border-left:4px solid #2e7d32">📂 ${escHtml(group)}</div>`;
-      }
-      const sub = t.targetUserName || '-';
-      if (sub !== lastSubGroup) {
-        lastSubGroup = sub;
-        html += `<div style="padding:6px 12px;margin:4px 0;font-size:.8rem;color:#555;font-weight:600">👤 ${escHtml(sub)}</div>`;
-      }
-    } else if (_dailyTaskFilter === 'all-report' && t.type === 'report') {
-      const group = t.departemen || 'Tanpa Departemen';
-      const sub = t.kategori || 'Tanpa Kategori';
-      if (group !== lastGroup) {
-        lastGroup = group;
-        lastSubGroup = '';
-        html += `<div style="padding:12px 14px;margin:16px 0 8px;background:#1a1a1a;border-radius:8px;font-weight:700;font-size:.95rem;color:#fff">🏢 ${escHtml(group)}</div>`;
-      }
-      if (sub !== lastSubGroup) {
-        lastSubGroup = sub;
-        html += `<div style="padding:8px 12px;margin:4px 0 6px;background:#f3e5f5;border-radius:6px;font-size:.83rem;color:#7b1fa2;font-weight:700">📂 ${escHtml(sub)}</div>`;
       }
     }
     // Daily Report display
@@ -2039,6 +2057,40 @@ async function loadDailyTasks(filter) {
       html += `<div style="display:flex;gap:4px;flex-wrap:wrap"><a href="${buildGCalUrl(t)}" target="_blank" class="btn btn-xs btn-info" title="Tambah ke Google Calendar" style="text-decoration:none">📅</a><button class="btn btn-xs btn-info" onclick="viewDailyTask('${t.id}')" title="Lihat">👁️</button></div></div>`;
     }
   });
+
+  // ── TASK COMPLETION TRACKER for leader+ on task tabs ───────────
+  var taskOnlyFilters = ['all', 'today', 'upcoming', 'done', 'overdue', 'assigned'];
+  if (taskOnlyFilters.includes(filter) && hasAccess(2) && filtered.length) {
+    var taskItems = filtered.filter(function (t) {
+      return t.type !== 'report';
+    });
+    if (taskItems.length) {
+      // Group by assignee/target or by dept for head+
+      var byGroup = {};
+      taskItems.forEach(function (t) {
+        var grpKey =
+          hasAccess(4) ? (t.departemen || 'Tanpa Departemen') : (t.targetUserName || t.assignedToName || 'Saya');
+        if (!byGroup[grpKey]) byGroup[grpKey] = [];
+        byGroup[grpKey].push(t);
+      });
+      var grpKeys = Object.keys(byGroup).sort();
+      if (grpKeys.length > 1 || (grpKeys.length === 1 && grpKeys[0] !== 'Saya')) {
+        html +=
+          '<div style="margin-top:16px;padding:10px 12px;background:#f8f9ff;border-radius:8px;border:1px solid #c8d8f0">' +
+          '<div style="font-weight:700;font-size:.82rem;color:#1565c0;margin-bottom:8px">\ud83d\udcca Ringkasan Penyelesaian Tugas</div>';
+        grpKeys.forEach(function (grpKey) {
+          var grpTasks = byGroup[grpKey];
+          html +=
+            '<div style="margin-bottom:6px;font-size:.8rem;font-weight:600;color:#333">' +
+            escHtml(grpKey) +
+            '</div>';
+          html += _buildTaskTrackerStats(grpTasks);
+        });
+        html += '</div>';
+      }
+    }
+  }
+
   listEl.innerHTML = html;
 }
 
@@ -4498,6 +4550,28 @@ async function loadWeeklyReports(divFilter) {
               '</div></div>';
           html += '</div>';
         });
+        // ── TRACKER STATS per division for leader+ ────────────────
+        if (hasAccess(2)) {
+          var wrKendala = 0, wrTanpaKendala = 0, wrTotalPct = 0;
+          rows.forEach(function (r) {
+            if ((r.kendala || r.case_desc || '').trim()) wrKendala++;
+            else wrTanpaKendala++;
+            var p = parseInt(r.progress, 10) || 0;
+            if (!isNaN(p)) wrTotalPct += Math.max(0, Math.min(100, p));
+          });
+          var wrAvg = rows.length ? Math.round(wrTotalPct / rows.length) : 0;
+          var wrKendalaCov = rows.length ? Math.round((wrKendala / rows.length) * 100) : 0;
+          html +=
+            '<div style="padding:8px 12px;background:#f0faf4;border-radius:8px;margin-top:6px;font-size:.75rem;border:1px solid #c8e6c9">' +
+            '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:4px">' +
+            '<span>\u26a0\ufe0f Kendala: <b>' + wrKendala + '</b></span>' +
+            '<span>\u2705 Tanpa Kendala: <b>' + wrTanpaKendala + '</b></span>' +
+            '<span>\ud83d\udccb Total: <b>' + rows.length + '</b></span>' +
+            '</div>' +
+            '<div style="color:#2e7d32;font-weight:700">\ud83d\udcc8 Rata-rata Progress: ' + wrAvg + '%</div>' +
+            '<div style="color:#777;margin-top:2px">Coverage kendala: <b>' + wrKendalaCov + '%</b> laporan punya hambatan</div>' +
+            '</div>';
+        }
         html += '</div>';
       });
     listEl.innerHTML = html;
@@ -4683,6 +4757,277 @@ async function viewUserProfile(nama) {
   } catch (e) {
     toast('Gagal memuat profil: ' + e.message, 'error');
   }
+}
+
+// ── ACTIVITY TRACKER HELPERS ────────────────────────────────────
+// Compute and render tracker stats block for a group of report items
+function _buildReportTrackerStats(items) {
+  var done = 0,
+    onTrack = 0,
+    needAttention = 0,
+    progress = 0,
+    kendala = 0,
+    tanpaKendala = 0,
+    totalPct = 0;
+  items.forEach(function (r) {
+    var p = Math.max(0, Math.min(100, parseInt(r.progress, 10) || 0));
+    totalPct += p;
+    if (p >= 100) {
+      done++;
+    } else {
+      progress++;
+      if (p >= 70) onTrack++;
+      else needAttention++;
+    }
+    if ((r.kendala || '').trim()) kendala++;
+    else tanpaKendala++;
+  });
+  var total = items.length;
+  var avg = total ? Math.round(totalPct / total) : 0;
+  var kendalaCov = total ? Math.round((kendala / total) * 100) : 0;
+  var highCov = total ? Math.round(((done + onTrack) / total) * 100) : 0;
+  var lowCov = total ? Math.round((needAttention / total) * 100) : 0;
+  return (
+    '<div style="padding:8px 12px;background:#f0faf4;border-radius:8px;margin-top:8px;font-size:.75rem;border:1px solid #c8e6c9">' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:4px">' +
+    '<span>\u2705 Done: <b>' +
+    done +
+    '</b></span>' +
+    '<span>\ud83d\udfe1 On Track: <b>' +
+    onTrack +
+    '</b></span>' +
+    '<span>\ud83d\udd34 Perlu Atensi: <b>' +
+    needAttention +
+    '</b></span>' +
+    '<span>\u23f3 Progress: <b>' +
+    progress +
+    '</b></span>' +
+    '<span>\u26a0\ufe0f Kendala: <b>' +
+    kendala +
+    '</b></span>' +
+    '<span>\u2705 Tanpa Kendala: <b>' +
+    tanpaKendala +
+    '</b></span>' +
+    '</div>' +
+    '<div style="color:#2e7d32;font-weight:700">\ud83d\udcc8 Rata-rata: ' +
+    avg +
+    '%</div>' +
+    '<div style="color:#777;margin-top:2px">Coverage kendala: <b>' +
+    kendalaCov +
+    '%</b> report punya hambatan</div>' +
+    '<div style="color:#777">Coverage progres tinggi (Done + On Track): <b>' +
+    highCov +
+    '%</b></div>' +
+    '<div style="color:#777">Coverage progres rendah (Perlu Atensi): <b>' +
+    lowCov +
+    '%</b></div>' +
+    '</div>'
+  );
+}
+
+// Render a single report person row with progress bar + aktivitas
+function _buildReportTrackerRow(r) {
+  var prog = Math.max(0, Math.min(100, parseInt(r.progress, 10) || 0));
+  var progressColor = prog >= 100 ? '#2e7d32' : prog >= 70 ? '#f57f17' : '#c62828';
+  var statusIcon = prog >= 100 ? '\u2705' : prog >= 70 ? '\ud83d\udfe1' : '\ud83d\udd34';
+  var aktivitasDisplay = (r.aktivitas || r.description || '-').substring(0, 200);
+  var canEditReport =
+    currentUser.role !== 'bod' &&
+    (r.userId === currentUser.id || hasAccess(3) || r.source === 'spreadsheet-import');
+  var editBtns = canEditReport
+    ? ' <button class="btn btn-xs btn-warning" onclick="event.stopPropagation();editDailyReport(\'' +
+      r.id +
+      '\')">&#9999;&#65039;</button>' +
+      ' <button class="btn btn-xs btn-danger" onclick="event.stopPropagation();hapusDailyTask(\'' +
+      r.id +
+      '\')">\ud83d\uddd1\ufe0f</button>'
+    : '';
+  return (
+    '<div style="margin-bottom:8px;padding:10px 12px;border:1px solid #e8e8e8;border-radius:8px;background:#fff;cursor:pointer" onclick="viewDailyReport(\'' +
+    r.id +
+    '\')">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">' +
+    '<div style="font-weight:600;font-size:.85rem">' +
+    statusIcon +
+    ' ' +
+    escHtml((r.targetUserName || r.nama || '-').toUpperCase()) +
+    '</div>' +
+    '<div style="display:flex;align-items:center;gap:6px">' +
+    '<span style="font-weight:700;color:' +
+    progressColor +
+    '">' +
+    (prog >= 100 ? '\u2705' : prog + '%') +
+    '</span>' +
+    '<button class="btn btn-xs btn-info" onclick="event.stopPropagation();viewDailyReport(\'' +
+    r.id +
+    '\')" style="padding:2px 7px;font-size:.7rem">\ud83d\udc41\ufe0f View</button>' +
+    editBtns +
+    '</div></div>' +
+    '<div style="height:8px;background:#eee;border-radius:999px;overflow:hidden;margin:6px 0">' +
+    '<div style="height:100%;width:' +
+    prog +
+    '%;background:' +
+    progressColor +
+    ';border-radius:999px;transition:width .3s"></div>' +
+    '</div>' +
+    '<div style="font-size:.82rem;color:#333">\ud83d\udccb Aktivitas: ' +
+    escHtml(aktivitasDisplay) +
+    '</div>' +
+    (r.kendala
+      ? '<div style="font-size:.78rem;color:#c62828;margin-top:3px">\u26a0\ufe0f Kendala: ' +
+        escHtml((r.kendala || '').substring(0, 120)) +
+        '</div>'
+      : '') +
+    '</div>'
+  );
+}
+
+// Build task completion stats block for a group of task items
+function _buildTaskTrackerStats(tasks) {
+  var total = tasks.length;
+  var done = tasks.filter(function (t) {
+    return t.done;
+  }).length;
+  var today2 = todayStr();
+  var overdue = tasks.filter(function (t) {
+    return !t.done && t.tanggal < today2;
+  }).length;
+  var pending = total - done - overdue;
+  var pct = total ? Math.round((done / total) * 100) : 0;
+  var progressColor = pct >= 80 ? '#2e7d32' : pct >= 50 ? '#f57f17' : '#c62828';
+  return (
+    '<div style="padding:8px 12px;background:#e8f5e9;border-radius:8px;margin-top:8px;font-size:.75rem;border:1px solid #c8e6c9">' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:4px">' +
+    '<span>\u2705 Selesai: <b>' +
+    done +
+    '</b></span>' +
+    '<span>\u23f3 Proses: <b>' +
+    pending +
+    '</b></span>' +
+    '<span>\ud83d\udd34 Terlambat: <b>' +
+    overdue +
+    '</b></span>' +
+    '<span>\ud83d\udccb Total: <b>' +
+    total +
+    '</b></span>' +
+    '</div>' +
+    '<div style="height:6px;background:#eee;border-radius:999px;overflow:hidden;margin-top:4px">' +
+    '<div style="height:100%;width:' +
+    pct +
+    '%;background:' +
+    progressColor +
+    ';border-radius:999px"></div>' +
+    '</div>' +
+    '<div style="color:' +
+    progressColor +
+    ';font-weight:700;margin-top:4px">\ud83d\udcc8 Penyelesaian: ' +
+    pct +
+    '%</div>' +
+    '</div>'
+  );
+}
+
+// Render grouped report tracker (team-report or all-report style)
+function _renderGroupedReportTracker(reports, filter) {
+  if (!reports.length) {
+    return (
+      '<div style="text-align:center;padding:32px;color:#999">' +
+      '<div style="font-size:2rem;margin-bottom:8px">\ud83d\udcca</div>' +
+      '<p>Tidak ada report</p></div>'
+    );
+  }
+  var html = '';
+  if (filter === 'all-report') {
+    // group by dept → category
+    var byDept = {};
+    reports.forEach(function (r) {
+      var dept = r.departemen || 'Tanpa Departemen';
+      if (!byDept[dept]) byDept[dept] = {};
+      var cat = r.kategori || 'Tanpa Kategori';
+      if (!byDept[dept][cat]) byDept[dept][cat] = [];
+      byDept[dept][cat].push(r);
+    });
+    Object.keys(byDept)
+      .sort()
+      .forEach(function (dept) {
+        var katMap = byDept[dept];
+        var allDeptItems = Object.values(katMap).reduce(function (a, b) {
+          return a.concat(b);
+        }, []);
+        html +=
+          '<div style="margin-bottom:20px">' +
+          '<div style="padding:12px 14px;margin:8px 0;background:#1a1a1a;border-radius:8px;font-weight:700;font-size:.95rem;color:#fff">' +
+          '\ud83c\udfe2 ' +
+          escHtml(dept) +
+          ' (' +
+          allDeptItems.length +
+          ')</div>';
+        Object.keys(katMap)
+          .sort()
+          .forEach(function (cat) {
+            var catItems = katMap[cat];
+            html +=
+              '<div style="margin-bottom:12px;background:#f8f9ff;border-radius:8px;padding:10px 12px">' +
+              '<div style="font-weight:600;font-size:.82rem;color:#7b1fa2;margin-bottom:8px;border-bottom:1px solid #e0d0ff;padding-bottom:4px">' +
+              '\ud83d\udcc2 ' +
+              escHtml(cat) +
+              ' (' +
+              catItems.length +
+              ')</div>';
+            catItems.forEach(function (r) {
+              html += _buildReportTrackerRow(r);
+            });
+            html += _buildReportTrackerStats(catItems);
+            html += '</div>';
+          });
+        html += '</div>';
+      });
+  } else {
+    // team-report: group by category → person
+    var byCat = {};
+    reports.forEach(function (r) {
+      var cat = r.kategori || 'Tanpa Kategori';
+      if (!byCat[cat]) byCat[cat] = [];
+      byCat[cat].push(r);
+    });
+    Object.keys(byCat)
+      .sort()
+      .forEach(function (cat) {
+        var catItems = byCat[cat];
+        html +=
+          '<div style="margin-bottom:16px">' +
+          '<div style="padding:10px 12px;margin:8px 0;background:#e8f5e9;border-radius:8px;font-weight:700;font-size:.92rem;color:#2e7d32;border-left:4px solid #2e7d32">' +
+          '\ud83d\udcc2 ' +
+          escHtml(cat) +
+          ' (' +
+          catItems.length +
+          ')</div>';
+        // group by person
+        var byPerson = {};
+        catItems.forEach(function (r) {
+          var person = r.targetUserName || '-';
+          if (!byPerson[person]) byPerson[person] = [];
+          byPerson[person].push(r);
+        });
+        var personKeys = Object.keys(byPerson).sort();
+        personKeys.forEach(function (person) {
+          var pItems = byPerson[person];
+          if (personKeys.length > 1) {
+            html +=
+              '<div style="padding:4px 0 4px 4px;font-size:.8rem;color:#555;font-weight:600">' +
+              '\ud83d\udc64 ' +
+              escHtml(person) +
+              '</div>';
+          }
+          pItems.forEach(function (r) {
+            html += _buildReportTrackerRow(r);
+          });
+        });
+        html += _buildReportTrackerStats(catItems);
+        html += '</div>';
+      });
+  }
+  return html;
 }
 
 // Full-screen photo viewer (WhatsApp style)
