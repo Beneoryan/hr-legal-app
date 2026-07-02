@@ -1136,7 +1136,11 @@ function applyCrop() {
 }
 
 async function simpanDataPerusahaan() {
+  const existingDoc = await db.collection('hrd_settings').doc('perusahaan').get();
+  const existing = existingDoc.exists ? existingDoc.data() || {} : {};
   var waNumbers = parseWhatsAppNumbers(document.getElementById('cpWhatsapp').value);
+  var waApiUrl = document.getElementById('cpWaApiUrl').value.trim();
+  var waApiToken = document.getElementById('cpWaApiToken').value.trim();
   const data = {
     nama: document.getElementById('cpNama').value,
     npwp: document.getElementById('cpNpwp').value,
@@ -1147,8 +1151,8 @@ async function simpanDataPerusahaan() {
     whatsapp: waNumbers[0] || '',
     whatsappList: waNumbers,
     waProvider: document.getElementById('cpWaProvider').value,
-    waApiUrl: document.getElementById('cpWaApiUrl').value,
-    waApiToken: document.getElementById('cpWaApiToken').value,
+    waApiUrl: waApiUrl || existing.waApiUrl || '',
+    waApiToken: waApiToken || existing.waApiToken || '',
     waAutoReportEnabled: document.getElementById('cpWaAutoEnabled').value === '1',
     waAutoReportTime: document.getElementById('cpWaAutoTime').value || '18:00',
     jumlahKaryawan: Number(document.getElementById('cpJmlKaryawan').value) || 0,
