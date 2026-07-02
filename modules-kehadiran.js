@@ -3241,14 +3241,18 @@ async function _loadReportSummaryForDate(dateVal) {
   container.setAttribute('data-wa-text', waText);
 }
 
-function shareReportWA() {
+async function shareReportWA() {
   var container = document.getElementById('reportSummaryContent');
   var text = container ? container.getAttribute('data-wa-text') : '';
   if (!text) {
     toast('Tidak ada data untuk di-share', 'warning');
     return;
   }
-  window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+  var waNumber = await getRegisteredWhatsAppNumber();
+  if (!waNumber) {
+    toast('Nomor WhatsApp admin belum terdaftar. Menggunakan share umum.', 'warning');
+  }
+  window.open(buildWhatsAppShareUrl(text, waNumber), '_blank');
 }
 
 async function loadReportSummaryByDate(dateVal) {
