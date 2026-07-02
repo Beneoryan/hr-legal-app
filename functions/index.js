@@ -71,15 +71,17 @@ function parseTimeToMinuteOfDay(timeStr) {
 }
 
 function buildDailyReportSummaryMessage(reportDate, reports) {
-  const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-  const dObj = new Date(`${reportDate}T00:00:00+07:00`);
-  const dayName = dayNames[dObj.getUTCDay()];
-  const dateStr = dObj.toLocaleDateString('id-ID', {
+  const dayNameRaw = new Intl.DateTimeFormat('id-ID', {
+    weekday: 'long',
+    timeZone: 'Asia/Jakarta',
+  }).format(new Date(`${reportDate}T00:00:00+07:00`));
+  const dayName = dayNameRaw.charAt(0).toUpperCase() + dayNameRaw.slice(1);
+  const dateStr = new Intl.DateTimeFormat('id-ID', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
     timeZone: 'Asia/Jakarta',
-  });
+  }).format(new Date(`${reportDate}T00:00:00+07:00`));
 
   let totalDone = 0;
   let totalProgress = 0;
@@ -123,29 +125,75 @@ function buildDailyReportSummaryMessage(reportDate, reports) {
     .forEach((dept) => {
       const items = byDept[dept];
       const icon = dept.includes('ACADEMIC') ? '📚' : '🏢';
-      const avg = Math.round(
-        items.reduce((acc, it) => {
-          let p = parseInt(it.progress, 10);
-          if (Number.isNaN(p)) p = 0;
-          return acc + Math.max(0, Math.min(100, p));
-        }, 0) / items.length
-      );
-      text += `${icon} ${dept} (${items.length})\n`;
-      text += `  📈 Rata-rata progress: ${avg}%\n`;
-      items.slice(0, 8).forEach((r) => {
+      let deptDone = 0;
+      let deptProgress = 0;
+      let deptOnTrack = 0;
+      let deptNeedAttention = 0;
+      let deptKendala = 0;
+      let deptTanpaKendala = 0;
+      const deptKendalaNotes = [];
+      text += `${icon} ${dept} (${items.length} report)\n`;
+      items.forEach((r) => {
         const nama = (r.targetUserName || r.nama || '-').toUpperCase();
         let prog = parseInt(r.progress, 10);
         if (Number.isNaN(prog)) prog = 0;
+        prog = Math.max(0, Math.min(100, prog));
+        const hasil = String(r.hasil || '').trim();
+        const kendala = String(r.kendala || '').trim();
+        const solusi = String(r.solusi || '').trim();
         const aktivitas = String(r.aktivitas || '-')
           .split('\n')[0]
-          .substring(0, 70);
-        text += `  • ${nama} (${prog}%) — ${aktivitas}\n`;
+          .substring(0, 80);
+
+        text += `• ${nama}\n`;
+        text += `  📈 Progress: ${prog}%\n`;
+        text += `  📋 Aktivitas: ${aktivitas}\n`;
+        if (hasil) text += `  ✔ Hasil: ${hasil.split('\n')[0].substring(0, 100)}\n`;
+        if (kendala) text += `  ⚠ Kendala: ${kendala.split('\n')[0].substring(0, 100)}\n`;
+        if (solusi) text += `  💡 Tindak Lanjut: ${solusi.split('\n')[0].substring(0, 100)}\n`;
+
+        if (prog >= 100) {
+          deptDone++;
+        } else {
+          deptProgress++;
+          if (prog >= 70) deptOnTrack++;
+          else deptNeedAttention++;
+        }
+
+        if (kendala) {
+          deptKendala++;
+          deptKendalaNotes.push(`• ${nama}: ${kendala.split('\n')[0].substring(0, 80)}`);
+        } else {
+          deptTanpaKendala++;
+        }
       });
+
+      const deptAvg = items.length
+        ? Math.round(
+            items.reduce((acc, it) => {
+              let p = parseInt(it.progress, 10);
+              if (Number.isNaN(p)) p = 0;
+              return acc + Math.max(0, Math.min(100, p));
+            }, 0) / items.length
+          )
+        : 0;
+      text +=
+        `  📊 Dept: ✅ ${deptDone} | 🟡 On Track ${deptOnTrack} | 🔴 Perlu Atensi ${deptNeedAttention} | ⚠ ${deptKendala} | 📈 ${deptAvg}%\n`;
+      if (deptKendalaNotes.length) {
+        text += '  🚧 Kendala Utama:\n';
+        deptKendalaNotes.slice(0, 3).forEach((k) => {
+          text += `   ${k}\n`;
+        });
+      }
       text += '\n';
     });
 
   const avgProgress = Math.round(totalProgressValue / reports.length);
-  text += `📊 Total: ${reports.length} report | ✅ ${totalDone} done | ⏳ ${totalProgress} progress | 🟡 ${totalOnTrack} on track | 🔴 ${totalNeedAttention} perlu atensi | ⚠ ${totalKendala} kendala | ✅ ${totalTanpaKendala} tanpa kendala | 📈 rata-rata ${avgProgress}%`;
+  const highCoverage = Math.round(((totalDone + totalOnTrack) / reports.length) * 100);
+  const kendalaCoverage = Math.round((totalKendala / reports.length) * 100);
+  text +=
+    `📊 Total: ${reports.length} report | ✅ ${totalDone} done | ⏳ ${totalProgress} progress | 🟡 ${totalOnTrack} on track | 🔴 ${totalNeedAttention} perlu atensi | ⚠ ${totalKendala} kendala | ✅ ${totalTanpaKendala} tanpa kendala | 📈 rata-rata ${avgProgress}%\n`;
+  text += `📊 Coverage: Progres tinggi ${highCoverage}% | Report dengan kendala ${kendalaCoverage}%`;
   return text;
 }
 
