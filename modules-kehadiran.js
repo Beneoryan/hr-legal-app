@@ -1344,8 +1344,8 @@ async function renderDailyTask() {
     tabs +=
       '<div class="tab" onclick="filterDailyTasks(\'history-assigned\')">📊 History Tugas</div>';
   }
-  if (hasAccess(3) && !hasAccess(5)) {
-    // Manager/Head only can view weekly reports (not BOD, not staff/leader)
+  if (hasAccess(2)) {
+    // Leader/Manager/Head/BOD can view weekly reports
     tabs += '<div class="tab" onclick="loadWeeklyReports()">📈 Laporan Mingguan</div>';
   }
 
@@ -4448,10 +4448,12 @@ async function loadWeeklyReports(divFilter) {
       wrCatOpts +
       '</select>';
     html += '<span style="margin-left:auto"></span>';
-    html +=
-      '<button class="btn btn-xs btn-danger" onclick="deleteSelectedWeeklyReports()">🗑️ Hapus Terpilih</button> ';
-    html +=
-      '<button class="btn btn-xs btn-warning" onclick="resetAllWeeklyReports()">⚠️ Reset Semua</button>';
+    if (currentUser.role !== 'bod') {
+      html +=
+        '<button class="btn btn-xs btn-danger" onclick="deleteSelectedWeeklyReports()">🗑️ Hapus Terpilih</button> ';
+      html +=
+        '<button class="btn btn-xs btn-warning" onclick="resetAllWeeklyReports()">⚠️ Reset Semua</button>';
+    }
     html += '</div>';
     html +=
       '<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;padding:8px 12px;background:#f8f9ff;border-radius:8px">';
@@ -4469,10 +4471,12 @@ async function loadWeeklyReports(divFilter) {
       html +=
         '<button class="btn btn-xs btn-outline" onclick="_wrDateFrom=\'\';_wrDateTo=\'\';loadWeeklyReports()">✕</button>';
     html += '</div>';
-    html +=
-      '<div style="margin-bottom:8px"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="wrSelectAll" onchange="document.querySelectorAll(\'.wr-check\').forEach(function(c){c.checked=this.checked}.bind(this))"> <span class="text-sm fw-700">Pilih Semua (' +
-      filtered.length +
-      ' data)</span></label></div>';
+    if (currentUser.role !== 'bod') {
+      html +=
+        '<div style="margin-bottom:8px"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="wrSelectAll" onchange="document.querySelectorAll(\'.wr-check\').forEach(function(c){c.checked=this.checked}.bind(this))"> <span class="text-sm fw-700">Pilih Semua (' +
+        filtered.length +
+        ' data)</span></label></div>';
+    }
     if (!filtered.length) {
       html +=
         '<div style="text-align:center;padding:24px;color:#999">Tidak ada data untuk filter ini.</div>';
@@ -4508,12 +4512,14 @@ async function loadWeeklyReports(divFilter) {
           html +=
             '<div style="border:1px solid #e0e0e0;border-radius:10px;padding:14px;margin-bottom:10px;background:#fff">';
           html += '<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">';
-          html +=
-            '<input type="checkbox" class="wr-check" value="' +
-            r.id +
-            '" data-col="' +
-            (r.col || 'hrd_daily_tasks') +
-            '">';
+          if (currentUser.role !== 'bod') {
+            html +=
+              '<input type="checkbox" class="wr-check" value="' +
+              r.id +
+              '" data-col="' +
+              (r.col || 'hrd_daily_tasks') +
+              '">';
+          }
           html += '<div style="flex:1"><div class="fw-700">' + escHtml(pic) + '</div>';
           html +=
             '<div class="text-xs" style="color:#666">📅 ' +
