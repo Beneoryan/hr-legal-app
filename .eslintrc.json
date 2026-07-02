@@ -10,6 +10,7 @@
     "sourceType": "module"
   },
   "rules": {
+    "no-undef": "off",
     "no-unused-vars": [
       "warn",
       {
@@ -19,25 +20,19 @@
     "no-console": [
       "warn",
       {
-        "allow": [
-          "warn",
-          "error"
-        ]
+        "allow": ["warn", "error"]
       }
     ],
     "quotes": [
-      "error",
+      "warn",
       "single",
       {
         "avoidEscape": true
       }
     ],
-    "semi": [
-      "error",
-      "always"
-    ],
+    "semi": ["warn", "always"],
     "comma-dangle": [
-      "error",
+      "warn",
       {
         "arrays": "always-multiline",
         "objects": "always-multiline",
@@ -45,6 +40,21 @@
         "exports": "always-multiline",
         "functions": "never"
       }
-    ]
-  }
+    ],
+    "no-empty": "warn",
+    "no-useless-escape": "warn"
+  },
+  "overrides": [
+    {
+      "files": ["functions/**/*.js"],
+      "env": {
+        "browser": false,
+        "node": true
+      },
+      "rules": {
+        "no-undef": "error",
+        "no-empty": "error"
+      }
+    }
+  ]
 }

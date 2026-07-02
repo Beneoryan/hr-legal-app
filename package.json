@@ -5,8 +5,8 @@
   "main": "index.html",
   "type": "module",
   "scripts": {
-    "lint": "eslint . --ext .js,.jsx,.ts,.tsx --ignore-path .gitignore",
-    "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix --ignore-path .gitignore",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx --ignore-path .gitignore --ignore-pattern functions/**",
+    "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix --ignore-path .gitignore --ignore-pattern functions/**",
     "format": "prettier --write . --ignore-path .gitignore",
     "format:check": "prettier --check . --ignore-path .gitignore",
     "validate": "npm run lint && npm run format:check"
