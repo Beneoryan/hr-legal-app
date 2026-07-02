@@ -149,6 +149,18 @@ function buildDailyReportSummaryMessage(reportDate, reports) {
   return text;
 }
 
+async function loadDailyReportsForDate(reportDate) {
+  const snap = await db.collection('hrd_daily_tasks').get();
+  const reports = [];
+  snap.forEach((d) => {
+    const data = d.data() || {};
+    if (data.type === 'report' && String(data.tanggal || '') === reportDate) {
+      reports.push(data);
+    }
+  });
+  return reports;
+}
+
 /**
  * Helper: Get FCM token(s) for a specific user ID.
  * Reads from subcollection: hrd_fcm_tokens/{userId}/devices/*
@@ -516,14 +528,7 @@ exports.autoQueueDailyReportWa = functions.pubsub
       { merge: true }
     );
 
-    const reportSnap = await db
-      .collection('hrd_daily_tasks')
-      .where('type', '==', 'report')
-      .where('tanggal', '==', reportDate)
-      .get();
-
-    const reports = [];
-    reportSnap.forEach((d) => reports.push(d.data()));
+    const reports = await loadDailyReportsForDate(reportDate);
     const message = buildDailyReportSummaryMessage(reportDate, reports);
     const createdAt = new Date().toISOString();
     const queueResults = [];
@@ -550,7 +555,9 @@ exports.autoQueueDailyReportWa = functions.pubsub
       queueResults.push({ targetNumber, status: 'queued' });
     }
 
-    const queuedCount = queueResults.filter((r) => r.status === 'queued' || r.status === 'exists').length;
+    const queuedCount = queueResults.filter(
+      (r) => r.status === 'queued' || r.status === 'exists'
+    ).length;
     await schedulerRef.set(
       {
         lastQueuedDate: reportDate,
