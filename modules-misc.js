@@ -576,15 +576,21 @@ async function simpanKontrak(id) {
   if (window._kontrakFile) {
     try {
       toast('⏳ Mengupload file...', 'info');
-      await ensureStorageAuth();
-      const storageUid = getStorageAuthUid();
-      if (!storageUid) throw new Error('Sesi Firebase Auth belum aktif. Coba login ulang.');
-      const path = `kontrak/${storageUid}/${karyawanId}/${Date.now()}_${window._kontrakFileName}`;
+      let storageUid = '';
+      try {
+        await ensureStorageAuth();
+        storageUid = getStorageAuthUid();
+      } catch (authErr) {
+        console.warn('[StorageAuth] Upload fallback to legacy path:', authErr.code || authErr.message);
+      }
+      const path = storageUid
+        ? `kontrak/${storageUid}/${karyawanId}/${Date.now()}_${window._kontrakFileName}`
+        : `kontrak/${karyawanId}/${Date.now()}_${window._kontrakFileName}`;
       const fileURL = await uploadFileToStorage(window._kontrakFile, path);
       data.fileURL = fileURL;
       data.fileName = window._kontrakFileName;
       data.fileSize = window._kontrakFile.size;
-      data.storageUid = storageUid;
+      if (storageUid) data.storageUid = storageUid;
     } catch (e) {
       return toast('Gagal upload file: ' + getStorageErrorMessage(e), 'error');
     }
@@ -761,10 +767,16 @@ async function simpanDokumen() {
   // Upload to Firebase Storage
   try {
     toast('⏳ Mengupload file...', 'info');
-    await ensureStorageAuth();
-    const storageUid = getStorageAuthUid();
-    if (!storageUid) throw new Error('Sesi Firebase Auth belum aktif. Coba login ulang.');
-    const path = `dokumen/${storageUid}/${karyawanId}/${tipeDokumen}_${Date.now()}_${window._dokFileName}`;
+    let storageUid = '';
+    try {
+      await ensureStorageAuth();
+      storageUid = getStorageAuthUid();
+    } catch (authErr) {
+      console.warn('[StorageAuth] Upload fallback to legacy path:', authErr.code || authErr.message);
+    }
+    const path = storageUid
+      ? `dokumen/${storageUid}/${karyawanId}/${tipeDokumen}_${Date.now()}_${window._dokFileName}`
+      : `dokumen/${karyawanId}/${tipeDokumen}_${Date.now()}_${window._dokFileName}`;
     const fileURL = await uploadFileToStorage(window._dokFile, path);
     const data = {
       karyawanId,
@@ -774,9 +786,9 @@ async function simpanDokumen() {
       fileURL,
       fileName: window._dokFileName,
       fileSize: window._dokFile.size,
-      storageUid,
       createdAt: new Date().toISOString(),
     };
+    if (storageUid) data.storageUid = storageUid;
     await db.collection('hrd_dokumen_karyawan').add(data);
     window._dokFile = null;
     window._dokFileName = null;
