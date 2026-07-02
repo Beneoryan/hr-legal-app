@@ -60,6 +60,9 @@ async function deleteFileFromStorage(url) {
 
 function getStorageErrorMessage(error) {
   const code = error && error.code ? error.code : '';
+  if (code === 'auth/admin-restricted-operation' || code === 'auth/operation-not-allowed') {
+    return 'Firebase Anonymous Auth belum aktif. Login aplikasi tetap bisa, tapi upload file butuh Anonymous Auth di Firebase Console.';
+  }
   if (code === 'storage/unauthorized' || code === 'storage/permission-denied') {
     return 'Akses upload ditolak Firebase Storage. Cek Storage Rules atau App Check.';
   }
@@ -245,7 +248,9 @@ async function initApp() {
       currentUser = JSON.parse(saved);
       const adminRoles = ['admin', 'bod', 'head', 'manager'];
       currentPage = adminRoles.includes(currentUser.role) ? 'dashboard' : 'portal';
-      await ensureStorageAuth();
+      ensureStorageAuth().catch((e) => {
+        console.warn('[StorageAuth] init skipped:', e.code || e.message);
+      });
       renderApp();
     } catch (e) {
       renderLogin();
@@ -277,7 +282,9 @@ async function doLogin(username, password) {
   if (data.status === 'nonaktif') throw new Error('Akun dinonaktifkan');
   currentUser = { id: doc.id, ...data };
   localStorage.setItem('hrd_session', JSON.stringify(currentUser));
-  await ensureStorageAuth();
+  ensureStorageAuth().catch((e) => {
+    console.warn('[StorageAuth] login skipped:', e.code || e.message);
+  });
   // Langsung ke beranda - admin/bod/head/manager get dashboard, leader/staff get portal
   const adminRoles = ['admin', 'bod', 'head', 'manager'];
   currentPage = adminRoles.includes(currentUser.role) ? 'dashboard' : 'portal';
