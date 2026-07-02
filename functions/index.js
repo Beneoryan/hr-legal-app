@@ -489,15 +489,32 @@ exports.autoQueueDailyReportWa = functions.pubsub
     const targetMinute = parseTimeToMinuteOfDay(cfg.waAutoReportTime || '18:00');
     const nowMinute = nowParts.minuteOfDay;
 
-    // Run only in a 15-minute window to match schedule cadence.
-    if (!(nowMinute >= targetMinute && nowMinute < targetMinute + 15)) return null;
+    if (nowMinute < targetMinute) return null;
 
     const reportDate = nowParts.date;
-    const outboxId = `auto_daily_report_${reportDate}`.replace(/-/g, '_');
-    const outboxRef = db.collection('hrd_wa_outbox').doc(outboxId);
+    const schedulerRef = db.collection('hrd_scheduler_state').doc('daily_report');
+    const schedulerSnap = await schedulerRef.get();
+    const schedulerState = schedulerSnap.exists ? schedulerSnap.data() || {} : {};
+    if (schedulerState.lastQueuedDate === reportDate && schedulerState.status === 'queued') {
+      return null;
+    }
+    if (schedulerState.lastQueuedDate === reportDate && schedulerState.status === 'processing') {
+      const updatedAt = schedulerState.updatedAt ? new Date(schedulerState.updatedAt).getTime() : 0;
+      if (updatedAt && Date.now() - updatedAt < 30 * 60 * 1000) {
+        return null;
+      }
+    }
 
-    const outboxSnap = await outboxRef.get();
-    if (outboxSnap.exists) return null;
+    await schedulerRef.set(
+      {
+        lastQueuedDate: reportDate,
+        status: 'processing',
+        targetMinute,
+        autoScheduleTime: cfg.waAutoReportTime || '18:00',
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
 
     const reportSnap = await db
       .collection('hrd_daily_tasks')
@@ -509,31 +526,43 @@ exports.autoQueueDailyReportWa = functions.pubsub
     reportSnap.forEach((d) => reports.push(d.data()));
     const message = buildDailyReportSummaryMessage(reportDate, reports);
     const createdAt = new Date().toISOString();
-    const writes = [];
-    targetNumbers.forEach((targetNumber, idx) => {
-      const docId =
-        idx === 0
-          ? outboxId
-          : `${outboxId}_${targetNumber.slice(Math.max(0, targetNumber.length - 6))}`;
-      writes.push(
-        db
-          .collection('hrd_wa_outbox')
-          .doc(docId)
-          .create({
-            targetNumber,
-            message,
-            type: 'daily_report_summary_auto',
-            requestedBy: 'system_scheduler',
-            requestedById: 'system',
-            createdAt,
-            status: 'queued',
-            reportDate,
-            autoScheduleTime: cfg.waAutoReportTime || '18:00',
-          })
-      );
-    });
+    const queueResults = [];
+    for (let idx = 0; idx < targetNumbers.length; idx++) {
+      const targetNumber = targetNumbers[idx];
+      const docId = `auto_daily_report_${reportDate}_${targetNumber}`.replace(/-/g, '_');
+      const docRef = db.collection('hrd_wa_outbox').doc(docId);
+      const existingDoc = await docRef.get();
+      if (existingDoc.exists) {
+        queueResults.push({ targetNumber, status: 'exists' });
+        continue;
+      }
+      await docRef.set({
+        targetNumber,
+        message,
+        type: 'daily_report_summary_auto',
+        requestedBy: 'system_scheduler',
+        requestedById: 'system',
+        createdAt,
+        status: 'queued',
+        reportDate,
+        autoScheduleTime: cfg.waAutoReportTime || '18:00',
+      });
+      queueResults.push({ targetNumber, status: 'queued' });
+    }
 
-    await Promise.allSettled(writes);
+    const queuedCount = queueResults.filter((r) => r.status === 'queued' || r.status === 'exists').length;
+    await schedulerRef.set(
+      {
+        lastQueuedDate: reportDate,
+        status: 'queued',
+        targetMinute,
+        autoScheduleTime: cfg.waAutoReportTime || '18:00',
+        recipients: targetNumbers,
+        queuedCount,
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
 
     return null;
   });
