@@ -3080,14 +3080,7 @@ async function _loadReportSummaryForDate(dateVal) {
           .sort()
           .forEach(function (kat) {
             var items = katMap[kat];
-            // Get the valid categories for this division
-            var validCats = REPORT_CATEGORIES[dept] || [];
-            var katLabel =
-              kat === 'UMUM' && !validCats.length
-                ? 'UMUM'
-                : validCats.includes(kat)
-                  ? kat
-                  : kat;
+            var katLabel = kat;
             htmlContent +=
               '<div style="margin-bottom:12px;background:#f8f9ff;border-radius:8px;padding:10px 12px">' +
               '<div style="font-weight:600;font-size:.82rem;color:#1565c0;margin-bottom:6px;border-bottom:1px solid #d0d9ff;padding-bottom:4px">' +
