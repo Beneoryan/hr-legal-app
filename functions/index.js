@@ -19,6 +19,25 @@ function normalizeWaNumber(raw) {
   return digits;
 }
 
+function parseWaNumbers(raw) {
+  const items = Array.isArray(raw) ? raw : String(raw || '').split(/[\n,;]+/);
+  const seen = new Set();
+  const out = [];
+  items.forEach((it) => {
+    const n = normalizeWaNumber(it);
+    if (!n || seen.has(n)) return;
+    seen.add(n);
+    out.push(n);
+  });
+  return out;
+}
+
+function getConfiguredWaRecipients(cfg = {}) {
+  const fromList = parseWaNumbers(cfg.whatsappList || []);
+  if (fromList.length) return fromList;
+  return parseWaNumbers(cfg.whatsapp || cfg.telepon || '');
+}
+
 function getJakartaDateParts(date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Jakarta',
@@ -117,7 +136,9 @@ function buildDailyReportSummaryMessage(reportDate, reports) {
         const nama = (r.targetUserName || r.nama || '-').toUpperCase();
         let prog = parseInt(r.progress, 10);
         if (Number.isNaN(prog)) prog = 0;
-        const aktivitas = String(r.aktivitas || '-').split('\n')[0].substring(0, 70);
+        const aktivitas = String(r.aktivitas || '-')
+          .split('\n')[0]
+          .substring(0, 70);
         text += `  • ${nama} (${prog}%) — ${aktivitas}\n`;
       });
       text += '\n';
@@ -461,8 +482,8 @@ exports.autoQueueDailyReportWa = functions.pubsub
     const enabled = typeof cfg.waAutoReportEnabled === 'boolean' ? cfg.waAutoReportEnabled : true;
     if (!enabled) return null;
 
-    const targetNumber = normalizeWaNumber(cfg.whatsapp || cfg.telepon || '');
-    if (!targetNumber) return null;
+    const targetNumbers = getConfiguredWaRecipients(cfg);
+    if (!targetNumbers.length) return null;
 
     const nowParts = getJakartaDateParts(new Date());
     const targetMinute = parseTimeToMinuteOfDay(cfg.waAutoReportTime || '18:00');
@@ -487,18 +508,32 @@ exports.autoQueueDailyReportWa = functions.pubsub
     const reports = [];
     reportSnap.forEach((d) => reports.push(d.data()));
     const message = buildDailyReportSummaryMessage(reportDate, reports);
-
-    await outboxRef.set({
-      targetNumber,
-      message,
-      type: 'daily_report_summary_auto',
-      requestedBy: 'system_scheduler',
-      requestedById: 'system',
-      createdAt: new Date().toISOString(),
-      status: 'queued',
-      reportDate,
-      autoScheduleTime: cfg.waAutoReportTime || '18:00',
+    const createdAt = new Date().toISOString();
+    const writes = [];
+    targetNumbers.forEach((targetNumber, idx) => {
+      const docId =
+        idx === 0
+          ? outboxId
+          : `${outboxId}_${targetNumber.slice(Math.max(0, targetNumber.length - 6))}`;
+      writes.push(
+        db
+          .collection('hrd_wa_outbox')
+          .doc(docId)
+          .create({
+            targetNumber,
+            message,
+            type: 'daily_report_summary_auto',
+            requestedBy: 'system_scheduler',
+            requestedById: 'system',
+            createdAt,
+            status: 'queued',
+            reportDate,
+            autoScheduleTime: cfg.waAutoReportTime || '18:00',
+          })
+      );
     });
+
+    await Promise.allSettled(writes);
 
     return null;
   });

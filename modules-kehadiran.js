@@ -3298,26 +3298,30 @@ async function shareReportWA() {
     toast('Tidak ada data untuk di-share', 'warning');
     return;
   }
-  var waNumber = await getRegisteredWhatsAppNumber();
-  if (!waNumber) {
+  var waNumbers = await getRegisteredWhatsAppNumbers();
+  if (!waNumbers.length) {
     toast('Nomor WhatsApp admin belum terdaftar di Data Perusahaan.', 'warning');
     return;
   }
   try {
-    await db.collection('hrd_wa_outbox').add({
-      targetNumber: waNumber,
-      message: text,
-      type: 'daily_report_summary',
-      requestedBy: currentUser?.nama || 'system',
-      requestedById: currentUser?.id || '',
-      createdAt: new Date().toISOString(),
-      status: 'queued',
-    });
-    toast('Report masuk antrian kirim WA nomor admin.', 'success');
+    await Promise.all(
+      waNumbers.map(function (waNumber) {
+        return db.collection('hrd_wa_outbox').add({
+          targetNumber: waNumber,
+          message: text,
+          type: 'daily_report_summary',
+          requestedBy: currentUser?.nama || 'system',
+          requestedById: currentUser?.id || '',
+          createdAt: new Date().toISOString(),
+          status: 'queued',
+        });
+      })
+    );
+    toast('Report masuk antrian kirim WA ke ' + waNumbers.length + ' nomor admin.', 'success');
   } catch (e) {
     console.warn('[WA Outbox] Queue failed, fallback to wa.me:', e.message);
     toast('Gagal enqueue WA. Membuka share manual sebagai fallback.', 'warning');
-    window.open(buildWhatsAppShareUrl(text, waNumber), '_blank');
+    window.open(buildWhatsAppShareUrl(text, waNumbers[0] || ''), '_blank');
   }
 }
 

@@ -954,7 +954,7 @@ async function renderAkun() {
       <div class="form-group"><label>Email</label><input class="form-control" id="cpEmail" type="email"></div>
     </div>
     <div class="grid-2">
-      <div class="form-group"><label>WhatsApp Admin (Nomor Tujuan Report)</label><input class="form-control" id="cpWhatsapp" placeholder="08xxxxxxxxxx atau 62xxxxxxxxxx"></div>
+      <div class="form-group"><label>WhatsApp Admin (Nomor Tujuan Report, bisa lebih dari 1)</label><input class="form-control" id="cpWhatsapp" placeholder="08xxxxxxxxxx, 08yyyyyyyyyy (pisah koma/baris)"></div>
       <div class="form-group"><label>WA Gateway Provider</label><select class="form-control" id="cpWaProvider"><option value="fonnte">Fonnte</option><option value="generic">Generic API</option></select></div>
     </div>
     <div class="grid-2">
@@ -1007,7 +1007,11 @@ async function loadCompanyData() {
   if (d.kota) document.getElementById('cpKota').value = d.kota;
   if (d.telepon) document.getElementById('cpTelp').value = d.telepon;
   if (d.email) document.getElementById('cpEmail').value = d.email;
-  if (d.whatsapp) document.getElementById('cpWhatsapp').value = d.whatsapp;
+  if (Array.isArray(d.whatsappList) && d.whatsappList.length) {
+    document.getElementById('cpWhatsapp').value = d.whatsappList.join(', ');
+  } else if (d.whatsapp) {
+    document.getElementById('cpWhatsapp').value = d.whatsapp;
+  }
   if (d.waProvider) document.getElementById('cpWaProvider').value = d.waProvider;
   if (d.waApiUrl) document.getElementById('cpWaApiUrl').value = d.waApiUrl;
   if (d.waApiToken) document.getElementById('cpWaApiToken').value = d.waApiToken;
@@ -1132,6 +1136,7 @@ function applyCrop() {
 }
 
 async function simpanDataPerusahaan() {
+  var waNumbers = parseWhatsAppNumbers(document.getElementById('cpWhatsapp').value);
   const data = {
     nama: document.getElementById('cpNama').value,
     npwp: document.getElementById('cpNpwp').value,
@@ -1139,7 +1144,8 @@ async function simpanDataPerusahaan() {
     kota: document.getElementById('cpKota').value,
     telepon: document.getElementById('cpTelp').value,
     email: document.getElementById('cpEmail').value,
-    whatsapp: document.getElementById('cpWhatsapp').value,
+    whatsapp: waNumbers[0] || '',
+    whatsappList: waNumbers,
     waProvider: document.getElementById('cpWaProvider').value,
     waApiUrl: document.getElementById('cpWaApiUrl').value,
     waApiToken: document.getElementById('cpWaApiToken').value,

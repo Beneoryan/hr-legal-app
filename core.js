@@ -87,20 +87,40 @@ function normalizeWhatsAppNumber(raw) {
   return digits;
 }
 
-async function getRegisteredWhatsAppNumber() {
-  if (typeof window._registeredWaNumber !== 'undefined') return window._registeredWaNumber;
+function parseWhatsAppNumbers(raw) {
+  var items = Array.isArray(raw) ? raw : String(raw || '').split(/[\n,;]+/);
+  var uniq = {};
+  var out = [];
+  items.forEach(function (it) {
+    var n = normalizeWhatsAppNumber(it);
+    if (!n || uniq[n]) return;
+    uniq[n] = true;
+    out.push(n);
+  });
+  return out;
+}
+
+async function getRegisteredWhatsAppNumbers() {
+  if (typeof window._registeredWaNumbers !== 'undefined') return window._registeredWaNumbers;
   try {
     const snap = await db.collection('hrd_settings').doc('perusahaan').get();
     const data = snap.exists ? snap.data() || {} : {};
-    const candidate =
-      data.whatsapp || data.whatsApp || data.wa || data.telepon || data.phone || data.contact || '';
-    window._registeredWaNumber = normalizeWhatsAppNumber(candidate);
-    return window._registeredWaNumber;
+    const rawList =
+      data.whatsappList || data.whatsapp || data.whatsApp || data.wa || data.telepon || '';
+    window._registeredWaNumbers = parseWhatsAppNumbers(rawList);
+    window._registeredWaNumber = window._registeredWaNumbers[0] || '';
+    return window._registeredWaNumbers;
   } catch (e) {
-    console.warn('[WA] Failed to load registered number:', e.message);
+    console.warn('[WA] Failed to load registered number(s):', e.message);
+    window._registeredWaNumbers = [];
     window._registeredWaNumber = '';
-    return '';
+    return [];
   }
+}
+
+async function getRegisteredWhatsAppNumber() {
+  const numbers = await getRegisteredWhatsAppNumbers();
+  return numbers[0] || '';
 }
 
 function buildWhatsAppShareUrl(message, phoneNumber) {
